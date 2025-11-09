@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prompanion Settings</title>
+    <link rel="stylesheet" href="styles/sidepanel.css" />
+    <style>
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+      }
+
+      .options-card {
+        max-width: 520px;
+        width: 100%;
+      }
+
+      .options-card h1 {
+        margin-top: 0;
+        font-size: 22px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="panel options-card">
+      <h1>Manage your Prompanion account in the side panel</h1>
+      <p>
+        Additional configuration options will arrive in a future milestone. For now, open
+        the extension side panel to adjust enhancement tone, style, and complexity.
+      </p>
+      <button class="btn btn--primary" id="open-sidepanel">Open Side Panel</button>
+    </div>
+
+    <script type="module">
+      document.getElementById("open-sidepanel").addEventListener("click", async () => {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.id) {
+          return;
+        }
+        await chrome.sidePanel.open({ tabId: tab.id });
+      });
+    </script>
+  </body>
+</html>
+

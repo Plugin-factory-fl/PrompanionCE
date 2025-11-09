@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prompanion Prompt Enhancer</title>
+    <link rel="stylesheet" href="styles/sidepanel.css" />
+  </head>
+  <body>
+    <div class="panel">
+      <header class="panel__header">
+        <div class="panel__brand">
+          <div class="brand__mark">P</div>
+          <div class="brand__meta">
+            <span class="brand__name">Prompanion</span>
+            <span class="brand__tagline">AI Prompt Enhancer</span>
+          </div>
+        </div>
+        <div class="panel__actions">
+          <button class="btn btn--ghost" id="open-settings" aria-label="Settings">
+            <span class="icon icon--settings"></span>
+          </button>
+        </div>
+      </header>
+
+      <section class="panel__section panel__section--status">
+        <div class="status-card">
+          <div class="status-card__label">Plan</div>
+          <div class="status-card__value" id="user-plan">Freemium</div>
+        </div>
+        <div class="status-card">
+          <div class="status-card__label">Enhancements used</div>
+          <div class="status-card__value">
+            <span id="enhancements-count">3</span>/<span id="enhancements-limit">10</span>
+          </div>
+        </div>
+        <div class="status-card status-card--highlight">
+          <div class="status-card__label">Platform</div>
+          <div class="status-card__value" id="active-platform">ChatGPT</div>
+        </div>
+      </section>
+
+      <section class="panel__section panel__section--prompt">
+        <div class="section-heading">
+          <h2>Prompt Enhancer</h2>
+          <div class="section-heading__actions">
+            <button class="btn btn--primary" id="enhance-btn">Enhance Prompt</button>
+          </div>
+        </div>
+
+        <div class="prompt-preview">
+          <div class="prompt-preview__column">
+            <h3>Original</h3>
+            <textarea class="prompt-textarea" id="original-prompt" readonly></textarea>
+            <div class="prompt-preview__actions">
+              <button class="btn btn--ghost" data-copy="original">Copy</button>
+            </div>
+          </div>
+          <div class="prompt-preview__column">
+            <h3>Option A</h3>
+            <textarea class="prompt-textarea" id="option-a" readonly></textarea>
+            <div class="prompt-preview__actions">
+              <button class="btn btn--ghost" data-copy="option-a">Copy</button>
+              <button class="btn btn--ghost" data-replace="option-a">Replace</button>
+            </div>
+          </div>
+          <div class="prompt-preview__column">
+            <h3>Option B</h3>
+            <textarea class="prompt-textarea" id="option-b" readonly></textarea>
+            <div class="prompt-preview__actions">
+              <button class="btn btn--ghost" data-copy="option-b">Copy</button>
+              <button class="btn btn--ghost" data-replace="option-b">Replace</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel__section panel__section--chat">
+        <div class="section-heading">
+          <h2>Side Chat</h2>
+          <div class="section-heading__actions">
+            <select id="adapter-select" class="select">
+              <option value="chatgpt">ChatGPT</option>
+              <option value="gemini">Gemini</option>
+              <option value="claude">Claude</option>
+              <option value="grok">Grok</option>
+              <option value="deepseek">Deepseek</option>
+              <option value="midjourney">Midjourney</option>
+              <option value="sora">Sora</option>
+              <option value="kling">Kling</option>
+            </select>
+          </div>
+        </div>
+        <div class="chat-window" id="chat-window">
+          <!-- Messages injected via JS -->
+        </div>
+        <form class="chat-input" id="chat-form">
+          <textarea
+            id="chat-message"
+            class="chat-input__textarea"
+            placeholder="Ask Prompanion for refinements..."
+            rows="2"
+            required
+          ></textarea>
+          <button type="submit" class="btn btn--primary">Send</button>
+        </form>
+      </section>
+
+      <section class="panel__section panel__section--library">
+        <div class="section-heading">
+          <h2>Prompt Library</h2>
+          <div class="section-heading__actions">
+            <button class="btn btn--ghost" id="add-prompt">Save current</button>
+          </div>
+        </div>
+        <ul class="prompt-library" id="prompt-library">
+          <!-- Library items injected via JS -->
+        </ul>
+      </section>
+    </div>
+
+    <dialog id="settings-dialog" class="modal">
+      <form method="dialog" class="modal__content">
+        <header class="modal__header">
+          <h2>Enhancement Settings</h2>
+          <button class="btn btn--ghost modal__close" value="cancel" aria-label="Close settings">
+            <span class="icon icon--close"></span>
+          </button>
+        </header>
+        <div class="modal__body">
+          <label class="form-field">
+            <span class="form-field__label">Tone</span>
+            <select id="setting-tone" class="select">
+              <option value="neutral">Neutral</option>
+              <option value="friendly">Friendly</option>
+              <option value="professional">Professional</option>
+              <option value="persuasive">Persuasive</option>
+            </select>
+          </label>
+
+          <label class="form-field">
+            <span class="form-field__label">Style</span>
+            <select id="setting-style" class="select">
+              <option value="concise">Concise</option>
+              <option value="detailed">Detailed</option>
+              <option value="storytelling">Storytelling</option>
+            </select>
+          </label>
+
+          <label class="form-field">
+            <span class="form-field__label">Complexity</span>
+            <input type="range" id="setting-complexity" min="1" max="5" value="3" />
+            <span class="range-output" data-for="setting-complexity">3</span>
+          </label>
+        </div>
+        <footer class="modal__footer">
+          <button class="btn btn--ghost" value="cancel">Cancel</button>
+          <button class="btn btn--primary" value="confirm">Save</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <template id="library-item-template">
+      <li class="prompt-library__item">
+        <div class="prompt-library__text"></div>
+        <div class="prompt-library__actions">
+          <button class="btn btn--ghost prompt-library__use">Use</button>
+          <button class="btn btn--ghost prompt-library__copy">Copy</button>
+          <button class="btn btn--ghost prompt-library__delete">Delete</button>
+        </div>
+      </li>
+    </template>
+
+    <script type="module" src="scripts/sidepanel.js"></script>
+  </body>
+</html>
+

@@ -1,0 +1,69 @@
+{
+  "manifest_version": 3,
+  "name": "Prompanion Prompt Enhancer",
+  "description": "Real-time AI prompt enhancement side panel for supported AI chat platforms.",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "Prompanion Prompt Enhancer",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "permissions": [
+    "scripting",
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "options_page": "options.html",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "sidepanel.html",
+        "styles/sidepanel.css",
+        "scripts/sidepanel.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["scripts/injector.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chatgpt.com/*", "https://*.chatgpt.com/*"],
+      "js": ["adapters/ChatGPT/adapter.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "open-sidepanel": {
+      "suggested_key": {
+        "default": "Alt+Shift+P"
+      },
+      "description": "Open Prompanion side panel"
+    }
+  }
+}
+
