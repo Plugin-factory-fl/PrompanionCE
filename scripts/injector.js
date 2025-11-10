@@ -1,5 +1,6 @@
 const PANEL_CONTAINER_ID = "prompanion-sidepanel-container";
 const PANEL_VISIBLE_CLASS = "prompanion-sidepanel-visible";
+const PANEL_PUSH_CLASS = "prompanion-sidepanel-push";
 
 function ensureStyles() {
   if (document.getElementById(`${PANEL_CONTAINER_ID}-style`)) {
@@ -54,10 +55,27 @@ function ensureStyles() {
       box-shadow: -8px 0 14px rgba(17, 24, 39, 0.35);
       padding: 0;
       font-size: 18px;
+      visibility: hidden;
+      pointer-events: none;
+      transition: visibility 0s linear 160ms, opacity 160ms ease;
+      opacity: 0;
     }
 
     #${PANEL_CONTAINER_ID} .prompanion-close:hover {
       background: #162036;
+    }
+
+    #${PANEL_CONTAINER_ID}.${PANEL_VISIBLE_CLASS} .prompanion-close {
+      visibility: visible;
+      pointer-events: auto;
+      transition-delay: 0s;
+      opacity: 1;
+    }
+
+    body.${PANEL_PUSH_CLASS} {
+      margin-right: min(546px, 94vw);
+      transition: margin-right 160ms ease-in-out;
+      overflow-x: hidden;
     }
   `;
 
@@ -81,7 +99,7 @@ function createPanel() {
   closeButton.textContent = "×";
   closeButton.title = "Close Prompanion";
   closeButton.addEventListener("click", () => {
-    container.classList.remove(PANEL_VISIBLE_CLASS);
+    closePanel(container);
   });
 
   const iframe = document.createElement("iframe");
@@ -93,9 +111,53 @@ function createPanel() {
   return container;
 }
 
+function updatePanelOffset(container, willShow) {
+  const width = willShow ? container.getBoundingClientRect().width : 0;
+  document.documentElement.style.setProperty("--prompanion-panel-width", `${width}px`);
+}
+
 function togglePanel() {
   const container = createPanel();
-  container.classList.toggle(PANEL_VISIBLE_CLASS);
+  const willShow = !container.classList.contains(PANEL_VISIBLE_CLASS);
+  container.classList.toggle(PANEL_VISIBLE_CLASS, willShow);
+  if (willShow) {
+    document.documentElement.classList.add(PANEL_PUSH_CLASS);
+    document.body.classList.add(PANEL_PUSH_CLASS);
+  } else {
+    document.documentElement.classList.remove(PANEL_PUSH_CLASS);
+    document.body.classList.remove(PANEL_PUSH_CLASS);
+  }
+  requestAnimationFrame(() => {
+    updatePanelOffset(container, willShow);
+    const notify = () => window.dispatchEvent(new CustomEvent("prompanion-panel-resize"));
+    notify();
+    setTimeout(notify, 180);
+  });
+}
+
+function openPanel() {
+  const container = createPanel();
+  container.classList.add(PANEL_VISIBLE_CLASS);
+  document.documentElement.classList.add(PANEL_PUSH_CLASS);
+  document.body.classList.add(PANEL_PUSH_CLASS);
+  requestAnimationFrame(() => {
+    updatePanelOffset(container, true);
+    const notify = () => window.dispatchEvent(new CustomEvent("prompanion-panel-resize"));
+    notify();
+    setTimeout(notify, 180);
+  });
+}
+
+function closePanel(container) {
+  container.classList.remove(PANEL_VISIBLE_CLASS);
+  document.documentElement.classList.remove(PANEL_PUSH_CLASS);
+  document.body.classList.remove(PANEL_PUSH_CLASS);
+  requestAnimationFrame(() => {
+    updatePanelOffset(container, false);
+    const notify = () => window.dispatchEvent(new CustomEvent("prompanion-panel-resize"));
+    notify();
+    setTimeout(notify, 180);
+  });
 }
 
 chrome.runtime.onMessage.addListener((message) => {
@@ -105,6 +167,11 @@ chrome.runtime.onMessage.addListener((message) => {
 
   if (message.type === "PROMPANION_TOGGLE_PANEL") {
     togglePanel();
+    return;
+  }
+
+  if (message.type === "PROMPANION_OPEN_PANEL") {
+    openPanel();
   }
 });
 

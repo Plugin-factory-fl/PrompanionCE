@@ -40,7 +40,8 @@
       "resources": [
         "sidepanel.html",
         "styles/sidepanel.css",
-        "scripts/sidepanel.js"
+        "scripts/sidepanel.js",
+        "icons/icon48.png"
       ],
       "matches": ["<all_urls>"]
     }
@@ -52,8 +53,13 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://chatgpt.com/*", "https://*.chatgpt.com/*"],
-      "js": ["adapters/ChatGPT/adapter.js"],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://*.chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://*.chat.openai.com/*"
+      ],
+      "js": ["Adapters/ChatGPT/adapter.js"],
       "run_at": "document_idle"
     }
   ],
