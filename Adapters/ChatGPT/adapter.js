@@ -1,6 +1,5 @@
 const BUTTON_ID = "prompanion-chatgpt-trigger";
 const BUTTON_CLASS = "prompanion-chatgpt-trigger";
-const PANEL_STATE_KEY = "prompanion-sidepanel-state";
 const SELECTION_TOOLBAR_ID = "prompanion-selection-toolbar";
 const SELECTION_TOOLBAR_VISIBLE_CLASS = "is-visible";
 const HIGHLIGHT_BUTTON_SELECTORS = [
@@ -9,19 +8,19 @@ const HIGHLIGHT_BUTTON_SELECTORS = [
   "button[aria-label='Ask ChatGPT']",
   "button[aria-label='Ask ChatGPT automatically']"
 ];
-let domObserverStarted = false;
-let buttonInitialized = false;
-const tooltipRegistry = new WeakMap();
 
-  location: window.location.href,
-  documentReadyState: document.readyState
-});
+const BUTTON_SIZE = {
+  wrapper: "44px",
+  element: "39px",
+  icon: "34px"
+};
+let domObserverStarted = false;
+const tooltipRegistry = new WeakMap();
 
 let enhanceTooltipElement = null;
 let enhanceTooltipTimer = null;
 let enhanceTooltipDismissed = false;
 let enhanceTooltipActiveTextarea = null;
-let enhanceTooltipContainer = null;
 let lastEnhanceTextSnapshot = "";
 let enhanceTooltipResizeHandler = null;
 let floatingButtonElement = null;
@@ -30,6 +29,7 @@ let floatingButtonTargetContainer = null;
 let floatingButtonTargetInput = null;
 let enhanceActionInFlight = false;
 let selectionAskInFlight = false;
+let tooltipClickInProgress = false;
 let selectionToolbarElement = null;
 let selectionToolbarButton = null;
 let selectionToolbarText = "";
@@ -43,8 +43,8 @@ const styles = `
     justify-content: center;
     border: none;
     border-radius: 50%;
-    width: 36px;
-    height: 36px;
+    width: ${BUTTON_SIZE.wrapper};
+    height: ${BUTTON_SIZE.wrapper};
     padding: 0;
     background: linear-gradient(135deg, #10152b, #1f2a44);
     box-shadow: 0 6px 16px rgba(31, 42, 68, 0.25);
@@ -63,8 +63,8 @@ const styles = `
   }
 
   .${BUTTON_CLASS}__icon {
-    width: 28px;
-    height: 28px;
+    width: ${BUTTON_SIZE.icon};
+    height: ${BUTTON_SIZE.icon};
     border-radius: 50%;
     display: block;
     background-color: #162036;
@@ -188,9 +188,13 @@ function ensureStyle() {
     style.id = `${BUTTON_ID}-style`;
     document.head.append(style);
   }
-  if (style.textContent !== styles) {
-    style.textContent = styles;
-  }
+  if (style.textContent !== styles) style.textContent = styles;
+}
+
+function getElementFromNode(node) {
+  if (!node) return null;
+  if (node.nodeType === Node.TEXT_NODE) return node.parentElement;
+  return node instanceof HTMLElement ? node : null;
 }
 
 function getHighlightButton() {
@@ -204,155 +208,91 @@ function getHighlightButton() {
 }
 
 function nodeInAssistantMessage(node) {
-  if (!node) {
-    return false;
-  }
-  const element =
-    node.nodeType === Node.TEXT_NODE ? node.parentElement : node instanceof HTMLElement ? node : null;
-  if (!element) {
-    return false;
-  }
-  if (element.closest("[data-message-author-role='assistant']")) {
-    return true;
-  }
-  if (element.closest("[data-testid^='conversation-turn'][data-message-author-role='assistant']")) {
-    return true;
-  }
-  if (element.closest("[data-testid='assistant-turn']")) {
-    return true;
-  }
-  const article = element.closest("article");
-  if (article && article.closest("main")) {
-    return true;
-  }
-  return false;
+  const element = getElementFromNode(node);
+  if (!element) return false;
+  return !!(
+    element.closest("[data-message-author-role='assistant']") ||
+    element.closest("[data-testid='assistant-turn']") ||
+    element.closest("article")?.closest("main")
+  );
 }
 
 function selectionTargetsAssistant(selection) {
-  if (!selection) {
-    return false;
-  }
-  if (nodeInAssistantMessage(selection.anchorNode)) {
+  if (!selection) return false;
+  if (nodeInAssistantMessage(selection.anchorNode) || nodeInAssistantMessage(selection.focusNode)) {
     return true;
   }
-  if (nodeInAssistantMessage(selection.focusNode)) {
-    return true;
-  }
-  // Walk through range common ancestor for nested text nodes.
   try {
     const range = selection.rangeCount ? selection.getRangeAt(0) : null;
-    if (range) {
-      return nodeInAssistantMessage(range.commonAncestorContainer);
-    }
-  } catch (error) {
-    // noop
+    return range ? nodeInAssistantMessage(range.commonAncestorContainer) : false;
+  } catch {
+    return false;
   }
-  return false;
 }
 
 function ensureHighlightObserver() {
-  if (highlightObserver || !document.body) {
-    return;
-  }
+  if (highlightObserver || !document.body) return;
   highlightObserver = new MutationObserver(() => {
-    if (getHighlightButton()) {
-      requestSelectionToolbarUpdate();
-    }
+    if (getHighlightButton()) requestSelectionToolbarUpdate();
   });
   highlightObserver.observe(document.body, { childList: true, subtree: true });
 }
 
-function findAskChatGPTSelectionButton() {
-  for (const selector of ASK_CHATGPT_SELECTORS) {
-    const candidate = document.querySelector(selector);
-    if (candidate instanceof HTMLButtonElement) {
-      return candidate;
-    }
-  }
-  const buttons = Array.from(document.querySelectorAll("button"));
-  return buttons.find((button) => {
-    const label = button.textContent?.toLowerCase().replace(/\s+/g, " ").trim() ?? "";
-    return label === "ask chatgpt automatically" || label === "ask chatgpt";
-  });
-}
-
 function nodeInComposer(node) {
-  if (!node) {
-    return false;
-  }
-  const element =
-    node.nodeType === Node.TEXT_NODE ? node.parentElement : node instanceof HTMLElement ? node : null;
-  if (!element) {
-    return false;
-  }
-  return Boolean(
+  const element = getElementFromNode(node);
+  if (!element) return false;
+  return !!(
     element.closest("[data-testid='conversation-turn-textbox']") ||
-      element.closest("[data-testid='composer-container']") ||
-      element.closest("form[data-testid='composer']")
+    element.closest("[data-testid='composer-container']") ||
+    element.closest("form[data-testid='composer']")
   );
 }
 
 function selectionWithinComposer(selection) {
-  if (!selection) {
-    return false;
-  }
-  return nodeInComposer(selection.anchorNode) || nodeInComposer(selection.focusNode);
+  return selection && (nodeInComposer(selection.anchorNode) || nodeInComposer(selection.focusNode));
 }
 
 function ensureSelectionToolbar() {
-  if (selectionToolbarElement) {
-    return selectionToolbarElement;
-  }
+  if (selectionToolbarElement) return selectionToolbarElement;
   const toolbar = document.createElement("div");
   toolbar.id = SELECTION_TOOLBAR_ID;
-
   const button = document.createElement("button");
   button.type = "button";
   button.className = "prompanion-selection-toolbar__button";
   button.textContent = "Ask Prompanion";
-  button.addEventListener("pointerdown", (event) => event.preventDefault());
-  button.addEventListener("mousedown", (event) => event.stopPropagation());
+  button.addEventListener("pointerdown", (e) => e.preventDefault());
+  button.addEventListener("mousedown", (e) => e.stopPropagation());
   button.addEventListener("click", handleSelectionToolbarAction);
-
   toolbar.append(button);
   document.body.append(toolbar);
-
   selectionToolbarElement = toolbar;
   selectionToolbarButton = button;
   return toolbar;
 }
 
 function hideSelectionToolbar() {
-  if (!selectionToolbarElement) {
-    selectionToolbarText = "";
-    return;
+  if (selectionToolbarElement) {
+    selectionToolbarElement.classList.remove(SELECTION_TOOLBAR_VISIBLE_CLASS);
+    selectionToolbarElement.style.visibility = "";
   }
-  selectionToolbarElement.classList.remove(SELECTION_TOOLBAR_VISIBLE_CLASS);
-  selectionToolbarElement.style.visibility = "";
   selectionToolbarText = "";
 }
 
 function getSelectionRect(selection) {
-  if (!selection || selection.rangeCount === 0) {
-    return null;
-  }
+  if (!selection?.rangeCount) return null;
   try {
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
-    if (rect && (rect.width || rect.height)) {
-      return rect;
-    }
+    if (rect?.width || rect?.height) return rect;
     const rects = range.getClientRects();
-    return rects.length ? rects[0] : null;
-  } catch (error) {
+    return rects[0] || null;
+  } catch {
     return null;
   }
 }
 
 function requestSelectionToolbarUpdate() {
-  if (selectionUpdateRaf !== null) {
-    return;
-  }
+  if (selectionUpdateRaf !== null) return;
   selectionUpdateRaf = window.requestAnimationFrame(() => {
     selectionUpdateRaf = null;
     updateSelectionToolbar();
@@ -361,35 +301,15 @@ function requestSelectionToolbarUpdate() {
 
 function updateSelectionToolbar() {
   const selection = window.getSelection();
-  if (!selection || selection.isCollapsed) {
+  const text = selection?.toString().trim();
+  if (!selection || selection.isCollapsed || !text || selectionWithinComposer(selection) || 
+      !selectionTargetsAssistant(selection)) {
     hideSelectionToolbar();
     return;
   }
-
-  const text = selection.toString().trim();
-  if (!text) {
-    hideSelectionToolbar();
-    return;
-  }
-
-  if (selectionWithinComposer(selection)) {
-    hideSelectionToolbar();
-    return;
-  }
-
-  if (!selectionTargetsAssistant(selection)) {
-    hideSelectionToolbar();
-    return;
-  }
-
   const highlightButton = getHighlightButton();
-  if (!highlightButton) {
-    hideSelectionToolbar();
-    return;
-  }
-
   const rangeRect = getSelectionRect(selection);
-  if (!rangeRect) {
+  if (!highlightButton || !rangeRect) {
     hideSelectionToolbar();
     return;
   }
@@ -402,33 +322,11 @@ function updateSelectionToolbar() {
   toolbar.style.visibility = "hidden";
   toolbar.classList.add(SELECTION_TOOLBAR_VISIBLE_CLASS);
 
-  const toolbarWidth = toolbar.offsetWidth;
-  const toolbarHeight = toolbar.offsetHeight;
-  const viewportWidth = document.documentElement.clientWidth;
-  const viewportHeight = document.documentElement.clientHeight;
-
-  const highlightRect = highlightButton.getBoundingClientRect();
-  const baseLeft =
-    highlightRect.left + highlightRect.width / 2 + window.scrollX || rangeRect.left + rangeRect.width / 2 + window.scrollX;
-  let left = baseLeft - toolbarWidth / 2;
-  let top = rangeRect.bottom + window.scrollY + highlightRect.height + 8;
-
-  const minLeft = window.scrollX + 8;
-  const maxLeft = window.scrollX + viewportWidth - toolbarWidth - 8;
-  if (left < minLeft) {
-    left = minLeft;
-  } else if (left > maxLeft) {
-    left = maxLeft;
-  }
-
-  const minTop = window.scrollY + 8;
-  const maxTop = window.scrollY + viewportHeight - toolbarHeight - 8;
-  if (top < minTop) {
-    top = minTop;
-  } else if (top > maxTop) {
-    top = maxTop;
-  }
-
+  const { offsetWidth: w, offsetHeight: h } = toolbar;
+  const { clientWidth: vw, clientHeight: vh } = document.documentElement;
+  const { left: hl, width: hw, height: hh } = highlightButton.getBoundingClientRect();
+  let left = Math.max(window.scrollX + 8, Math.min(window.scrollX + vw - w - 8, hl + hw / 2 + window.scrollX - w / 2));
+  let top = Math.max(window.scrollY + 8, Math.min(window.scrollY + vh - h - 8, rangeRect.bottom + window.scrollY + hh + 8));
   toolbar.style.left = `${Math.round(left)}px`;
   toolbar.style.top = `${Math.round(top)}px`;
   toolbar.style.visibility = "";
@@ -436,27 +334,17 @@ function updateSelectionToolbar() {
 
 function submitSelectionToSideChat(text) {
   const snippet = typeof text === "string" ? text.trim() : "";
-  if (!snippet || selectionAskInFlight) {
-    return;
-  }
-
+  if (!snippet || selectionAskInFlight) return;
   selectionAskInFlight = true;
   try {
-    chrome.runtime.sendMessage(
-      { type: "PROMPANION_SIDECHAT_REQUEST", text: snippet },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          console.warn(
-            "Prompanion: failed to request sidechat from selection",
-            chrome.runtime.lastError
-          );
-        } else if (!response?.ok) {
-          console.warn("Prompanion: sidechat request rejected", response?.reason);
-        } else {
-        }
-        selectionAskInFlight = false;
+    chrome.runtime.sendMessage({ type: "PROMPANION_SIDECHAT_REQUEST", text: snippet }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.warn("Prompanion: failed to request sidechat from selection", chrome.runtime.lastError);
+      } else if (!response?.ok) {
+        console.warn("Prompanion: sidechat request rejected", response?.reason);
       }
-    );
+      selectionAskInFlight = false;
+    });
   } catch (error) {
     console.error("Prompanion: sidechat request threw synchronously", error);
     selectionAskInFlight = false;
@@ -477,18 +365,14 @@ function handleSelectionChange() {
 
 function setButtonTextContent(button, text) {
   const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
-  let replaced = false;
   while (walker.nextNode()) {
     const node = walker.currentNode;
-    if (node.textContent && node.textContent.trim()) {
+    if (node.textContent?.trim()) {
       node.textContent = text;
-      replaced = true;
-      break;
+      return;
     }
   }
-  if (!replaced) {
-    button.textContent = text;
-  }
+  button.textContent = text;
 }
 
 function createIcon() {
@@ -503,12 +387,7 @@ function createIcon() {
 
 function requestPromptEnhancement(promptText) {
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage(
-      {
-        type: "PROMPANION_PREPARE_ENHANCEMENT",
-        prompt: promptText,
-        openPanel: true
-      },
+    chrome.runtime.sendMessage({ type: "PROMPANION_PREPARE_ENHANCEMENT", prompt: promptText, openPanel: false },
       (response) => {
         if (chrome.runtime.lastError) {
           console.warn("Prompanion: enhancement request failed", chrome.runtime.lastError);
@@ -516,22 +395,17 @@ function requestPromptEnhancement(promptText) {
           return;
         }
         resolve(response ?? { ok: false });
-      }
-    );
+      });
   });
 }
 
 function setComposerText(node, text) {
-  if (!node) {
-    return false;
-  }
-
+  if (!node) return false;
   if (node instanceof HTMLTextAreaElement) {
     node.value = text;
     node.dispatchEvent(new Event("input", { bubbles: true }));
     return true;
   }
-
   if (node.isContentEditable) {
     node.focus();
     node.textContent = text;
@@ -546,104 +420,34 @@ function setComposerText(node, text) {
     node.dispatchEvent(new InputEvent("input", { bubbles: true, data: text, inputType: "insertText" }));
     return true;
   }
-
   return false;
-}
-
-function requestPanelOpen() {
-  chrome.runtime.sendMessage({ type: "PROMPANION_OPEN_PANEL" }, (response) => {
-    if (chrome.runtime.lastError) {
-      console.warn("Prompanion: failed to request panel open", chrome.runtime.lastError);
-      return;
-    }
-    if (!response?.ok) {
-      console.warn("Prompanion: open panel rejected", response?.reason);
-    } else {
-    }
-  });
-}
-
-function handleTooltipEnhanceAction(event) {
-  event.preventDefault();
-  event.stopPropagation();
-
-  if (enhanceActionInFlight) {
-    return;
-  }
-
-  const composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
-  const promptText = extractInputText();
-  if (!promptText.trim()) {
-    return;
-  }
-
-  enhanceActionInFlight = true;
-    promptLength: promptText.length,
-    snippet: promptText.slice(0, 24)
-  });
-  enhanceTooltipDismissed = true;
-  hideEnhanceTooltip();
-
-  requestPromptEnhancement(promptText)
-    .then((result) => {
-      const refinedText =
-        result?.ok && typeof result.optionA === "string" && result.optionA.trim()
-          ? result.optionA.trim()
-          : `${promptText}\n\n(Refined draft ready once your API key is configured.)`;
-      const applied = setComposerText(composerNode, refinedText);
-      requestPanelOpen();
-    })
-    .catch((error) => {
-      console.error("Prompanion: refine request threw", error);
-      const applied = setComposerText(
-        composerNode,
-        `${promptText}\n\n(Unable to refine right now. Check your API key in the sidebar settings.)`
-      );
-      requestPanelOpen();
-    })
-    .finally(() => {
-      enhanceActionInFlight = false;
-    });
 }
 
 function buildButton() {
   ensureStyle();
-
   const button = document.createElement("button");
   button.id = BUTTON_ID;
   button.type = "button";
   button.className = BUTTON_CLASS;
   button.append(createIcon());
   attachTooltip(button);
-
-  button.addEventListener("click", () => {
-    chrome.runtime.sendMessage({ type: "PROMPANION_TOGGLE_PANEL" }).catch((error) => {
-      console.error("Prompanion: failed to open sidebar from ChatGPT adapter", error);
-    });
-  });
-
+  button.addEventListener("click", () => chrome.runtime.sendMessage({ type: "PROMPANION_TOGGLE_PANEL" })
+    .catch((e) => console.error("Prompanion: failed to open sidebar from ChatGPT adapter", e)));
   button.addEventListener("mouseenter", () => showTooltip(button));
   button.addEventListener("focus", () => showTooltip(button));
   button.addEventListener("mouseleave", () => hideTooltip(button));
   button.addEventListener("blur", () => hideTooltip(button));
-
-  buttonInitialized = true;
   return button;
 }
 
 function ensureFloatingButton() {
   if (floatingButtonWrapper && floatingButtonElement) {
-    floatingButtonWrapper.style.width = "36px";
-    floatingButtonWrapper.style.height = "36px";
-    floatingButtonElement.style.width = "32px";
-    floatingButtonElement.style.height = "32px";
+    floatingButtonWrapper.style.width = floatingButtonWrapper.style.height = BUTTON_SIZE.wrapper;
+    floatingButtonElement.style.width = floatingButtonElement.style.height = BUTTON_SIZE.element;
     return;
   }
-
   ensureStyle();
-
   floatingButtonWrapper = document.getElementById(`${BUTTON_ID}-wrapper`);
-
   if (!floatingButtonWrapper) {
     floatingButtonWrapper = document.createElement("div");
     floatingButtonWrapper.id = `${BUTTON_ID}-wrapper`;
@@ -654,25 +458,14 @@ function ensureFloatingButton() {
     floatingButtonWrapper.style.alignItems = "center";
     floatingButtonWrapper.style.justifyContent = "center";
   }
-
-  floatingButtonWrapper.style.width = "36px";
-  floatingButtonWrapper.style.height = "36px";
-
+  floatingButtonWrapper.style.width = floatingButtonWrapper.style.height = BUTTON_SIZE.wrapper;
   floatingButtonElement = document.getElementById(BUTTON_ID) ?? buildButton();
-
-  floatingButtonElement.style.width = "32px";
-  floatingButtonElement.style.height = "32px";
-
-  if (!floatingButtonElement.isConnected) {
-    floatingButtonWrapper.append(floatingButtonElement);
-  }
+  floatingButtonElement.style.width = floatingButtonElement.style.height = BUTTON_SIZE.element;
+  if (!floatingButtonElement.isConnected) floatingButtonWrapper.append(floatingButtonElement);
 }
 
 function placeButton(targetContainer, inputNode) {
-  if (!inputNode) {
-    return;
-  }
-
+  if (!inputNode) return;
   ensureFloatingButton();
   floatingButtonTargetContainer = targetContainer ?? inputNode;
   floatingButtonTargetInput = inputNode;
@@ -680,112 +473,57 @@ function placeButton(targetContainer, inputNode) {
 }
 
 function positionFloatingButton(inputNode, containerNode = floatingButtonTargetContainer) {
-  if (!floatingButtonWrapper) {
-    return;
-  }
-
+  if (!floatingButtonWrapper) return;
   const target = containerNode ?? inputNode;
-  if (!target) {
-    return;
-  }
-
-  const computed = getComputedStyle(target);
-  if (computed.position === "static") {
+  if (!target) return;
+  if (getComputedStyle(target).position === "static") {
     target.style.position = "relative";
   }
-
   if (floatingButtonWrapper.parentElement !== target) {
     target.append(floatingButtonWrapper);
   }
-
   floatingButtonWrapper.style.top = "50%";
   floatingButtonWrapper.style.right = "12px";
   floatingButtonWrapper.style.transform = "translateY(-50%)";
 }
 
 function refreshFloatingButtonPosition() {
-  if (!floatingButtonTargetInput) {
-    return;
+  if (floatingButtonTargetInput) {
+    positionFloatingButton(floatingButtonTargetInput, floatingButtonTargetContainer);
   }
-  positionFloatingButton(floatingButtonTargetInput, floatingButtonTargetContainer);
 }
 
 function ensureDomObserver() {
-  if (domObserverStarted) {
-    return;
-  }
-
+  if (domObserverStarted) return;
   const observer = new MutationObserver(() => {
     requestSelectionToolbarUpdate();
     const composer = locateComposer();
-      hasComposer: Boolean(composer),
-      hasButton: Boolean(document.getElementById(BUTTON_ID))
-    });
-
-    if (!composer) {
-      detachButtonPositionHandler();
-      return;
+    if (composer) {
+      placeButton(composer.container, composer.input);
+      setupEnhanceTooltip(composer.input, composer.container);
     }
-
-    placeButton(composer.container, composer.input);
-    setupEnhanceTooltip(composer.input, composer.container);
   });
-
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true
-  });
-
+  observer.observe(document.documentElement, { childList: true, subtree: true });
   domObserverStarted = true;
 }
 
 function locateComposer() {
-  const wrappers = [
-    document.querySelector("[data-testid='conversation-turn-textbox']"),
-    document.querySelector("[data-testid='composer-container']"),
-    document.querySelector("main form")
-  ].filter(Boolean);
-
+  const wrappers = ["[data-testid='conversation-turn-textbox']", "[data-testid='composer-container']", "main form"]
+    .map(sel => document.querySelector(sel)).filter(Boolean);
   let input = null;
-
   for (const wrapper of wrappers) {
-    const editable =
-      wrapper.querySelector("[data-testid='textbox'][contenteditable='true']") ??
-      wrapper.querySelector("div[contenteditable='true']");
-    if (editable instanceof HTMLElement) {
-      input = editable;
-      break;
-    }
+    const editable = wrapper.querySelector("[data-testid='textbox'][contenteditable='true']") ??
+                     wrapper.querySelector("div[contenteditable='true']");
+    if (editable instanceof HTMLElement) { input = editable; break; }
   }
-
   if (!input) {
-    const textarea = document.querySelector(
-      "[data-testid='conversation-turn-textbox'] textarea:not([readonly])"
-    );
-    if (
-      textarea instanceof HTMLTextAreaElement &&
-      !textarea.className.includes("_fallbackTextarea")
-    ) {
-      input = textarea;
-    }
+    const textarea = document.querySelector("[data-testid='conversation-turn-textbox'] textarea:not([readonly])");
+    if (textarea instanceof HTMLTextAreaElement && !textarea.className.includes("_fallbackTextarea")) input = textarea;
   }
-
-  if (!input) {
-    return null;
-  }
-
-  const container =
-    input.closest("[data-testid='composer-footer']") ??
-    input.closest("[data-testid='composer-container']") ??
-    input.parentElement ??
-    document.body;
-
-    inputTag: input.tagName,
-    inputClass: input.className,
-    containerTag: container?.tagName ?? "UNKNOWN"
-  });
-
-  return { input, container };
+  if (!input) return null;
+  return { input, container: input.closest("[data-testid='composer-footer']") ??
+                             input.closest("[data-testid='composer-container']") ??
+                             input.parentElement ?? document.body };
 }
 
 function init() {
@@ -815,10 +553,7 @@ function bootstrap() {
 
 function attachTooltip(button) {
   ensureTooltipResources();
-
-  tooltipRegistry.set(button, {
-    text: "Open Prompanion to enhance your prompts for the best response."
-  });
+  tooltipRegistry.set(button, { text: "Open Prompanion to enhance your prompts for the best response." });
 }
 
 function ensureTooltipResources() {
@@ -890,34 +625,22 @@ function ensureTooltipResources() {
 
 function showTooltip(button) {
   const data = tooltipRegistry.get(button);
-  if (!data) {
-    return;
-  }
-
   const container = document.getElementById(`${BUTTON_ID}-tooltip-layer`);
-  if (!container) {
-    return;
-  }
-
+  if (!data || !container) return;
   let tooltip = button._prompanionTooltip;
   if (!tooltip) {
     tooltip = document.createElement("div");
     tooltip.className = "prompanion-tooltip";
     tooltip.setAttribute("role", "tooltip");
-
     const text = document.createElement("span");
     text.textContent = data.text;
-    tooltip.append(text);
-
     const hidden = document.createElement("span");
     hidden.className = "prompanion-visually-hidden";
     hidden.textContent = data.text;
-    tooltip.append(hidden);
-
+    tooltip.append(text, hidden);
     button._prompanionTooltip = tooltip;
     container.append(tooltip);
   }
-
   positionTooltip(button, tooltip);
   tooltip.classList.add("is-visible");
 }
@@ -929,28 +652,16 @@ function hideTooltip(button) {
 
 function positionTooltip(button, tooltip) {
   const rect = button.getBoundingClientRect();
-  const top = rect.bottom + window.scrollY + 5;
-  const left = rect.left + rect.width / 2 + window.scrollX;
-
-  tooltip.style.top = `${top}px`;
-  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${rect.bottom + window.scrollY + 5}px`;
+  tooltip.style.left = `${rect.left + rect.width / 2 + window.scrollX}px`;
 }
 
 function setupEnhanceTooltip(input, container) {
-  if (!input) {
-    return;
-  }
-
-  if (enhanceTooltipActiveTextarea === input) {
-    return;
-  }
-
+  if (!input || enhanceTooltipActiveTextarea === input) return;
   teardownEnhanceTooltip();
   enhanceTooltipActiveTextarea = input;
-  enhanceTooltipContainer = input.parentElement || container;
   enhanceTooltipDismissed = false;
   lastEnhanceTextSnapshot = "";
-
   ensureEnhanceTooltipElement();
   bindInputEvents(input);
 }
@@ -971,33 +682,73 @@ function teardownEnhanceTooltip() {
 
 function ensureEnhanceTooltipElement() {
   if (!enhanceTooltipElement) {
+    console.log("[Prompanion] Creating enhance tooltip element");
     enhanceTooltipElement = document.createElement("div");
     enhanceTooltipElement.className = "prompanion-enhance-tooltip";
-
     const dismiss = document.createElement("button");
     dismiss.type = "button";
     dismiss.className = "prompanion-enhance-tooltip__dismiss";
-    dismiss.setAttribute("aria-label", "Dismiss prompt enhancement suggestion");
     dismiss.textContent = "×";
+    dismiss.setAttribute("aria-label", "Dismiss prompt enhancement suggestion");
     dismiss.addEventListener("click", () => {
       enhanceTooltipDismissed = true;
       hideEnhanceTooltip();
     });
-
     const action = document.createElement("button");
     action.type = "button";
     action.className = "prompanion-enhance-tooltip__action";
     setButtonTextContent(action, "Refine");
-    action.addEventListener("click", handleTooltipEnhanceAction);
-
+    console.log("[Prompanion] Attaching click handler to Refine button");
+    console.log("[Prompanion] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
+    action.addEventListener("click", handleRefineButtonClick);
+    console.log("[Prompanion] Click handler attached, button:", action);
     enhanceTooltipElement.append(dismiss, action);
+    console.log("[Prompanion] Enhance tooltip element created");
   }
-
   if (!enhanceTooltipElement.isConnected) {
+    console.log("[Prompanion] Appending enhance tooltip to body");
     document.body.append(enhanceTooltipElement);
   }
-
   hideEnhanceTooltip();
+}
+
+function handleRefineButtonClick(e) {
+  console.log("[Prompanion] ========== REFINE BUTTON HANDLER FIRED ==========");
+  console.log("[Prompanion] Event type:", e.type);
+  console.log("[Prompanion] Event target:", e.target);
+  e.preventDefault();
+  e.stopPropagation();
+  if (enhanceActionInFlight) {
+    console.log("[Prompanion] Refine action already in flight, ignoring");
+    return;
+  }
+  const composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
+  console.log("[Prompanion] Composer node:", composerNode);
+  if (!composerNode) {
+    console.error("[Prompanion] No composer node found!");
+    return;
+  }
+  const promptText = extractInputText().trim();
+  console.log("[Prompanion] Prompt text:", promptText);
+  if (!promptText) {
+    console.log("[Prompanion] No prompt text, returning");
+    return;
+  }
+  enhanceActionInFlight = true;
+  enhanceTooltipDismissed = true;
+  hideEnhanceTooltip();
+  console.log("[Prompanion] Requesting prompt enhancement...");
+  requestPromptEnhancement(promptText)
+    .then((result) => {
+      console.log("[Prompanion] Enhancement result:", result);
+      const refinedText = result?.ok && typeof result.optionA === "string" && result.optionA.trim()
+        ? result.optionA.trim() : promptText;
+      console.log("[Prompanion] Setting refined text:", refinedText);
+      const success = setComposerText(composerNode, refinedText);
+      console.log("[Prompanion] setComposerText success:", success);
+    })
+    .catch((error) => console.error("Prompanion: refine request threw", error))
+    .finally(() => { enhanceActionInFlight = false; });
 }
 
 function bindInputEvents(input) {
@@ -1005,46 +756,26 @@ function bindInputEvents(input) {
   input.removeEventListener("keyup", handleInputChange);
   input.removeEventListener("focus", handleInputChange);
   input.removeEventListener("blur", handleInputBlur);
-
   input.addEventListener("input", handleInputChange);
   input.addEventListener("keyup", handleInputChange);
   input.addEventListener("focus", handleInputChange);
   input.addEventListener("blur", handleInputBlur);
-
   handleInputChange();
 }
 
 function extractInputText() {
-  if (!enhanceTooltipActiveTextarea) {
-    return "";
-  }
-
-  if ("value" in enhanceTooltipActiveTextarea) {
-    return enhanceTooltipActiveTextarea.value;
-  }
-
-  return enhanceTooltipActiveTextarea.textContent ?? "";
+  if (!enhanceTooltipActiveTextarea) return "";
+  return "value" in enhanceTooltipActiveTextarea
+    ? enhanceTooltipActiveTextarea.value
+    : enhanceTooltipActiveTextarea.textContent ?? "";
 }
 
 function handleInputChange() {
-  if (!enhanceTooltipActiveTextarea) {
-    return;
-  }
-
+  if (!enhanceTooltipActiveTextarea) return;
   const rawText = extractInputText();
-  const sanitized =
-    rawText.startsWith("window.__oai") || rawText.includes("__oai_logHTML")
-      ? ""
-      : rawText;
-  const text = sanitized.trim();
-  const words = text.split(/\s+/).filter(Boolean);
-
-    rawText,
-    wordCount: words.length,
-    dismissed: enhanceTooltipDismissed
-  });
-
-  if (words.length < 3) {
+  const text = (rawText.startsWith("window.__oai") || rawText.includes("__oai_logHTML") ? "" : rawText).trim();
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  if (wordCount < 3) {
     hideEnhanceTooltip();
     enhanceTooltipDismissed = false;
     clearTimeout(enhanceTooltipTimer);
@@ -1052,16 +783,11 @@ function handleInputChange() {
     lastEnhanceTextSnapshot = "";
     return;
   }
-
-  if (enhanceTooltipDismissed && text === lastEnhanceTextSnapshot) {
-    return;
-  }
-
+  if (enhanceTooltipDismissed && text === lastEnhanceTextSnapshot) return;
   lastEnhanceTextSnapshot = text;
   enhanceTooltipDismissed = false;
   scheduleEnhanceTooltip();
-
-  if (enhanceTooltipElement?.classList.contains("is-visible")) {
+  if (enhanceTooltipElement?.classList.contains("is-visible") && !tooltipClickInProgress) {
     positionEnhanceTooltip();
   }
 }
@@ -1075,21 +801,16 @@ function handleInputBlur() {
 function scheduleEnhanceTooltip() {
   clearTimeout(enhanceTooltipTimer);
   enhanceTooltipTimer = window.setTimeout(() => {
-    if (!enhanceTooltipActiveTextarea) {
-      return;
-    }
-    const text = extractInputText().trim();
-    const words = text.split(/\s+/).filter(Boolean);
-
-    if (words.length >= 3 && !enhanceTooltipDismissed) {
-      showEnhanceTooltip();
-    }
+    if (!enhanceTooltipActiveTextarea) return;
+    const wordCount = extractInputText().trim().split(/\s+/).filter(Boolean).length;
+    if (wordCount >= 3 && !enhanceTooltipDismissed) showEnhanceTooltip();
   }, 1000);
 }
 
 function showEnhanceTooltip() {
   if (!enhanceTooltipElement) {
-    return;
+    ensureEnhanceTooltipElement();
+    if (!enhanceTooltipElement) return;
   }
   positionEnhanceTooltip();
   enhanceTooltipElement.classList.add("is-visible");
@@ -1097,58 +818,32 @@ function showEnhanceTooltip() {
 }
 
 function hideEnhanceTooltip() {
-  if (!enhanceTooltipElement) {
-    return;
-  }
-  if (enhanceTooltipElement.classList.contains("is-visible")) {
-  }
+  if (!enhanceTooltipElement) return;
   enhanceTooltipElement.classList.remove("is-visible");
   detachTooltipResizeHandler();
 }
 
 function positionEnhanceTooltip() {
-  if (!enhanceTooltipElement || !enhanceTooltipActiveTextarea) {
-    return;
-  }
-
+  if (!enhanceTooltipElement || !enhanceTooltipActiveTextarea) return;
   const rect = enhanceTooltipActiveTextarea.getBoundingClientRect();
-  const top = rect.top - 8;
-  const left = rect.left + rect.width * 0.5;
-
-  enhanceTooltipElement.style.top = `${top}px`;
-  enhanceTooltipElement.style.left = `${left}px`;
+  enhanceTooltipElement.style.top = `${rect.top - 8}px`;
+  enhanceTooltipElement.style.left = `${rect.left + rect.width * 0.5}px`;
   enhanceTooltipElement.style.transform = "translate(-50%, -100%)";
 }
 
 function attachTooltipResizeHandler() {
-  if (enhanceTooltipResizeHandler) {
-    return;
-  }
-
+  if (enhanceTooltipResizeHandler) return;
   enhanceTooltipResizeHandler = () => positionEnhanceTooltip();
   window.addEventListener("resize", enhanceTooltipResizeHandler);
   window.addEventListener("scroll", enhanceTooltipResizeHandler, true);
 }
 
 function detachTooltipResizeHandler() {
-  if (!enhanceTooltipResizeHandler) {
-    return;
-  }
-
+  if (!enhanceTooltipResizeHandler) return;
   window.removeEventListener("resize", enhanceTooltipResizeHandler);
   window.removeEventListener("scroll", enhanceTooltipResizeHandler, true);
   enhanceTooltipResizeHandler = null;
 }
-
-function ensureResizeObserver() {
-  // no-op: deprecated
-}
-
-function attachButtonPositionHandler() {
-  // no-op: deprecated
-}
-
-function detachButtonPositionHandler() {}
 
 const readyState = document.readyState;
 if (readyState === "complete" || readyState === "interactive") {
@@ -1165,3 +860,85 @@ window.addEventListener("prompanion-panel-resize", () => {
   refreshFloatingButtonPosition();
 });
 
+document.addEventListener("click", (e) => {
+  const tooltipVisible = enhanceTooltipElement?.classList.contains("is-visible");
+  if (tooltipVisible) {
+    console.log("[Prompanion] ========== CLICK DETECTED (tooltip visible) ==========");
+    const button = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
+    const buttonRect = button?.getBoundingClientRect();
+    const clickX = e.clientX;
+    const clickY = e.clientY;
+    const inButtonBounds = buttonRect && clickX >= buttonRect.left && clickX <= buttonRect.right && 
+                           clickY >= buttonRect.top && clickY <= buttonRect.bottom;
+    const clickedButton = e.target.closest(".prompanion-enhance-tooltip__action");
+    const clickedTooltip = e.target.closest(".prompanion-enhance-tooltip");
+    
+    console.log("[Prompanion] Target:", e.target);
+    console.log("[Prompanion] Click coordinates:", clickX, clickY);
+    console.log("[Prompanion] Button bounds:", buttonRect);
+    console.log("[Prompanion] Click in button bounds:", inButtonBounds);
+    console.log("[Prompanion] clickedButton (closest):", clickedButton);
+    console.log("[Prompanion] clickedTooltip (closest):", clickedTooltip);
+    
+    if (clickedButton || inButtonBounds) {
+      console.log("[Prompanion] ========== CLICK ON TOOLTIP/BUTTON CONFIRMED ==========");
+      if (typeof handleRefineButtonClick === "function") {
+        console.log("[Prompanion] Calling handleRefineButtonClick from global listener");
+        handleRefineButtonClick(e);
+      } else {
+        console.error("[Prompanion] handleRefineButtonClick is not a function!");
+      }
+    }
+  }
+}, true);
+
+window.addEventListener("click", (e) => {
+  if (enhanceTooltipElement?.classList.contains("is-visible")) {
+    console.log("[Prompanion] ========== WINDOW CLICK DETECTED (tooltip visible) ==========");
+    console.log("[Prompanion] Target:", e.target);
+    const button = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
+    const clickedButton = e.target.closest(".prompanion-enhance-tooltip__action");
+    if (clickedButton || button === e.target) {
+      console.log("[Prompanion] ========== WINDOW CLICK ON BUTTON ==========");
+      if (typeof handleRefineButtonClick === "function") {
+        handleRefineButtonClick(e);
+      }
+    }
+  }
+}, true);
+
+document.addEventListener("mousedown", (e) => {
+  if (enhanceTooltipElement?.classList.contains("is-visible")) {
+    const button = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
+    const clickedButton = e.target.closest(".prompanion-enhance-tooltip__action");
+    if (clickedButton || button === e.target) {
+      console.log("[Prompanion] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
+      console.log("[Prompanion] Setting tooltipClickInProgress flag");
+      tooltipClickInProgress = true;
+      const buttonRef = button;
+      const mousedownTime = Date.now();
+      
+      const clickHandler = (clickEvent) => {
+        const timeSinceMousedown = Date.now() - mousedownTime;
+        console.log("[Prompanion] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
+        console.log("[Prompanion] Time since mousedown:", timeSinceMousedown, "ms");
+        console.log("[Prompanion] Click target:", clickEvent.target);
+        if (typeof handleRefineButtonClick === "function") {
+          handleRefineButtonClick(clickEvent);
+        }
+        document.removeEventListener("click", clickHandler, true);
+      };
+      
+      document.addEventListener("click", clickHandler, true);
+      
+      setTimeout(() => {
+        tooltipClickInProgress = false;
+        console.log("[Prompanion] tooltipClickInProgress flag cleared");
+        document.removeEventListener("click", clickHandler, true);
+        if (buttonRef && !buttonRef.isConnected) {
+          console.error("[Prompanion] BUTTON WAS REMOVED FROM DOM!");
+        }
+      }, 300);
+    }
+  }
+}, true);
