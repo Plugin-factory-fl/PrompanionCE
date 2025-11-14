@@ -59,7 +59,6 @@
 
           <div class="section-content">
             <div class="section-content__actions">
-              <button class="btn btn--primary" id="enhance-btn">Enhance Prompt</button>
               <button class="btn btn--ghost" id="open-settings" aria-label="Enhancement settings">
                 <svg class="icon icon--gear" viewBox="0 0 24 24" aria-hidden="true">
                   <path
@@ -72,11 +71,15 @@
             <div class="prompt-preview">
               <div class="prompt-preview__column prompt-preview__column--original">
                 <div class="prompt-preview__column-header">
-                  <h3>Original</h3>
+                  <h3>Original - This is the prompt that we will enhance for better responses.</h3>
                 </div>
-                <textarea class="prompt-textarea" id="original-prompt" readonly></textarea>
+                <div class="prompt-feedback" style="visibility: hidden; pointer-events: none;">
+                  <div style="width: 28px; height: 28px;"></div>
+                  <div style="width: 28px; height: 28px;"></div>
+                </div>
+                <textarea class="prompt-textarea" id="original-prompt" placeholder="Enter your prompt here..."></textarea>
                 <div class="prompt-preview__actions">
-                  <button class="btn btn--ghost" data-copy="original">Copy</button>
+                  <button class="btn btn--primary" id="enhance-btn">Enhance Prompt</button>
                 </div>
               </div>
               <div class="prompt-preview__column prompt-preview__column--tabs">
@@ -159,7 +162,12 @@
       <section class="panel__section panel__section--library">
         <details class="section-collapsible" data-section="library">
           <summary class="section-heading">
-            <h2>Prompt Library</h2>
+            <div class="section-heading__title-group">
+              <h2>Prompt Library</h2>
+              <button class="library-info-btn" id="library-info-btn" type="button" aria-label="Prompt Library information">
+                <span class="library-info-btn__icon">i</span>
+              </button>
+            </div>
             <div class="section-heading__actions">
               <button class="btn btn--ghost btn--pill library-add-folder" id="add-folder" type="button">
                 Create New Prompt File
@@ -303,6 +311,51 @@
         <footer class="modal__footer account__footer">
           <button class="btn btn--ghost account__cancel" value="cancel">Cancel</button>
           <button class="btn btn--primary account__submit" value="login">Log In</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="library-info-dialog" class="modal modal--dark">
+      <form method="dialog" class="modal__content">
+        <header class="modal__header">
+          <h2>Prompt Library Information</h2>
+          <button class="btn btn--ghost modal__close" value="cancel" aria-label="Close information">
+            <svg class="icon icon--close" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7.05 6.34a1 1 0 0 1 1.41 0L12 9.88l3.54-3.54a1 1 0 1 1 1.41 1.41L13.41 11.3l3.54 3.54a1 1 0 0 1-1.41 1.41L12 12.7l-3.54 3.54a1 1 0 0 1-1.41-1.41l3.54-3.54-3.54-3.54a1 1 0 0 1 0-1.41Z" />
+            </svg>
+          </button>
+        </header>
+        <div class="modal__body library-info-content">
+          <div class="library-info-section">
+            <h3 class="library-info-section__title">Storage Capacity</h3>
+            <p class="library-info-section__text">
+              Your prompts are stored using Chrome Sync Storage, which has a limit of approximately <strong>100KB per item</strong>. 
+              You can store up to <strong>200 prompts per folder</strong>, with a practical total capacity of around <strong>200-400 prompts</strong> depending on prompt length.
+            </p>
+          </div>
+          <div class="library-info-section">
+            <h3 class="library-info-section__title">Sync Across Devices</h3>
+            <p class="library-info-section__text">
+              To keep your prompts synchronized across all your devices:
+            </p>
+            <ol class="library-info-list">
+              <li>Make sure you're signed into Chrome with the same Google account on all devices</li>
+              <li>Enable Chrome Sync in your browser settings</li>
+              <li>Ensure "Extensions" sync is enabled:
+                <ul class="library-info-sublist">
+                  <li>Go to <strong>chrome://settings/syncSetup</strong> or Chrome Settings → Sync and Google Services</li>
+                  <li>Click "Manage what you sync"</li>
+                  <li>Make sure "Extensions" is checked</li>
+                </ul>
+              </li>
+            </ol>
+            <p class="library-info-section__text">
+              Once enabled, your prompt library will automatically sync to all devices where you're signed in.
+            </p>
+          </div>
+        </div>
+        <footer class="modal__footer">
+          <button class="btn btn--primary" value="confirm">Got it</button>
         </footer>
       </form>
     </dialog>

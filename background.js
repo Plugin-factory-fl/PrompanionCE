@@ -253,7 +253,13 @@ async function regenerateEnhancement(apiKey, currentPrompt) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log("[Prompanion Background] ========== MESSAGE RECEIVED ==========");
+  console.log("[Prompanion Background] Message type:", message?.type);
+  console.log("[Prompanion Background] Message:", message);
+  console.log("[Prompanion Background] Sender:", sender);
+  
   if (!message || typeof message !== "object") {
+    console.log("[Prompanion Background] Invalid message, ignoring");
     return;
   }
 
@@ -439,6 +445,130 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse?.({ ok: true });
       } catch (error) {
         console.error("Prompanion: open panel message failed", error);
+        sendResponse?.({ ok: false, reason: error?.message ?? "UNKNOWN" });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === "PROMPANION_INSERT_TEXT") {
+    console.log("[Prompanion Background] ========== PROMPANION_INSERT_TEXT RECEIVED ==========");
+    console.log("[Prompanion Background] Text to insert:", typeof message.text === "string" ? message.text.substring(0, 50) + "..." : "invalid");
+    console.log("[Prompanion Background] Sender:", sender);
+    (async () => {
+      try {
+        const textToInsert = typeof message.text === "string" ? message.text.trim() : "";
+        if (!textToInsert) {
+          console.log("[Prompanion Background] Empty text, returning error");
+          sendResponse?.({ ok: false, reason: "EMPTY_TEXT" });
+          return;
+        }
+
+        // Try to get tab from sender first (if message came from a tab)
+        let targetTabId = sender?.tab?.id;
+        console.log("[Prompanion Background] Sender tab ID:", targetTabId);
+        
+        // If no tab from sender, find ChatGPT tab
+        if (!targetTabId) {
+          try {
+            console.log("[Prompanion Background] No sender tab, searching for ChatGPT tab...");
+            // First try to find active ChatGPT tab
+            const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            console.log("[Prompanion Background] Active tab:", activeTab?.url);
+            if (activeTab && activeTab.url && (
+              activeTab.url.includes("chatgpt.com") || 
+              activeTab.url.includes("chat.openai.com")
+            )) {
+              targetTabId = activeTab.id;
+              console.log("[Prompanion Background] Using active ChatGPT tab:", targetTabId);
+            } else {
+              // Fallback: find any ChatGPT tab
+              console.log("[Prompanion Background] Active tab is not ChatGPT, searching all tabs...");
+              const tabs = await chrome.tabs.query({
+                url: [
+                  "https://chatgpt.com/*",
+                  "https://*.chatgpt.com/*",
+                  "https://chat.openai.com/*",
+                  "https://*.chat.openai.com/*"
+                ]
+              });
+              console.log("[Prompanion Background] Found ChatGPT tabs:", tabs.length);
+              if (tabs.length > 0) {
+                // Prefer active tab, otherwise use first one
+                targetTabId = tabs.find(tab => tab.active)?.id || tabs[0].id;
+                console.log("[Prompanion Background] Selected tab ID:", targetTabId);
+              }
+            }
+          } catch (queryError) {
+            console.error("[Prompanion Background] Failed to query tabs:", queryError);
+          }
+        }
+
+        if (!targetTabId) {
+          console.log("[Prompanion Background] No ChatGPT tab found, returning error");
+          sendResponse?.({ ok: false, reason: "NO_CHATGPT_TAB" });
+          return;
+        }
+
+        // Send message to adapter.js content script
+        console.log("[Prompanion Background] Sending message to tab:", targetTabId);
+        console.log("[Prompanion Background] Message payload:", { type: "PROMPANION_INSERT_TEXT", text: textToInsert.substring(0, 50) + "..." });
+        
+        // Check if content script is loaded by trying to query the tab
+        try {
+          const tab = await chrome.tabs.get(targetTabId);
+          console.log("[Prompanion Background] Tab info:", { id: tab.id, url: tab.url, status: tab.status });
+        } catch (tabError) {
+          console.error("[Prompanion Background] Failed to get tab info:", tabError);
+        }
+        
+        try {
+          // Use a timeout to detect if adapter doesn't respond
+          const responsePromise = chrome.tabs.sendMessage(targetTabId, {
+            type: "PROMPANION_INSERT_TEXT",
+            text: textToInsert
+          });
+          
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("TIMEOUT: Adapter did not respond within 5 seconds")), 5000);
+          });
+          
+          const response = await Promise.race([responsePromise, timeoutPromise]);
+          console.log("[Prompanion Background] Received response from adapter:", response);
+          console.log("[Prompanion Background] Response type:", typeof response);
+          console.log("[Prompanion Background] Response is null/undefined:", response === null || response === undefined);
+          
+          if (!response) {
+            console.error("[Prompanion Background] Adapter returned null/undefined response!");
+            sendResponse?.({ ok: false, reason: "NO_RESPONSE_FROM_ADAPTER" });
+            return;
+          }
+          
+          sendResponse?.(response);
+        } catch (error) {
+          console.error("[Prompanion Background] Failed to send insert message to tab:", error);
+          console.error("[Prompanion Background] Error name:", error.name);
+          console.error("[Prompanion Background] Error message:", error.message);
+          console.error("[Prompanion Background] Error stack:", error.stack);
+          
+          // Check if error is because content script isn't ready
+          if (error.message?.includes("Could not establish connection") || 
+              error.message?.includes("Receiving end does not exist") ||
+              error.message?.includes("Extension context invalidated") ||
+              error.message?.includes("TIMEOUT")) {
+            console.log("[Prompanion Background] Adapter not ready - content script may not be loaded or not responding");
+            console.log("[Prompanion Background] This usually means:");
+            console.log("[Prompanion Background] 1. The content script hasn't loaded yet");
+            console.log("[Prompanion Background] 2. The content script's message listener isn't registered");
+            console.log("[Prompanion Background] 3. The content script is in a different frame/context");
+            sendResponse?.({ ok: false, reason: "ADAPTER_NOT_READY" });
+          } else {
+            console.log("[Prompanion Background] Send failed with unexpected error:", error.message);
+            sendResponse?.({ ok: false, reason: error?.message ?? "SEND_FAILED" });
+          }
+        }
+      } catch (error) {
+        console.error("[Prompanion Background] Insert text message failed:", error);
         sendResponse?.({ ok: false, reason: error?.message ?? "UNKNOWN" });
       }
     })();

@@ -63,6 +63,107 @@
   letter-spacing: 0.1px;
 }
 
+/* Section Heading Title Group */
+.section-heading__title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-heading__title-group h2 {
+  margin: 0;
+}
+
+/* Library Info Button */
+.library-info-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  font-style: italic;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+  flex-shrink: 0;
+}
+
+.library-info-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: scale(1.1);
+}
+
+.library-info-btn:focus-visible {
+  outline: 2px solid rgba(32, 212, 176, 0.6);
+  outline-offset: 2px;
+}
+
+.library-info-btn__icon {
+  line-height: 1;
+  display: block;
+}
+
+/* Library Info Dialog Content */
+.library-info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.library-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.library-info-section__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.library-info-section__text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-subtle);
+}
+
+.library-info-section__text strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.library-info-list {
+  margin: 8px 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--color-text-subtle);
+}
+
+.library-info-list li {
+  margin-bottom: 6px;
+}
+
+.library-info-sublist {
+  margin: 6px 0 0 0;
+  padding-left: 20px;
+  list-style-type: disc;
+}
+
+.library-info-sublist li {
+  margin-bottom: 4px;
+}
+
 /* Section Heading Actions for Library Section */
 .panel__section--library .section-heading__actions {
   opacity: 0;

@@ -45,12 +45,33 @@
   letter-spacing: 0.1px;
 }
 
+/* Section Wrapper for Prompt Enhancer - override overflow to allow content to be visible */
+.panel__section--prompt {
+  overflow: visible !important; /* Override base overflow: hidden to show all content */
+}
+
+/* Section Collapsible for Prompt Enhancer */
+.panel__section--prompt .section-collapsible {
+  overflow: visible !important; /* Override base overflow: hidden to show all content */
+}
+
+/* Section Content for Prompt Enhancer */
+.panel__section--prompt .section-content {
+  min-height: auto; /* Allow content to determine height */
+  overflow: visible; /* Don't clip content */
+  padding: 16px 16px 20px 16px; /* 20px padding at bottom, standard padding on other sides */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* Section Content Actions (used in Prompt Enhancer) */
 .panel__section--prompt .section-content__actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  flex-shrink: 0; /* Don't shrink the action buttons */
 }
 
 .panel__section--prompt .section-content__actions .btn--primary {
@@ -92,7 +113,9 @@
   display: grid;
   grid-template-columns: 1fr 1.2fr;
   gap: 16px;
-  align-items: stretch;
+  align-items: start; /* Align to start so content doesn't stretch */
+  min-height: 0; /* Allow grid to shrink if needed */
+  flex-shrink: 0; /* Don't shrink the preview container */
 }
 
 /* Prompt Preview Columns */
@@ -100,6 +123,13 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-height: 0; /* Allow column to shrink if needed */
+  align-items: stretch; /* Ensure columns stretch to show all content */
+}
+
+/* Ensure original column matches tabs column structure */
+.prompt-preview__column--original {
+  gap: 12px; /* Match the gap in tabpanel */
 }
 
 .prompt-preview__column--tabs {
@@ -110,7 +140,8 @@
 .prompt-preview__column-header {
   display: flex;
   align-items: center;
-  min-height: 36px;
+  min-height: 44px; /* Match the height of the tabs container */
+  height: 44px; /* Fixed height to ensure alignment */
 }
 
 .prompt-preview__column-header--tabs {
@@ -172,7 +203,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  flex: 1;
+  flex: 0 1 auto; /* Don't grow to fill space, allow buttons to be visible */
+  min-height: 0;
   animation: fadeIn var(--prompt-transition-speed) var(--prompt-transition-ease);
 }
 
@@ -189,6 +221,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-height: 28px; /* Match button height */
+  height: 28px; /* Fixed height for alignment */
 }
 
 .prompt-feedback .btn--icon {
@@ -215,18 +249,19 @@
 /* Prompt Textarea */
 .prompt-textarea {
   width: 100%;
-  min-height: 200px;
+  min-height: 180px;
+  max-height: 250px;
   border: 1px solid var(--prompt-border);
   border-radius: var(--radius-sm);
   padding: 12px;
   background: var(--prompt-bg-primary);
-  resize: none;
+  resize: vertical;
   font-family: inherit;
   font-size: 13px;
   color: var(--prompt-text-primary);
   line-height: 1.5;
   overflow-y: auto;
-  flex: 1;
+  flex: 0 0 auto; /* Don't grow or shrink, use fixed height based on min/max */
   transition: border-color var(--prompt-transition-speed) var(--prompt-transition-ease),
               outline var(--prompt-transition-speed) var(--prompt-transition-ease),
               box-shadow var(--prompt-transition-speed) var(--prompt-transition-ease);
@@ -246,12 +281,27 @@
 .prompt-preview__actions {
   display: flex;
   gap: 8px;
+  flex-shrink: 0; /* Don't shrink the action buttons */
+  margin-top: 4px; /* Small margin above buttons */
 }
 
 .prompt-preview__actions .btn {
   transition: background-color var(--prompt-transition-speed) var(--prompt-transition-ease),
               transform var(--prompt-transition-speed) var(--prompt-transition-ease),
               box-shadow var(--prompt-transition-speed) var(--prompt-transition-ease);
+}
+
+.prompt-preview__actions .btn--primary {
+  background: var(--color-primary);
+  border: 1px solid rgba(32, 212, 176, 0.45);
+  color: #04121a;
+  box-shadow: var(--shadow-sm);
+}
+
+.prompt-preview__actions .btn--primary:hover {
+  background: var(--color-primary-strong);
+  box-shadow: 0 12px 28px rgba(31, 214, 173, 0.35);
+  transform: translateY(-1px);
 }
 
 .prompt-preview__actions .btn:hover {

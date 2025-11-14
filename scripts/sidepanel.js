@@ -21,7 +21,8 @@ import {
   sendSideChatMessage,
   triggerAutoSideChat,
   processPendingSideChat,
-  registerChatHandlers
+  registerChatHandlers,
+  isFreshConversation
 } from "../Source/sideChat.js";
 import {
   LIBRARY_SCHEMA_VERSION,
@@ -115,6 +116,11 @@ function filterExpiredConversations(conversations) {
 }
 
 /**
+ * Welcome message content for new conversations
+ */
+const WELCOME_MESSAGE = "Welcome to the Side Chat! This is where you can ask me questions to elaborate on ideas you aren't clear on. I open up automatically when you highlight any text response from your LLM in the browser and click the \"Elaborate\" button. I'm here to help!";
+
+/**
  * Creates a new conversation with the welcome message
  * @returns {Object} New conversation object
  */
@@ -125,8 +131,7 @@ function createNewConversation() {
     history: [
       {
         role: "agent",
-        content:
-          "Welcome to the Side Chat! This is where you can ask me questions to elaborate on ideas you aren't clear on. I open up automatically when you highlight any text response from your LLM in the browser and click the \"Elaborate\" button. I'm here to help!",
+        content: WELCOME_MESSAGE,
         timestamp: Date.now()
       }
     ]
@@ -237,10 +242,20 @@ async function init() {
     initPromptEnhancer(currentState);
   }
 
-  // Always create a new conversation on load
-  const newConversation = createNewConversation();
-  currentState.conversations.push(newConversation);
-  currentState.activeConversationId = newConversation.id;
+  // Check if there's already a fresh conversation (only welcome message)
+  const existingFreshConversation = currentState.conversations.find((conv) => 
+    isFreshConversation(conv)
+  );
+
+  if (existingFreshConversation) {
+    // Use the existing fresh conversation instead of creating a new one
+    currentState.activeConversationId = existingFreshConversation.id;
+  } else {
+    // Create a new conversation only if no fresh one exists
+    const newConversation = createNewConversation();
+    currentState.conversations.push(newConversation);
+    currentState.activeConversationId = newConversation.id;
+  }
   await saveState(currentState);
 
   const activeConversation = getActiveConversation(currentState);

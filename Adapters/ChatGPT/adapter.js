@@ -360,6 +360,7 @@ function handleSelectionToolbarAction(event) {
 }
 
 function handleSelectionChange() {
+  console.log("[Prompanion] handleSelectionChange fired");
   requestSelectionToolbarUpdate();
 }
 
@@ -851,11 +852,12 @@ if (readyState === "complete" || readyState === "interactive") {
 } else {
   document.addEventListener("DOMContentLoaded", bootstrap);
 }
+console.log("[Prompanion] Registering selection change event listeners");
 
 document.addEventListener("selectionchange", handleSelectionChange);
 window.addEventListener("scroll", handleSelectionChange, true);
 window.addEventListener("resize", handleSelectionChange);
-
+console.log("[Prompanion] Selection change event listeners registered");
 window.addEventListener("prompanion-panel-resize", () => {
   refreshFloatingButtonPosition();
 });
