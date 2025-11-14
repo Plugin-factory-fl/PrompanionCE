@@ -1,0 +1,329 @@
+/**
+ * Settings Panel Styles
+ * Self-contained styling for the Settings dialog panel including
+ * color schemes, font styles, and animations
+ */
+
+/* Settings Panel Color Scheme */
+#settings-dialog {
+  --settings-bg-primary: var(--color-surface);
+  --settings-bg-secondary: var(--color-surface-alt);
+  --settings-bg-tabs: rgba(12, 18, 32, 0.75);
+  --settings-text-primary: var(--color-text);
+  --settings-text-secondary: rgba(226, 232, 240, 0.82);
+  --settings-text-subtle: rgba(226, 232, 240, 0.6);
+  --settings-text-inverse: var(--color-text-inverse);
+  --settings-border: rgba(148, 163, 184, 0.28);
+  --settings-border-soft: rgba(148, 163, 184, 0.18);
+  --settings-focus-outline: rgba(32, 212, 176, 0.45);
+  --settings-active-bg: rgba(32, 212, 176, 0.18);
+  --settings-upload-bg: rgba(12, 18, 32, 0.6);
+  --settings-upload-border: rgba(226, 232, 240, 0.35);
+  --settings-transition-speed: 140ms;
+  --settings-transition-ease: ease;
+}
+
+/* Settings Panel Font Styles */
+.settings-form {
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.settings-form .form-field__label {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.settings-form .form-field__helper {
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.1px;
+}
+
+.settings-form .form-field__hint {
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.1px;
+}
+
+/* Settings Form Container */
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-form .form-field--tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-form .form-field--model {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-form .form-field--context {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Form Field Base Styles */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-field__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--settings-text-secondary);
+}
+
+.form-field__helper {
+  font-size: 12px;
+  color: var(--settings-text-subtle);
+}
+
+.form-field__hint {
+  font-size: 12px;
+  color: var(--color-text-subtle);
+}
+
+/* Form Tabs */
+.form-tabs {
+  display: inline-flex;
+  background: var(--settings-bg-tabs);
+  border-radius: 9999px;
+  border: 1px solid var(--settings-border-soft);
+  padding: 4px;
+  gap: 4px;
+  transition: border-color var(--settings-transition-speed) var(--settings-transition-ease),
+              box-shadow var(--settings-transition-speed) var(--settings-transition-ease);
+}
+
+.form-tabs:focus-within {
+  box-shadow: 0 0 0 2px rgba(32, 212, 176, 0.35);
+  border-color: var(--settings-focus-outline);
+}
+
+.form-tab {
+  position: relative;
+  border: none;
+  border-radius: 9999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(226, 232, 240, 0.7);
+  background: transparent;
+  cursor: pointer;
+  transition: background var(--settings-transition-speed) var(--settings-transition-ease),
+              color var(--settings-transition-speed) var(--settings-transition-ease),
+              box-shadow var(--settings-transition-speed) var(--settings-transition-ease);
+}
+
+.form-tab:hover {
+  color: #ffffff;
+}
+
+.form-tab.is-active {
+  background: var(--settings-active-bg);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(5, 7, 13, 0.35);
+}
+
+.form-tab:focus-visible {
+  outline: 2px solid var(--settings-focus-outline);
+  outline-offset: 2px;
+}
+
+/* Model Pills */
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.model-pill {
+  border-radius: 12px;
+  border: none;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--settings-transition-speed) var(--settings-transition-ease),
+              box-shadow var(--settings-transition-speed) var(--settings-transition-ease),
+              opacity var(--settings-transition-speed) var(--settings-transition-ease);
+}
+
+.model-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(5, 7, 13, 0.38);
+}
+
+.model-pill:focus-visible {
+  outline: 2px solid var(--settings-focus-outline);
+  outline-offset: 2px;
+}
+
+.model-pill.is-active {
+  box-shadow: 0 12px 28px rgba(5, 7, 13, 0.45);
+  transform: translateY(-1px);
+}
+
+.model-pill--chatgpt {
+  background: var(--color-surface-light);
+  color: var(--settings-text-inverse);
+}
+
+.model-pill--gemini {
+  background: linear-gradient(135deg, #6240ff, #a36bff);
+  color: #ffffff;
+}
+
+.model-pill--claude {
+  background: linear-gradient(135deg, #ff8a5c, #ffb274);
+  color: #ffffff;
+}
+
+.model-pill--grok {
+  background: #111827;
+  color: #ffffff;
+}
+
+.model-pill:is([disabled]) {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Range Input and Output */
+.range-output {
+  font-size: 12px;
+  color: var(--color-text-subtle);
+  font-weight: 500;
+}
+
+input[type="range"] {
+  width: 100%;
+  cursor: pointer;
+  transition: opacity var(--settings-transition-speed) var(--settings-transition-ease);
+}
+
+input[type="range"]:hover {
+  opacity: 0.9;
+}
+
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--settings-focus-outline);
+  outline-offset: 2px;
+}
+
+/* Form Field Upload */
+.form-field__upload {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  border-radius: var(--radius-md);
+  background: var(--settings-upload-bg);
+  border: 2px dashed var(--settings-upload-border);
+  color: rgba(226, 232, 240, 0.85);
+  cursor: not-allowed;
+  min-height: 128px;
+  width: 100%;
+  transition: border-color var(--settings-transition-speed) var(--settings-transition-ease),
+              background-color var(--settings-transition-speed) var(--settings-transition-ease);
+}
+
+.form-field__upload:not([disabled]):hover {
+  border-color: rgba(226, 232, 240, 0.5);
+  background: rgba(12, 18, 32, 0.75);
+}
+
+/* Modal Dark Theme for Settings */
+.modal--dark .form-field__label,
+.modal--dark .range-output {
+  color: var(--settings-text-secondary);
+}
+
+.modal--dark .select,
+.modal--dark input,
+.modal--dark textarea {
+  background: var(--settings-bg-secondary);
+  border: 1px solid var(--settings-border);
+  color: var(--settings-text-primary);
+  transition: border-color var(--settings-transition-speed) var(--settings-transition-ease),
+              outline var(--settings-transition-speed) var(--settings-transition-ease);
+}
+
+.modal--dark .select:focus,
+.modal--dark input:focus,
+.modal--dark textarea:focus {
+  outline: 2px solid var(--settings-focus-outline);
+  border-color: transparent;
+}
+
+.modal--dark .account__input {
+  background: var(--color-surface-light);
+  color: var(--settings-text-inverse);
+  box-shadow: 0 8px 20px rgba(5, 7, 13, 0.2);
+}
+
+.modal--dark .account__input:focus {
+  outline: 2px solid var(--color-primary);
+  border-color: transparent;
+}
+
+/* Animations */
+@keyframes settingsFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+#settings-dialog[open] .modal__content {
+  animation: settingsFadeIn 200ms ease;
+}
+
+/* Responsive Design */
+@media (max-width: 360px) {
+  .model-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .model-pill {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .form-tab {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .form-field__label {
+    font-size: 12px;
+  }
+
+  .form-field__upload {
+    padding: 16px;
+    min-height: 100px;
+  }
+}
+

@@ -1,7 +1,15 @@
+/**
+ * Injector Script
+ * Handles side panel injection and management on web pages
+ */
+
 const PANEL_CONTAINER_ID = "prompanion-sidepanel-container";
 const PANEL_VISIBLE_CLASS = "prompanion-sidepanel-visible";
 const PANEL_PUSH_CLASS = "prompanion-sidepanel-push";
 
+/**
+ * Ensures panel styles are injected into the page
+ */
 function ensureStyles() {
   if (document.getElementById(`${PANEL_CONTAINER_ID}-style`)) {
     return;
@@ -82,6 +90,10 @@ function ensureStyles() {
   document.head.append(style);
 }
 
+/**
+ * Creates the side panel container if it doesn't exist
+ * @returns {HTMLElement} Panel container element
+ */
 function createPanel() {
   ensureStyles();
 
@@ -111,11 +123,26 @@ function createPanel() {
   return container;
 }
 
+/**
+ * Updates CSS custom property for panel width
+ * @param {HTMLElement} container - Panel container element
+ * @param {boolean} willShow - Whether panel will be visible
+ */
 function updatePanelOffset(container, willShow) {
   const width = willShow ? container.getBoundingClientRect().width : 0;
   document.documentElement.style.setProperty("--prompanion-panel-width", `${width}px`);
 }
 
+/**
+ * Dispatches panel resize event
+ */
+function notifyPanelResize() {
+  window.dispatchEvent(new CustomEvent("prompanion-panel-resize"));
+}
+
+/**
+ * Toggles the side panel visibility
+ */
 function togglePanel() {
   const container = createPanel();
   const willShow = !container.classList.contains(PANEL_VISIBLE_CLASS);
@@ -129,12 +156,14 @@ function togglePanel() {
   }
   requestAnimationFrame(() => {
     updatePanelOffset(container, willShow);
-    const notify = () => window.dispatchEvent(new CustomEvent("prompanion-panel-resize"));
-    notify();
-    setTimeout(notify, 180);
+    notifyPanelResize();
+    setTimeout(notifyPanelResize, 180);
   });
 }
 
+/**
+ * Opens the side panel
+ */
 function openPanel() {
   const container = createPanel();
   container.classList.add(PANEL_VISIBLE_CLASS);
@@ -142,21 +171,23 @@ function openPanel() {
   document.body.classList.add(PANEL_PUSH_CLASS);
   requestAnimationFrame(() => {
     updatePanelOffset(container, true);
-    const notify = () => window.dispatchEvent(new CustomEvent("prompanion-panel-resize"));
-    notify();
-    setTimeout(notify, 180);
+    notifyPanelResize();
+    setTimeout(notifyPanelResize, 180);
   });
 }
 
+/**
+ * Closes the side panel
+ * @param {HTMLElement} container - Panel container element
+ */
 function closePanel(container) {
   container.classList.remove(PANEL_VISIBLE_CLASS);
   document.documentElement.classList.remove(PANEL_PUSH_CLASS);
   document.body.classList.remove(PANEL_PUSH_CLASS);
   requestAnimationFrame(() => {
     updatePanelOffset(container, false);
-    const notify = () => window.dispatchEvent(new CustomEvent("prompanion-panel-resize"));
-    notify();
-    setTimeout(notify, 180);
+    notifyPanelResize();
+    setTimeout(notifyPanelResize, 180);
   });
 }
 

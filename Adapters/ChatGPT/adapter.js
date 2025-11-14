@@ -12,9 +12,7 @@ const HIGHLIGHT_BUTTON_SELECTORS = [
 let domObserverStarted = false;
 let buttonInitialized = false;
 const tooltipRegistry = new WeakMap();
-const debug = (...args) => console.log("[Prompanion][ChatGPT]", ...args);
 
-debug("Adapter loaded", {
   location: window.location.href,
   documentReadyState: document.readyState
 });
@@ -45,35 +43,35 @@ const styles = `
     justify-content: center;
     border: none;
     border-radius: 50%;
-    width: 48px;
-    height: 48px;
+    width: 36px;
+    height: 36px;
     padding: 0;
-    background: linear-gradient(135deg, #3a7bff, #2957c7);
-    box-shadow: 0 12px 28px rgba(46, 86, 150, 0.45);
+    background: linear-gradient(135deg, #10152b, #1f2a44);
+    box-shadow: 0 6px 16px rgba(31, 42, 68, 0.25);
     cursor: pointer;
     transition: transform 120ms ease, box-shadow 120ms ease;
   }
 
   .${BUTTON_CLASS}:hover {
     transform: translateY(-1px);
-    box-shadow: 0 16px 32px rgba(46, 86, 150, 0.5);
+    box-shadow: 0 8px 18px rgba(31, 42, 68, 0.3);
   }
 
   .${BUTTON_CLASS}:focus-visible {
-    outline: 2px solid #6ca1ff;
+    outline: 2px solid #246bff;
     outline-offset: 2px;
   }
 
   .${BUTTON_CLASS}__icon {
-    width: 40px;
-    height: 40px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     display: block;
-    background-color: #0f1626;
+    background-color: #162036;
     background-position: center;
     background-repeat: no-repeat;
     background-size: cover;
-    box-shadow: inset 0 0 0 1px rgba(233, 237, 255, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   }
 
   .prompanion-enhance-tooltip {
@@ -184,13 +182,15 @@ const styles = `
 `;
 
 function ensureStyle() {
-  if (document.getElementById(`${BUTTON_ID}-style`)) {
-    return;
+  let style = document.getElementById(`${BUTTON_ID}-style`);
+  if (!style) {
+    style = document.createElement("style");
+    style.id = `${BUTTON_ID}-style`;
+    document.head.append(style);
   }
-  const style = document.createElement("style");
-  style.id = `${BUTTON_ID}-style`;
-  style.textContent = styles;
-  document.head.append(style);
+  if (style.textContent !== styles) {
+    style.textContent = styles;
+  }
 }
 
 function getHighlightButton() {
@@ -453,7 +453,6 @@ function submitSelectionToSideChat(text) {
         } else if (!response?.ok) {
           console.warn("Prompanion: sidechat request rejected", response?.reason);
         } else {
-          debug("Sidechat request submitted from selection", { textLength: snippet.length });
         }
         selectionAskInFlight = false;
       }
@@ -496,7 +495,7 @@ function createIcon() {
   const icon = document.createElement("span");
   icon.className = `${BUTTON_CLASS}__icon`;
   icon.setAttribute("aria-hidden", "true");
-  const assetUrl = chrome.runtime.getURL("/icons/icon48.png");
+  const assetUrl = chrome.runtime.getURL("/Assets/icons/icon48.png");
   icon.style.backgroundImage = `url('${assetUrl}')`;
   icon.dataset.iconUrl = assetUrl;
   return icon;
@@ -560,7 +559,6 @@ function requestPanelOpen() {
     if (!response?.ok) {
       console.warn("Prompanion: open panel rejected", response?.reason);
     } else {
-      debug("Panel open request acknowledged", response);
     }
   });
 }
@@ -570,7 +568,6 @@ function handleTooltipEnhanceAction(event) {
   event.stopPropagation();
 
   if (enhanceActionInFlight) {
-    debug("Enhance action ignored; already in flight");
     return;
   }
 
@@ -581,7 +578,6 @@ function handleTooltipEnhanceAction(event) {
   }
 
   enhanceActionInFlight = true;
-  debug("Enhance action triggered", {
     promptLength: promptText.length,
     snippet: promptText.slice(0, 24)
   });
@@ -595,7 +591,6 @@ function handleTooltipEnhanceAction(event) {
           ? result.optionA.trim()
           : `${promptText}\n\n(Refined draft ready once your API key is configured.)`;
       const applied = setComposerText(composerNode, refinedText);
-      debug("Composer updated with refined option", { applied });
       requestPanelOpen();
     })
     .catch((error) => {
@@ -604,7 +599,6 @@ function handleTooltipEnhanceAction(event) {
         composerNode,
         `${promptText}\n\n(Unable to refine right now. Check your API key in the sidebar settings.)`
       );
-      debug("Composer updated with fallback after error", { applied });
       requestPanelOpen();
     })
     .finally(() => {
@@ -639,8 +633,14 @@ function buildButton() {
 
 function ensureFloatingButton() {
   if (floatingButtonWrapper && floatingButtonElement) {
+    floatingButtonWrapper.style.width = "36px";
+    floatingButtonWrapper.style.height = "36px";
+    floatingButtonElement.style.width = "32px";
+    floatingButtonElement.style.height = "32px";
     return;
   }
+
+  ensureStyle();
 
   floatingButtonWrapper = document.getElementById(`${BUTTON_ID}-wrapper`);
 
@@ -653,11 +653,15 @@ function ensureFloatingButton() {
     floatingButtonWrapper.style.display = "flex";
     floatingButtonWrapper.style.alignItems = "center";
     floatingButtonWrapper.style.justifyContent = "center";
-    floatingButtonWrapper.style.width = "48px";
-    floatingButtonWrapper.style.height = "48px";
   }
 
+  floatingButtonWrapper.style.width = "36px";
+  floatingButtonWrapper.style.height = "36px";
+
   floatingButtonElement = document.getElementById(BUTTON_ID) ?? buildButton();
+
+  floatingButtonElement.style.width = "32px";
+  floatingButtonElement.style.height = "32px";
 
   if (!floatingButtonElement.isConnected) {
     floatingButtonWrapper.append(floatingButtonElement);
@@ -714,7 +718,6 @@ function ensureDomObserver() {
   const observer = new MutationObserver(() => {
     requestSelectionToolbarUpdate();
     const composer = locateComposer();
-    debug("Mutation observed", {
       hasComposer: Boolean(composer),
       hasButton: Boolean(document.getElementById(BUTTON_ID))
     });
@@ -777,7 +780,6 @@ function locateComposer() {
     input.parentElement ??
     document.body;
 
-  debug("Composer located", {
     inputTag: input.tagName,
     inputClass: input.className,
     containerTag: container?.tagName ?? "UNKNOWN"
@@ -788,13 +790,11 @@ function locateComposer() {
 
 function init() {
   const composer = locateComposer();
-  debug("Init called", { hasComposer: Boolean(composer) });
   requestSelectionToolbarUpdate();
   if (composer) {
     placeButton(composer.container, composer.input);
     setupEnhanceTooltip(composer.input, composer.container);
     ensureDomObserver();
-    debug("Init successful");
     return true;
   }
   ensureDomObserver();
@@ -802,13 +802,10 @@ function init() {
 }
 
 function bootstrap() {
-  debug("Bootstrap invoked", { readyState: document.readyState });
   ensureHighlightObserver();
   if (!init()) {
     const observer = new MutationObserver(() => {
-      debug("Bootstrap observer mutation triggered");
       if (init()) {
-        debug("Deferred init succeeded via bootstrap observer");
         observer.disconnect();
       }
     });
@@ -940,13 +937,11 @@ function positionTooltip(button, tooltip) {
 }
 
 function setupEnhanceTooltip(input, container) {
-  debug("Compose container detected", { hasInput: Boolean(input) });
   if (!input) {
     return;
   }
 
   if (enhanceTooltipActiveTextarea === input) {
-    debug("Skipping tooltip setup; input already bound");
     return;
   }
 
@@ -1016,7 +1011,6 @@ function bindInputEvents(input) {
   input.addEventListener("focus", handleInputChange);
   input.addEventListener("blur", handleInputBlur);
 
-  debug("Input listeners attached", { node: input });
   handleInputChange();
 }
 
@@ -1045,7 +1039,6 @@ function handleInputChange() {
   const text = sanitized.trim();
   const words = text.split(/\s+/).filter(Boolean);
 
-  debug("Input change detected", {
     rawText,
     wordCount: words.length,
     dismissed: enhanceTooltipDismissed
@@ -1089,7 +1082,6 @@ function scheduleEnhanceTooltip() {
     const words = text.split(/\s+/).filter(Boolean);
 
     if (words.length >= 3 && !enhanceTooltipDismissed) {
-      debug("Showing enhance tooltip", { wordCount: words.length, text });
       showEnhanceTooltip();
     }
   }, 1000);
@@ -1100,7 +1092,6 @@ function showEnhanceTooltip() {
     return;
   }
   positionEnhanceTooltip();
-  debug("Enhance tooltip visible");
   enhanceTooltipElement.classList.add("is-visible");
   attachTooltipResizeHandler();
 }
@@ -1110,7 +1101,6 @@ function hideEnhanceTooltip() {
     return;
   }
   if (enhanceTooltipElement.classList.contains("is-visible")) {
-    debug("Enhance tooltip hidden");
   }
   enhanceTooltipElement.classList.remove("is-visible");
   detachTooltipResizeHandler();
@@ -1164,7 +1154,6 @@ const readyState = document.readyState;
 if (readyState === "complete" || readyState === "interactive") {
   bootstrap();
 } else {
-  debug("Waiting for DOMContentLoaded to bootstrap", { readyState });
   document.addEventListener("DOMContentLoaded", bootstrap);
 }
 

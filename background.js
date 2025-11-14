@@ -1,7 +1,36 @@
-const STATE_KEY = "prompanion-sidepanel-state";
+/**
+ * Background Service Worker
+ * Handles extension state management, API calls, and message routing
+ */
 
+const STATE_KEY = "prompanion-sidepanel-state";
 const storageArea = chrome.storage?.sync ?? chrome.storage?.local;
 
+/**
+ * Gets the tab ID from sender or active tab
+ * @param {Object} sender - Message sender object
+ * @returns {Promise<number|null>} Tab ID or null if unavailable
+ */
+async function getTabId(sender) {
+  if (sender.tab?.id) {
+    return sender.tab.id;
+  }
+  try {
+    const [activeTab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true
+    });
+    return activeTab?.id;
+  } catch (error) {
+    console.warn("Prompanion: failed to resolve active tab", error);
+    return null;
+  }
+}
+
+/**
+ * Reads application state from storage
+ * @returns {Promise<Object>} Application state object
+ */
 async function readState() {
   if (!storageArea) {
     return {};
@@ -10,6 +39,10 @@ async function readState() {
   return result?.[STATE_KEY] ?? {};
 }
 
+/**
+ * Writes application state to storage
+ * @param {Object} nextState - State object to save
+ */
 async function writeState(nextState) {
   if (!storageArea) {
     return;
@@ -25,54 +58,57 @@ chrome.action.onClicked.addListener(async (tab) => {
   await togglePanel(tab.id);
 });
 
+/**
+ * Sends a message to a tab, with fallback injection if needed
+ * @param {number} tabId - Target tab ID
+ * @param {string} messageType - Message type to send
+ * @returns {Promise<boolean>} Success status
+ */
+async function sendMessageToTab(tabId, messageType) {
+  if (!tabId) {
+    return false;
+  }
+
+  try {
+    await chrome.tabs.sendMessage(tabId, { type: messageType });
+    return true;
+  } catch (error) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["scripts/injector.js"]
+      });
+      await chrome.tabs.sendMessage(tabId, { type: messageType });
+      return true;
+    } catch (injectError) {
+      console.error(`Prompanion: unable to ${messageType.toLowerCase()} panel`, injectError);
+      return false;
+    }
+  }
+}
+
+/**
+ * Toggles the side panel visibility
+ * @param {number} tabId - Target tab ID
+ */
 async function togglePanel(tabId) {
-  if (!tabId) {
-    return;
-  }
-
-  try {
-    await chrome.tabs.sendMessage(tabId, { type: "PROMPANION_TOGGLE_PANEL" });
-  } catch (error) {
-    console.warn(
-      `Prompanion: tabs.sendMessage failed for tab ${tabId}, attempting to inject content script`,
-      error
-    );
-    try {
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        files: ["scripts/injector.js"]
-      });
-      await chrome.tabs.sendMessage(tabId, { type: "PROMPANION_TOGGLE_PANEL" });
-    } catch (injectError) {
-      console.error("Prompanion: unable to toggle sidebar panel", injectError);
-    }
-  }
+  await sendMessageToTab(tabId, "PROMPANION_TOGGLE_PANEL");
 }
 
+/**
+ * Opens the side panel
+ * @param {number} tabId - Target tab ID
+ */
 async function openPanel(tabId) {
-  if (!tabId) {
-    return;
-  }
-
-  try {
-    await chrome.tabs.sendMessage(tabId, { type: "PROMPANION_OPEN_PANEL" });
-  } catch (error) {
-    console.warn(
-      `Prompanion: tabs.sendMessage failed for open request in tab ${tabId}, attempting to inject content script`,
-      error
-    );
-    try {
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        files: ["scripts/injector.js"]
-      });
-      await chrome.tabs.sendMessage(tabId, { type: "PROMPANION_OPEN_PANEL" });
-    } catch (injectError) {
-      console.error("Prompanion: unable to open sidebar panel", injectError);
-    }
-  }
+  await sendMessageToTab(tabId, "PROMPANION_OPEN_PANEL");
 }
 
+/**
+ * Generates two enhanced versions of a prompt using OpenAI API
+ * @param {string} apiKey - OpenAI API key
+ * @param {string} promptText - Original prompt text
+ * @returns {Promise<Object>} Object with optionA and optionB enhanced prompts
+ */
 async function generateEnhancements(apiKey, promptText) {
   const fallbackA = `${promptText}\n\nRefined focus: clarify intent and add a persuasive closing.`;
   const fallbackB = `${promptText}\n\nRefined focus: provide more context and outline clear next steps.`;
@@ -162,14 +198,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           clearPending: true
         });
 
-        let tabId = sender.tab?.id;
-        if (!tabId) {
-          const [activeTab] = await chrome.tabs.query({
-            active: true,
-            currentWindow: true
-          });
-          tabId = activeTab?.id;
-        }
+        const tabId = await getTabId(sender);
         if (tabId) {
           await openPanel(tabId);
         }
@@ -186,7 +215,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
       try {
         const state = await readState();
-        console.info("Prompanion: panel requested state", state);
         sendResponse?.({ ok: true, state });
       } catch (error) {
         console.error("Prompanion: failed to read state for panel request", error);
@@ -199,10 +227,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "PROMPANION_PREPARE_ENHANCEMENT") {
     (async () => {
       try {
-        console.info("Prompanion: enhancement request received", {
-          hasSenderTab: Boolean(sender.tab?.id),
-          promptLength: typeof message.prompt === "string" ? message.prompt.length : null
-        });
         const promptText =
           typeof message.prompt === "string" ? message.prompt : "";
         const currentState = await readState();
@@ -215,21 +239,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           optionB
         };
         await writeState(nextState);
-        console.info("Prompanion: enhancement seeded", { promptLength: promptText.length });
         chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState });
         if (message.openPanel !== false) {
-          let tabId = sender.tab?.id;
-          if (!tabId) {
-            try {
-              const [activeTab] = await chrome.tabs.query({
-                active: true,
-                currentWindow: true
-              });
-              tabId = activeTab?.id;
-            } catch (queryError) {
-              console.warn("Prompanion: failed to resolve active tab for toggle", queryError);
-            }
-          }
+          const tabId = await getTabId(sender);
           if (tabId) {
             await openPanel(tabId);
           } else {
@@ -265,14 +277,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "PROMPANION_OPEN_PANEL") {
     (async () => {
       try {
-        let tabId = sender.tab?.id;
-        if (!tabId) {
-          const [activeTab] = await chrome.tabs.query({
-            active: true,
-            currentWindow: true
-          });
-          tabId = activeTab?.id;
-        }
+        const tabId = await getTabId(sender);
         if (!tabId) {
           sendResponse?.({ ok: false, reason: "NO_TAB" });
           return;
