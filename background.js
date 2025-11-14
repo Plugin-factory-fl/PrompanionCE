@@ -4,7 +4,7 @@
  */
 
 const STATE_KEY = "prompanion-sidepanel-state";
-const storageArea = chrome.storage?.sync ?? chrome.storage?.local;
+const storageArea = chrome.storage?.sync;
 
 /**
  * Gets the tab ID from sender or active tab
@@ -114,7 +114,7 @@ async function generateEnhancements(apiKey, promptText) {
   const fallbackB = `${promptText}\n\nRefined focus: provide more context and outline clear next steps.`;
 
   if (!apiKey) {
-    return { optionA: fallbackA, optionB: fallbackB };
+    return { optionA: fallbackA, optionB: fallbackB, error: "NO_API_KEY" };
   }
 
   try {
@@ -131,11 +131,105 @@ async function generateEnhancements(apiKey, promptText) {
           {
             role: "system",
             content:
-              "You enhance prompts for LLM users. Produce two improved versions. Reply ONLY with JSON: {\"optionA\":\"...\",\"optionB\":\"...\"}."
+              "You are an expert at refining and enhancing prompts for AI language models. Your task is to take a user's original prompt and create two distinct, improved versions that are more effective, clear, and likely to produce better results.\n\n" +
+              "Option A should focus on: clarity, specificity, and structure. Make it more precise and easier for the AI to understand exactly what is needed.\n\n" +
+              "Option B should focus on: adding context, examples, or constraints that guide the AI toward the desired output style and quality.\n\n" +
+              "Both versions should be complete, standalone prompts that improve upon the original. Do not add explanations or meta-commentary - just provide the enhanced prompts.\n\n" +
+              "Reply ONLY with valid JSON in this exact format: {\"optionA\":\"enhanced prompt A here\",\"optionB\":\"enhanced prompt B here\"}"
           },
           {
             role: "user",
-            content: `Original prompt:\n${promptText}`
+            content: `Enhance this prompt:\n\n${promptText}`
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: { message: errorText } };
+      }
+      
+      // Check for quota/billing errors
+      if (errorData.error?.code === "insufficient_quota" || 
+          errorData.error?.type === "insufficient_quota" ||
+          errorText.includes("quota") ||
+          errorText.includes("billing")) {
+        throw new Error("API_QUOTA_EXCEEDED");
+      }
+      
+      throw new Error(errorText);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (!content) {
+      return { optionA: fallbackA, optionB: fallbackB, error: "EMPTY_RESPONSE" };
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (error) {
+      return { optionA: fallbackA, optionB: fallbackB, error: "PARSE_ERROR" };
+    }
+
+    const optionA = typeof parsed.optionA === "string" ? parsed.optionA.trim() : fallbackA;
+    const optionB = typeof parsed.optionB === "string" ? parsed.optionB.trim() : fallbackB;
+    return { optionA, optionB };
+  } catch (error) {
+    console.error("Prompanion: enhancement generation failed", error);
+    const errorMessage = error.message || String(error);
+    if (errorMessage === "API_QUOTA_EXCEEDED") {
+      return { optionA: promptText, optionB: promptText, error: "API_QUOTA_EXCEEDED" };
+    }
+    return { optionA: promptText, optionB: promptText, error: "API_ERROR" };
+  }
+}
+
+/**
+ * Regenerates a single enhanced prompt option by re-wording it for better clarity
+ * @param {string} apiKey - OpenAI API key
+ * @param {string} currentPrompt - The current enhanced prompt to regenerate
+ * @returns {Promise<string>} Regenerated prompt text
+ */
+async function regenerateEnhancement(apiKey, currentPrompt) {
+  const fallback = `${currentPrompt}\n\n(Re-worded for improved clarity and precision.)`;
+
+  if (!apiKey) {
+    return fallback;
+  }
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-3.5-turbo",
+        temperature: 0.8,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an expert at re-wording and refining prompts for AI language models. Your task is to take an existing enhanced prompt and re-word it to be more clear, precise, and effective while maintaining the same intent and meaning.\n\n" +
+              "Improve the prompt by:\n" +
+              "- Using clearer, more direct language\n" +
+              "- Improving sentence structure and flow\n" +
+              "- Enhancing specificity where needed\n" +
+              "- Making it more concise without losing important details\n" +
+              "- Ensuring it's easy for an AI to understand and execute\n\n" +
+              "Do not add explanations or meta-commentary - just provide the re-worded prompt. Return ONLY the improved prompt text, nothing else."
+          },
+          {
+            role: "user",
+            content: `Re-word this prompt to be more clear and effective:\n\n${currentPrompt}`
           }
         ]
       })
@@ -148,22 +242,13 @@ async function generateEnhancements(apiKey, promptText) {
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content?.trim();
     if (!content) {
-      return { optionA: fallbackA, optionB: fallbackB };
+      return fallback;
     }
 
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch (error) {
-      return { optionA: fallbackA, optionB: fallbackB };
-    }
-
-    const optionA = typeof parsed.optionA === "string" ? parsed.optionA.trim() : fallbackA;
-    const optionB = typeof parsed.optionB === "string" ? parsed.optionB.trim() : fallbackB;
-    return { optionA, optionB };
+    return content;
   } catch (error) {
-    console.error("Prompanion: enhancement generation failed", error);
-    return { optionA: fallbackA, optionB: fallbackB };
+    console.error("Prompanion: regeneration failed", error);
+    return fallback;
   }
 }
 
@@ -229,18 +314,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       try {
         const promptText =
           typeof message.prompt === "string" ? message.prompt : "";
+        console.log("[Prompanion Background] PROMPANION_PREPARE_ENHANCEMENT received, prompt:", promptText);
         const currentState = await readState();
         const apiKey = currentState.settings?.apiKey;
-        const { optionA, optionB } = await generateEnhancements(apiKey, promptText);
+        const result = await generateEnhancements(apiKey, promptText);
+        const { optionA, optionB, error } = result;
+        console.log("[Prompanion Background] Enhancement result - optionA:", optionA, "optionB:", optionB, "error:", error);
         const nextState = {
           ...currentState,
           originalPrompt: promptText,
           optionA,
           optionB
         };
+        console.log("[Prompanion Background] Next state prepared:", { 
+          originalPrompt: nextState.originalPrompt?.substring(0, 50), 
+          optionA: nextState.optionA?.substring(0, 50), 
+          optionB: nextState.optionB?.substring(0, 50) 
+        });
         await writeState(nextState);
-        chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState });
-        if (message.openPanel !== false) {
+        console.log("[Prompanion Background] ========== STATE SAVED TO STORAGE ==========");
+        console.log("[Prompanion Background] Verifying state was saved...");
+        const verifyState = await readState();
+        console.log("[Prompanion Background] Verified saved state:", {
+          hasOriginalPrompt: !!verifyState.originalPrompt,
+          hasOptionA: !!verifyState.optionA,
+          hasOptionB: !!verifyState.optionB,
+          originalPrompt: verifyState.originalPrompt?.substring(0, 50),
+          optionA: verifyState.optionA?.substring(0, 50),
+          optionB: verifyState.optionB?.substring(0, 50)
+        });
+        console.log("[Prompanion Background] State saved, sending PROMPANION_STATE_PUSH message");
+        
+        // Send message to any listeners (including sidepanel if it's loaded)
+        chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState }, (response) => {
+          if (chrome.runtime.lastError) {
+            // This is normal if sidepanel isn't loaded yet - state is saved to storage
+            console.log("[Prompanion Background] STATE_PUSH message sent (sidepanel may not be loaded yet):", chrome.runtime.lastError.message);
+          } else {
+            console.log("[Prompanion Background] STATE_PUSH message sent successfully");
+          }
+        });
+        
+        if (message.openPanel !== false && !error) {
           const tabId = await getTabId(sender);
           if (tabId) {
             await openPanel(tabId);
@@ -248,10 +363,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             console.warn("Prompanion: could not toggle panel, no tabId resolved");
           }
         }
-        sendResponse?.({ ok: true, optionA, optionB });
+        sendResponse?.({ ok: !error, optionA, optionB, error });
       } catch (error) {
         console.error("Prompanion: failed to prepare enhancement", error);
-        sendResponse?.({ ok: false, reason: error?.message ?? "UNKNOWN" });
+        sendResponse?.({ ok: false, reason: error?.message ?? "UNKNOWN", error: "UNKNOWN" });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === "PROMPANION_REGENERATE_ENHANCEMENT") {
+    (async () => {
+      try {
+        const currentPrompt = typeof message.prompt === "string" ? message.prompt.trim() : "";
+        if (!currentPrompt) {
+          if (sendResponse) {
+            sendResponse({ ok: false, reason: "EMPTY_PROMPT" });
+          }
+          return;
+        }
+
+        const currentState = await readState();
+        const apiKey = currentState.settings?.apiKey;
+        const regenerated = await regenerateEnhancement(apiKey, currentPrompt);
+        
+        const optionKey = message.option === "a" ? "optionA" : message.option === "b" ? "optionB" : null;
+        if (optionKey) {
+          const nextState = {
+            ...currentState,
+            [optionKey]: regenerated
+          };
+          await writeState(nextState);
+          chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState });
+        }
+        
+        if (sendResponse) {
+          sendResponse({ ok: true, regenerated });
+        }
+      } catch (error) {
+        console.error("Prompanion: failed to regenerate enhancement", error);
+        if (sendResponse) {
+          sendResponse({ ok: false, reason: error?.message ?? "UNKNOWN" });
+        }
       }
     })();
     return true;

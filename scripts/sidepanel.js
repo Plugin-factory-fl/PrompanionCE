@@ -4,11 +4,14 @@
  */
 
 import {
+  initPromptEnhancer,
   renderPrompts,
   handleEnhance,
   registerCopyHandlers,
   initTabs,
-  registerEnhanceButton
+  registerEnhanceButton,
+  handleStateRestore,
+  handleStatePush
 } from "../Source/promptEnhancer.js";
 import {
   renderChat,
@@ -42,8 +45,7 @@ const defaultState = {
   enhancementsUsed: 3,
   enhancementsLimit: 10,
   activePlatform: "ChatGPT",
-  originalPrompt:
-    "Draft a customer support response thanking them for their feedback and promising a follow-up within 24 hours.",
+  originalPrompt: "",
   optionA: "",
   optionB: "",
   library: createDefaultLibrary(),
@@ -56,20 +58,7 @@ const defaultState = {
     output: "text",
     contentType: "research"
   },
-  conversations: [
-    {
-      id: `conv-${Date.now()}`,
-      title: "Welcome",
-      history: [
-        {
-          role: "agent",
-          content:
-            "Welcome back! Drop any snippet you'd like me to elaborate or clarify, and I'll help expand it on the spot.",
-          timestamp: Date.now()
-        }
-      ]
-    }
-  ],
+  conversations: [],
   activeConversationId: null,
   pendingSideChat: null
 };
@@ -77,30 +66,72 @@ const defaultState = {
 /**
  * Storage abstraction layer - uses Chrome sync storage if available, falls back to localStorage
  */
-const storage = (() => {
-  const hasChromeSync = Boolean(globalThis.chrome?.storage?.sync);
-
-  return {
-    async get(key) {
-      if (hasChromeSync) {
-        const result = await chrome.storage.sync.get(key);
-        return result[key];
-      }
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : undefined;
-    },
-    async set(key, value) {
-      if (hasChromeSync) {
-        await chrome.storage.sync.set({ [key]: value });
-        return;
-      }
-      localStorage.setItem(key, JSON.stringify(value));
-    }
-  };
-})();
+const storage = {
+  async get(key) {
+    const result = await chrome.storage.sync.get(key);
+    return result[key];
+  },
+  async set(key, value) {
+    await chrome.storage.sync.set({ [key]: value });
+  }
+};
 
 const STATE_KEY = "prompanion-sidepanel-state";
 let currentState = null;
+const pendingMessages = [];
+const pendingStorageChanges = [];
+
+/**
+ * Conversation expiration time: 48 hours in milliseconds
+ */
+const CONVERSATION_EXPIRATION_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * Filters out conversations that are older than 48 hours
+ * @param {Array} conversations - Array of conversation objects
+ * @returns {Array} Filtered array with only non-expired conversations
+ */
+function filterExpiredConversations(conversations) {
+  if (!Array.isArray(conversations)) {
+    return [];
+  }
+  const now = Date.now();
+  return conversations.filter((conv) => {
+    if (!conv || !conv.id) {
+      return false;
+    }
+    // Extract timestamp from conversation ID (format: "conv-{timestamp}")
+    const timestampMatch = conv.id.match(/^conv-(\d+)$/);
+    if (!timestampMatch) {
+      return false;
+    }
+    const conversationTimestamp = Number.parseInt(timestampMatch[1], 10);
+    if (!Number.isFinite(conversationTimestamp)) {
+      return false;
+    }
+    // Keep conversation if it's less than 48 hours old
+    return (now - conversationTimestamp) < CONVERSATION_EXPIRATION_MS;
+  });
+}
+
+/**
+ * Creates a new conversation with the welcome message
+ * @returns {Object} New conversation object
+ */
+function createNewConversation() {
+  return {
+    id: `conv-${Date.now()}`,
+    title: "New chat",
+    history: [
+      {
+        role: "agent",
+        content:
+          "Welcome to the Side Chat! This is where you can ask me questions to elaborate on ideas you aren't clear on. I open up automatically when you highlight any text response from your LLM in the browser and click the \"Elaborate\" button. I'm here to help!",
+        timestamp: Date.now()
+      }
+    ]
+  };
+}
 
 /**
  * Loads application state from storage, merging with defaults
@@ -110,6 +141,9 @@ async function loadState() {
   const stored = await storage.get(STATE_KEY);
   if (!stored) {
     const initialState = structuredClone(defaultState);
+    const newConversation = createNewConversation();
+    initialState.conversations = [newConversation];
+    initialState.activeConversationId = newConversation.id;
     await storage.set(STATE_KEY, initialState);
     return initialState;
   }
@@ -117,12 +151,16 @@ async function loadState() {
     ? stored.libraryVersion
     : 0;
   const normalizedLibrary = normalizeLibrary(stored.library ?? []);
+  
+  // Filter out expired conversations (older than 48 hours)
+  const validConversations = filterExpiredConversations(stored.conversations ?? []);
+  
   const mergedState = {
     ...structuredClone(defaultState),
     ...stored,
     settings: { ...defaultState.settings, ...stored.settings },
-    conversations: stored.conversations ?? structuredClone(defaultState.conversations),
-    activeConversationId: stored.activeConversationId ?? defaultState.conversations[0].id
+    conversations: validConversations,
+    activeConversationId: null // Will be set to new conversation in init()
   };
 
   if (storedLibraryVersion !== LIBRARY_SCHEMA_VERSION) {
@@ -171,6 +209,19 @@ function registerSectionActionGuards() {
       );
     });
   });
+
+  // Prevent info buttons from triggering section collapse
+  document.querySelectorAll(".library-info-btn").forEach((button) => {
+    ["pointerdown", "mousedown", "click", "touchstart", "keydown"].forEach((type) => {
+      button.addEventListener(
+        type,
+        (event) => {
+          event.stopPropagation();
+        },
+        { passive: false }
+      );
+    });
+  });
 }
 
 /**
@@ -179,14 +230,22 @@ function registerSectionActionGuards() {
 async function init() {
   currentState = await loadState();
 
-  if (!currentState.activeConversationId) {
-    currentState.activeConversationId = currentState.conversations[0]?.id;
+  const hasSavedPrompts = currentState && (currentState.originalPrompt || currentState.optionA || currentState.optionB);
+  if (hasSavedPrompts) {
+    renderPrompts(currentState);
+  } else {
+    initPromptEnhancer(currentState);
   }
+
+  // Always create a new conversation on load
+  const newConversation = createNewConversation();
+  currentState.conversations.push(newConversation);
+  currentState.activeConversationId = newConversation.id;
+  await saveState(currentState);
 
   const activeConversation = getActiveConversation(currentState);
 
   renderStatus(currentState);
-  renderPrompts(currentState);
   renderSettings(currentState.settings);
   renderLibrary(currentState.library);
   renderChat(activeConversation?.history ?? []);
@@ -209,16 +268,60 @@ async function init() {
 
   registerEnhanceButton(currentState, {
     renderStatus,
-    saveState,
-    detailLevelLabels,
-    defaultState
+    saveState
   });
+
+  // Process any pending messages that arrived before initialization
+  if (pendingMessages.length > 0) {
+    pendingMessages.forEach((message) => {
+      if (message.type === "PROMPANION_STATE_PUSH" && message.state) {
+        const otherState = handleStatePush(currentState, message.state);
+        Object.assign(currentState, otherState);
+        renderStatus(currentState);
+        processPendingSideChat(currentState, { saveState });
+      }
+    });
+    pendingMessages.length = 0;
+  }
+
+  // Process any storage changes that happened before init completed
+  if (pendingStorageChanges.length > 0) {
+    pendingStorageChanges.forEach((newState) => {
+      if (newState.originalPrompt || newState.optionA || newState.optionB) {
+        const otherState = handleStatePush(currentState, newState);
+        Object.assign(currentState, otherState);
+        renderStatus(currentState);
+        processPendingSideChat(currentState, { saveState });
+      }
+    });
+    pendingStorageChanges.length = 0;
+  }
+
+  // Final check: re-read storage to catch any updates that happened during init
+  const finalState = await loadState();
+  if (finalState && (finalState.originalPrompt || finalState.optionA || finalState.optionB)) {
+    const needsUpdate = 
+      currentState.originalPrompt !== finalState.originalPrompt ||
+      currentState.optionA !== finalState.optionA ||
+      currentState.optionB !== finalState.optionB;
+    if (needsUpdate) {
+      const otherState = handleStatePush(currentState, finalState);
+      Object.assign(currentState, otherState);
+      renderStatus(currentState);
+    }
+  }
 
   if (chrome?.runtime?.sendMessage) {
     chrome.runtime.sendMessage({ type: "PROMPANION_REQUEST_STATE" }, (response) => {
       if (response?.ok && response.state) {
-        Object.assign(currentState, response.state);
-        renderPrompts(currentState);
+        const hasRecentPrompts = response.state.originalPrompt && 
+                                (response.state.optionA || response.state.optionB);
+        if (hasRecentPrompts) {
+          const otherState = handleStatePush(currentState, response.state);
+          Object.assign(currentState, otherState);
+        } else {
+          handleStateRestore(currentState, response.state);
+        }
         renderStatus(currentState);
       }
     });
@@ -227,6 +330,27 @@ async function init() {
 
 document.addEventListener("DOMContentLoaded", init);
 
+// Set up storage listener BEFORE init() to catch all changes
+if (chrome?.storage?.onChanged) {
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === "sync" && changes[STATE_KEY]?.newValue) {
+      const newState = changes[STATE_KEY].newValue;
+      if (newState.originalPrompt || newState.optionA || newState.optionB) {
+        if (currentState) {
+          // Process immediately if currentState is ready
+          const otherState = handleStatePush(currentState, newState);
+          Object.assign(currentState, otherState);
+          renderStatus(currentState);
+          processPendingSideChat(currentState, { saveState });
+        } else {
+          // Queue for processing after init() completes
+          pendingStorageChanges.push(newState);
+        }
+      }
+    }
+  });
+}
+
 if (chrome?.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message) => {
     if (!message || typeof message !== "object") {
@@ -234,11 +358,12 @@ if (chrome?.runtime?.onMessage) {
     }
     if (message.type === "PROMPANION_STATE_PUSH") {
       if (!currentState) {
+        pendingMessages.push(message);
         return;
       }
       if (message.state && typeof message.state === "object") {
-        Object.assign(currentState, message.state);
-        renderPrompts(currentState);
+        const otherState = handleStatePush(currentState, message.state);
+        Object.assign(currentState, otherState);
         renderStatus(currentState);
         processPendingSideChat(currentState, { saveState });
       }

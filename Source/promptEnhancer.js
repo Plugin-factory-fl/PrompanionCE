@@ -4,6 +4,37 @@
  */
 
 /**
+ * Initializes the Prompt Enhancer section
+ * Clears all prompt fields to ensure a clean working area on every load
+ * This directly manipulates the DOM to guarantee empty fields regardless of cached state
+ * @param {Object} stateRef - Reference to current state object
+ */
+export function initPromptEnhancer(stateRef) {
+  stateRef.originalPrompt = "";
+  stateRef.optionA = "";
+  stateRef.optionB = "";
+  
+  requestAnimationFrame(() => {
+    const originalField = document.getElementById("original-prompt");
+    const optionAField = document.getElementById("option-a");
+    const optionBField = document.getElementById("option-b");
+    
+    if (originalField) {
+      originalField.value = "";
+      originalField.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    if (optionAField) {
+      optionAField.value = "";
+      optionAField.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    if (optionBField) {
+      optionBField.value = "";
+      optionBField.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  });
+}
+
+/**
  * Renders the prompt values into the DOM
  * @param {Object} prompts - Object containing originalPrompt, optionA, and optionB
  */
@@ -19,12 +50,13 @@ export function renderPrompts({ originalPrompt, optionA, optionB }) {
 
 /**
  * Handles the enhance button click action
+ * Calls the OpenAI API to generate two enhanced versions of the prompt
  * @param {Object} state - Current application state
- * @param {Object} dependencies - Required dependencies (renderStatus, saveState, detailLevelLabels, defaultState)
+ * @param {Object} dependencies - Required dependencies (renderStatus, saveState)
  * @returns {Promise<Object>} Updated state
  */
 export async function handleEnhance(state, dependencies = {}) {
-  const { renderStatus, saveState, detailLevelLabels, defaultState } = dependencies;
+  const { renderStatus, saveState } = dependencies;
   const { enhancementsUsed, enhancementsLimit } = state;
   
   if (enhancementsUsed >= enhancementsLimit) {
@@ -38,24 +70,92 @@ export async function handleEnhance(state, dependencies = {}) {
   }
   
   const basePrompt = textarea.value.trim();
-  const fallbackA = defaultState.optionA;
-  const fallbackB = defaultState.optionB;
+  if (!basePrompt) {
+    alert("Please enter a prompt to enhance.");
+    return state;
+  }
 
-  const spin = (text) =>
-    `${text} (Model: ${state.settings.model}, Output: ${state.settings.output}, Type: ${state.settings.contentType}, Detail: ${detailLevelLabels[state.settings.complexity] || state.settings.complexity})`;
+  const enhanceButton = document.getElementById("enhance-btn");
+  const originalButtonText = enhanceButton?.textContent;
+  
+  // Show loading state
+  if (enhanceButton) {
+    enhanceButton.disabled = true;
+    enhanceButton.textContent = "Enhancing...";
+  }
 
-  state.enhancementsUsed = enhancementsUsed + 1;
-  state.optionA = basePrompt
-    ? spin(`${basePrompt} — Version A focuses on clarity and persuasive voice.`)
-    : spin(fallbackA);
-  state.optionB = basePrompt
-    ? spin(`${basePrompt} — Version B adds context and a stronger CTA.`)
-    : spin(fallbackB);
+  try {
+    // Call background script to generate enhancements
+    const response = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        {
+          type: "PROMPANION_PREPARE_ENHANCEMENT",
+          prompt: basePrompt,
+          openPanel: false
+        },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          resolve(response);
+        }
+      );
+    });
 
-  renderStatus(state);
-  renderPrompts(state);
-  await saveState(state);
-  return state;
+    if (!response?.ok) {
+      throw new Error(response?.reason || "Failed to generate enhancements");
+    }
+
+    // Check if API key is missing (fallback prompts were used)
+    const hasApiKey = state.settings?.apiKey?.trim();
+    if (!hasApiKey && (response.optionA?.includes("Refined focus:") || response.optionB?.includes("Refined focus:"))) {
+      // Show a one-time notification that API key is recommended
+      const notificationShown = sessionStorage.getItem("prompanion-api-key-notification");
+      if (!notificationShown) {
+        setTimeout(() => {
+          alert("Tip: Add your OpenAI API key in settings for AI-powered prompt enhancements. Currently using basic fallback enhancements.");
+          sessionStorage.setItem("prompanion-api-key-notification", "true");
+        }, 500);
+      }
+    }
+
+    // Update state with the enhanced prompts
+    state.originalPrompt = basePrompt;
+    state.optionA = response.optionA || basePrompt;
+    state.optionB = response.optionB || basePrompt;
+    state.enhancementsUsed = enhancementsUsed + 1;
+
+    // Render the updated prompts
+    renderPrompts(state);
+    if (renderStatus) {
+      renderStatus(state);
+    }
+    
+    // Save state
+    if (saveState) {
+      await saveState(state);
+    }
+
+    return state;
+  } catch (error) {
+    console.error("Prompanion: enhancement failed", error);
+    
+    // Show error message to user
+    const errorMessage = error.message?.includes("API key") 
+      ? "Please add your OpenAI API key in settings to use prompt enhancement."
+      : "Failed to enhance prompt. Please try again.";
+    
+    alert(errorMessage);
+    
+    return state;
+  } finally {
+    // Restore button state
+    if (enhanceButton) {
+      enhanceButton.disabled = false;
+      enhanceButton.textContent = originalButtonText || "Enhance";
+    }
+  }
 }
 
 /**
@@ -107,14 +207,86 @@ export function registerCopyHandlers() {
   });
 
   const regenerateButtons = document.querySelectorAll("[data-regenerate]");
+  if (!regenerateButtons.length) {
+    console.warn("Prompanion: No regenerate buttons found");
+    return;
+  }
+  
   regenerateButtons.forEach((button) => {
     button.addEventListener("click", async () => {
       const targetId = button.dataset.regenerate;
-      const field = document.getElementById(targetId);
-      if (!field) {
+      if (!targetId) {
+        console.error("Prompanion: Regenerate button missing data-regenerate attribute");
         return;
       }
-      field.value = `${field.value}\n\n(Re-generated preview coming soon.)`;
+      
+      const field = document.getElementById(targetId);
+      if (!field) {
+        console.error(`Prompanion: Field with id "${targetId}" not found`);
+        return;
+      }
+
+      const currentPrompt = field.value.trim();
+      if (!currentPrompt) {
+        alert("No prompt to regenerate. Please enhance a prompt first.");
+        return;
+      }
+
+      const originalButtonText = button.textContent;
+      button.disabled = true;
+      button.textContent = "Regenerating...";
+
+      try {
+        // Determine which option (a or b) based on targetId
+        const option = targetId === "option-a" ? "a" : targetId === "option-b" ? "b" : null;
+        if (!option) {
+          throw new Error(`Invalid option: ${targetId}`);
+        }
+        
+        // Call background script to regenerate
+        const response = await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage(
+            {
+              type: "PROMPANION_REGENERATE_ENHANCEMENT",
+              prompt: currentPrompt,
+              option: option
+            },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+                return;
+              }
+              if (!response) {
+                reject(new Error("No response from background script"));
+                return;
+              }
+              resolve(response);
+            }
+          );
+        });
+
+        if (!response || !response.ok) {
+          throw new Error(response?.reason || "Failed to regenerate enhancement");
+        }
+
+        // Update the field with regenerated prompt
+        if (response.regenerated) {
+          field.value = response.regenerated;
+          // Trigger input event to notify any listeners
+          field.dispatchEvent(new Event("input", { bubbles: true }));
+        } else {
+          throw new Error("No regenerated prompt received");
+        }
+      } catch (error) {
+        console.error("Prompanion: regeneration failed", error);
+        const errorMessage = error.message?.includes("API key") 
+          ? "Please add your OpenAI API key in settings to use prompt regeneration."
+          : error.message || "Failed to regenerate prompt. Please try again.";
+        alert(errorMessage);
+      } finally {
+        button.disabled = false;
+        button.textContent = originalButtonText;
+      }
     });
   });
 }
@@ -148,9 +320,68 @@ export function initTabs() {
 }
 
 /**
+ * Handles state restoration from background script
+ * Excludes prompt enhancer fields to keep them clean
+ * @param {Object} stateRef - Reference to current state object
+ * @param {Object} restoredState - State object from background script
+ * @returns {Object} State object with prompt enhancer fields excluded
+ */
+export function handleStateRestore(stateRef, restoredState) {
+  // Exclude prompt enhancer fields from restoration - keep them clean
+  const { originalPrompt, optionA, optionB, ...otherState } = restoredState;
+  
+  // Update state with everything except prompt enhancer fields
+  Object.assign(stateRef, otherState);
+  
+  // Explicitly keep prompt enhancer fields empty
+  stateRef.originalPrompt = "";
+  stateRef.optionA = "";
+  stateRef.optionB = "";
+  
+  // Re-initialize prompt enhancer to ensure DOM is cleared
+  initPromptEnhancer(stateRef);
+  
+  return otherState;
+}
+
+/**
+ * Handles state updates from background script
+ * Updates prompts when new enhancements are received, otherwise keeps them clean
+ * @param {Object} stateRef - Reference to current state object
+ * @param {Object} newState - New state object from background script
+ * @returns {Object} State object with prompt enhancer fields handled appropriately
+ */
+export function handleStatePush(stateRef, newState) {
+  const hasPromptUpdates = newState.originalPrompt !== undefined || 
+                          newState.optionA !== undefined || 
+                          newState.optionB !== undefined;
+  
+  if (hasPromptUpdates) {
+    if (newState.originalPrompt !== undefined) {
+      stateRef.originalPrompt = newState.originalPrompt;
+    }
+    if (newState.optionA !== undefined) {
+      stateRef.optionA = newState.optionA;
+    }
+    if (newState.optionB !== undefined) {
+      stateRef.optionB = newState.optionB;
+    }
+    renderPrompts(stateRef);
+  } else {
+    stateRef.originalPrompt = "";
+    stateRef.optionA = "";
+    stateRef.optionB = "";
+    initPromptEnhancer(stateRef);
+  }
+  
+  const { originalPrompt, optionA, optionB, ...otherState } = newState;
+  return otherState;
+}
+
+/**
  * Registers the enhance button click handler
  * @param {Object} stateRef - Reference to current state object
- * @param {Object} dependencies - Required dependencies (renderStatus, saveState, detailLevelLabels, defaultState)
+ * @param {Object} dependencies - Required dependencies (renderStatus, saveState)
  */
 export function registerEnhanceButton(stateRef, dependencies) {
   const enhanceButton = document.getElementById("enhance-btn");
