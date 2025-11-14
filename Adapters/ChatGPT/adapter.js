@@ -1,5 +1,14 @@
 const BUTTON_ID = "prompanion-chatgpt-trigger";
 const BUTTON_CLASS = "prompanion-chatgpt-trigger";
+const PANEL_STATE_KEY = "prompanion-sidepanel-state";
+const SELECTION_TOOLBAR_ID = "prompanion-selection-toolbar";
+const SELECTION_TOOLBAR_VISIBLE_CLASS = "is-visible";
+const HIGHLIGHT_BUTTON_SELECTORS = [
+  "[data-testid='select-to-ask__ask-button']",
+  "[data-testid='select-to-ask__askbutton']",
+  "button[aria-label='Ask ChatGPT']",
+  "button[aria-label='Ask ChatGPT automatically']"
+];
 let domObserverStarted = false;
 let buttonInitialized = false;
 const tooltipRegistry = new WeakMap();
@@ -19,8 +28,15 @@ let lastEnhanceTextSnapshot = "";
 let enhanceTooltipResizeHandler = null;
 let floatingButtonElement = null;
 let floatingButtonWrapper = null;
-let floatingButtonPositionHandler = null;
 let floatingButtonTargetContainer = null;
+let floatingButtonTargetInput = null;
+let enhanceActionInFlight = false;
+let selectionAskInFlight = false;
+let selectionToolbarElement = null;
+let selectionToolbarButton = null;
+let selectionToolbarText = "";
+let selectionUpdateRaf = null;
+let highlightObserver = null;
 
 const styles = `
   .${BUTTON_CLASS} {
@@ -32,19 +48,19 @@ const styles = `
     width: 48px;
     height: 48px;
     padding: 0;
-    background: linear-gradient(135deg, #10152b, #1f2a44);
-    box-shadow: 0 6px 16px rgba(31, 42, 68, 0.25);
+    background: linear-gradient(135deg, #3a7bff, #2957c7);
+    box-shadow: 0 12px 28px rgba(46, 86, 150, 0.45);
     cursor: pointer;
     transition: transform 120ms ease, box-shadow 120ms ease;
   }
 
   .${BUTTON_CLASS}:hover {
     transform: translateY(-1px);
-    box-shadow: 0 8px 18px rgba(31, 42, 68, 0.3);
+    box-shadow: 0 16px 32px rgba(46, 86, 150, 0.5);
   }
 
   .${BUTTON_CLASS}:focus-visible {
-    outline: 2px solid #246bff;
+    outline: 2px solid #6ca1ff;
     outline-offset: 2px;
   }
 
@@ -53,11 +69,11 @@ const styles = `
     height: 40px;
     border-radius: 50%;
     display: block;
-    background-color: #162036;
+    background-color: #0f1626;
     background-position: center;
     background-repeat: no-repeat;
     background-size: cover;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(233, 237, 255, 0.12);
   }
 
   .prompanion-enhance-tooltip {
@@ -67,9 +83,9 @@ const styles = `
     gap: 8px;
     padding: 8px 12px;
     border-radius: 12px;
-    background: rgba(10, 14, 26, 0.94);
-    color: #ffffff;
-    box-shadow: 0 12px 28px rgba(10, 14, 26, 0.32);
+    background: rgba(12, 18, 32, 0.9);
+    color: #e9edff;
+    box-shadow: 0 18px 40px rgba(8, 12, 28, 0.45);
     transform: translate(-50%, 6px);
     opacity: 0;
     pointer-events: none;
@@ -93,7 +109,7 @@ const styles = `
     height: 24px;
     border-radius: 12px;
     background: transparent;
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(233, 237, 255, 0.6);
     display: grid;
     place-items: center;
     font-size: 14px;
@@ -101,7 +117,7 @@ const styles = `
   }
 
   .prompanion-enhance-tooltip__dismiss:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(233, 237, 255, 0.14);
     color: #ffffff;
   }
 
@@ -111,15 +127,59 @@ const styles = `
     justify-content: center;
     padding: 6px 12px;
     border-radius: 9999px;
-    background: #246bff;
+    background: #3a7bff;
     color: #ffffff;
     font-size: 13px;
     font-weight: 600;
-    box-shadow: 0 6px 16px rgba(36, 107, 255, 0.35);
+    box-shadow: 0 10px 26px rgba(58, 123, 255, 0.35);
   }
 
   .prompanion-enhance-tooltip__action:hover {
-    background: #1e58d0;
+    background: #2957c7;
+  }
+
+  #${SELECTION_TOOLBAR_ID} {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    background: rgba(12, 18, 32, 0.95);
+    color: #f5f8ff;
+    border-radius: 9999px;
+    box-shadow: 0 12px 28px rgba(8, 12, 28, 0.45);
+    padding: 0;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-6px);
+    transition: opacity 140ms ease, transform 140ms ease;
+    z-index: 2147483647;
+  }
+
+  #${SELECTION_TOOLBAR_ID}.${SELECTION_TOOLBAR_VISIBLE_CLASS} {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  #${SELECTION_TOOLBAR_ID} .prompanion-selection-toolbar__button {
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+
+  #${SELECTION_TOOLBAR_ID} .prompanion-selection-toolbar__button:hover,
+  #${SELECTION_TOOLBAR_ID} .prompanion-selection-toolbar__button:focus-visible {
+    background: rgba(255, 255, 255, 0.12);
+    outline: none;
   }
 `;
 
@@ -133,6 +193,305 @@ function ensureStyle() {
   document.head.append(style);
 }
 
+function getHighlightButton() {
+  for (const selector of HIGHLIGHT_BUTTON_SELECTORS) {
+    const button = document.querySelector(selector);
+    if (button instanceof HTMLButtonElement && button.offsetParent) {
+      return button;
+    }
+  }
+  return null;
+}
+
+function nodeInAssistantMessage(node) {
+  if (!node) {
+    return false;
+  }
+  const element =
+    node.nodeType === Node.TEXT_NODE ? node.parentElement : node instanceof HTMLElement ? node : null;
+  if (!element) {
+    return false;
+  }
+  if (element.closest("[data-message-author-role='assistant']")) {
+    return true;
+  }
+  if (element.closest("[data-testid^='conversation-turn'][data-message-author-role='assistant']")) {
+    return true;
+  }
+  if (element.closest("[data-testid='assistant-turn']")) {
+    return true;
+  }
+  const article = element.closest("article");
+  if (article && article.closest("main")) {
+    return true;
+  }
+  return false;
+}
+
+function selectionTargetsAssistant(selection) {
+  if (!selection) {
+    return false;
+  }
+  if (nodeInAssistantMessage(selection.anchorNode)) {
+    return true;
+  }
+  if (nodeInAssistantMessage(selection.focusNode)) {
+    return true;
+  }
+  // Walk through range common ancestor for nested text nodes.
+  try {
+    const range = selection.rangeCount ? selection.getRangeAt(0) : null;
+    if (range) {
+      return nodeInAssistantMessage(range.commonAncestorContainer);
+    }
+  } catch (error) {
+    // noop
+  }
+  return false;
+}
+
+function ensureHighlightObserver() {
+  if (highlightObserver || !document.body) {
+    return;
+  }
+  highlightObserver = new MutationObserver(() => {
+    if (getHighlightButton()) {
+      requestSelectionToolbarUpdate();
+    }
+  });
+  highlightObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+function findAskChatGPTSelectionButton() {
+  for (const selector of ASK_CHATGPT_SELECTORS) {
+    const candidate = document.querySelector(selector);
+    if (candidate instanceof HTMLButtonElement) {
+      return candidate;
+    }
+  }
+  const buttons = Array.from(document.querySelectorAll("button"));
+  return buttons.find((button) => {
+    const label = button.textContent?.toLowerCase().replace(/\s+/g, " ").trim() ?? "";
+    return label === "ask chatgpt automatically" || label === "ask chatgpt";
+  });
+}
+
+function nodeInComposer(node) {
+  if (!node) {
+    return false;
+  }
+  const element =
+    node.nodeType === Node.TEXT_NODE ? node.parentElement : node instanceof HTMLElement ? node : null;
+  if (!element) {
+    return false;
+  }
+  return Boolean(
+    element.closest("[data-testid='conversation-turn-textbox']") ||
+      element.closest("[data-testid='composer-container']") ||
+      element.closest("form[data-testid='composer']")
+  );
+}
+
+function selectionWithinComposer(selection) {
+  if (!selection) {
+    return false;
+  }
+  return nodeInComposer(selection.anchorNode) || nodeInComposer(selection.focusNode);
+}
+
+function ensureSelectionToolbar() {
+  if (selectionToolbarElement) {
+    return selectionToolbarElement;
+  }
+  const toolbar = document.createElement("div");
+  toolbar.id = SELECTION_TOOLBAR_ID;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "prompanion-selection-toolbar__button";
+  button.textContent = "Ask Prompanion";
+  button.addEventListener("pointerdown", (event) => event.preventDefault());
+  button.addEventListener("mousedown", (event) => event.stopPropagation());
+  button.addEventListener("click", handleSelectionToolbarAction);
+
+  toolbar.append(button);
+  document.body.append(toolbar);
+
+  selectionToolbarElement = toolbar;
+  selectionToolbarButton = button;
+  return toolbar;
+}
+
+function hideSelectionToolbar() {
+  if (!selectionToolbarElement) {
+    selectionToolbarText = "";
+    return;
+  }
+  selectionToolbarElement.classList.remove(SELECTION_TOOLBAR_VISIBLE_CLASS);
+  selectionToolbarElement.style.visibility = "";
+  selectionToolbarText = "";
+}
+
+function getSelectionRect(selection) {
+  if (!selection || selection.rangeCount === 0) {
+    return null;
+  }
+  try {
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    if (rect && (rect.width || rect.height)) {
+      return rect;
+    }
+    const rects = range.getClientRects();
+    return rects.length ? rects[0] : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function requestSelectionToolbarUpdate() {
+  if (selectionUpdateRaf !== null) {
+    return;
+  }
+  selectionUpdateRaf = window.requestAnimationFrame(() => {
+    selectionUpdateRaf = null;
+    updateSelectionToolbar();
+  });
+}
+
+function updateSelectionToolbar() {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed) {
+    hideSelectionToolbar();
+    return;
+  }
+
+  const text = selection.toString().trim();
+  if (!text) {
+    hideSelectionToolbar();
+    return;
+  }
+
+  if (selectionWithinComposer(selection)) {
+    hideSelectionToolbar();
+    return;
+  }
+
+  if (!selectionTargetsAssistant(selection)) {
+    hideSelectionToolbar();
+    return;
+  }
+
+  const highlightButton = getHighlightButton();
+  if (!highlightButton) {
+    hideSelectionToolbar();
+    return;
+  }
+
+  const rangeRect = getSelectionRect(selection);
+  if (!rangeRect) {
+    hideSelectionToolbar();
+    return;
+  }
+
+  const toolbar = ensureSelectionToolbar();
+  if (selectionToolbarButton) {
+    selectionToolbarButton.disabled = highlightButton.disabled ?? false;
+  }
+  selectionToolbarText = text;
+  toolbar.style.visibility = "hidden";
+  toolbar.classList.add(SELECTION_TOOLBAR_VISIBLE_CLASS);
+
+  const toolbarWidth = toolbar.offsetWidth;
+  const toolbarHeight = toolbar.offsetHeight;
+  const viewportWidth = document.documentElement.clientWidth;
+  const viewportHeight = document.documentElement.clientHeight;
+
+  const highlightRect = highlightButton.getBoundingClientRect();
+  const baseLeft =
+    highlightRect.left + highlightRect.width / 2 + window.scrollX || rangeRect.left + rangeRect.width / 2 + window.scrollX;
+  let left = baseLeft - toolbarWidth / 2;
+  let top = rangeRect.bottom + window.scrollY + highlightRect.height + 8;
+
+  const minLeft = window.scrollX + 8;
+  const maxLeft = window.scrollX + viewportWidth - toolbarWidth - 8;
+  if (left < minLeft) {
+    left = minLeft;
+  } else if (left > maxLeft) {
+    left = maxLeft;
+  }
+
+  const minTop = window.scrollY + 8;
+  const maxTop = window.scrollY + viewportHeight - toolbarHeight - 8;
+  if (top < minTop) {
+    top = minTop;
+  } else if (top > maxTop) {
+    top = maxTop;
+  }
+
+  toolbar.style.left = `${Math.round(left)}px`;
+  toolbar.style.top = `${Math.round(top)}px`;
+  toolbar.style.visibility = "";
+}
+
+function submitSelectionToSideChat(text) {
+  const snippet = typeof text === "string" ? text.trim() : "";
+  if (!snippet || selectionAskInFlight) {
+    return;
+  }
+
+  selectionAskInFlight = true;
+  try {
+    chrome.runtime.sendMessage(
+      { type: "PROMPANION_SIDECHAT_REQUEST", text: snippet },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn(
+            "Prompanion: failed to request sidechat from selection",
+            chrome.runtime.lastError
+          );
+        } else if (!response?.ok) {
+          console.warn("Prompanion: sidechat request rejected", response?.reason);
+        } else {
+          debug("Sidechat request submitted from selection", { textLength: snippet.length });
+        }
+        selectionAskInFlight = false;
+      }
+    );
+  } catch (error) {
+    console.error("Prompanion: sidechat request threw synchronously", error);
+    selectionAskInFlight = false;
+  }
+}
+
+function handleSelectionToolbarAction(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const text = selectionToolbarText;
+  hideSelectionToolbar();
+  submitSelectionToSideChat(text);
+}
+
+function handleSelectionChange() {
+  requestSelectionToolbarUpdate();
+}
+
+function setButtonTextContent(button, text) {
+  const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
+  let replaced = false;
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (node.textContent && node.textContent.trim()) {
+      node.textContent = text;
+      replaced = true;
+      break;
+    }
+  }
+  if (!replaced) {
+    button.textContent = text;
+  }
+}
+
 function createIcon() {
   const icon = document.createElement("span");
   icon.className = `${BUTTON_CLASS}__icon`;
@@ -141,6 +500,116 @@ function createIcon() {
   icon.style.backgroundImage = `url('${assetUrl}')`;
   icon.dataset.iconUrl = assetUrl;
   return icon;
+}
+
+function requestPromptEnhancement(promptText) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(
+      {
+        type: "PROMPANION_PREPARE_ENHANCEMENT",
+        prompt: promptText,
+        openPanel: true
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn("Prompanion: enhancement request failed", chrome.runtime.lastError);
+          resolve({ ok: false });
+          return;
+        }
+        resolve(response ?? { ok: false });
+      }
+    );
+  });
+}
+
+function setComposerText(node, text) {
+  if (!node) {
+    return false;
+  }
+
+  if (node instanceof HTMLTextAreaElement) {
+    node.value = text;
+    node.dispatchEvent(new Event("input", { bubbles: true }));
+    return true;
+  }
+
+  if (node.isContentEditable) {
+    node.focus();
+    node.textContent = text;
+    const selection = window.getSelection();
+    if (selection) {
+      selection.removeAllRanges();
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      range.collapse(false);
+      selection.addRange(range);
+    }
+    node.dispatchEvent(new InputEvent("input", { bubbles: true, data: text, inputType: "insertText" }));
+    return true;
+  }
+
+  return false;
+}
+
+function requestPanelOpen() {
+  chrome.runtime.sendMessage({ type: "PROMPANION_OPEN_PANEL" }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.warn("Prompanion: failed to request panel open", chrome.runtime.lastError);
+      return;
+    }
+    if (!response?.ok) {
+      console.warn("Prompanion: open panel rejected", response?.reason);
+    } else {
+      debug("Panel open request acknowledged", response);
+    }
+  });
+}
+
+function handleTooltipEnhanceAction(event) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  if (enhanceActionInFlight) {
+    debug("Enhance action ignored; already in flight");
+    return;
+  }
+
+  const composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
+  const promptText = extractInputText();
+  if (!promptText.trim()) {
+    return;
+  }
+
+  enhanceActionInFlight = true;
+  debug("Enhance action triggered", {
+    promptLength: promptText.length,
+    snippet: promptText.slice(0, 24)
+  });
+  enhanceTooltipDismissed = true;
+  hideEnhanceTooltip();
+
+  requestPromptEnhancement(promptText)
+    .then((result) => {
+      const refinedText =
+        result?.ok && typeof result.optionA === "string" && result.optionA.trim()
+          ? result.optionA.trim()
+          : `${promptText}\n\n(Refined draft ready once your API key is configured.)`;
+      const applied = setComposerText(composerNode, refinedText);
+      debug("Composer updated with refined option", { applied });
+      requestPanelOpen();
+    })
+    .catch((error) => {
+      console.error("Prompanion: refine request threw", error);
+      const applied = setComposerText(
+        composerNode,
+        `${promptText}\n\n(Unable to refine right now. Check your API key in the sidebar settings.)`
+      );
+      debug("Composer updated with fallback after error", { applied });
+      requestPanelOpen();
+    })
+    .finally(() => {
+      enhanceActionInFlight = false;
+    });
 }
 
 function buildButton() {
@@ -178,7 +647,7 @@ function ensureFloatingButton() {
   if (!floatingButtonWrapper) {
     floatingButtonWrapper = document.createElement("div");
     floatingButtonWrapper.id = `${BUTTON_ID}-wrapper`;
-    floatingButtonWrapper.style.position = "fixed";
+    floatingButtonWrapper.style.position = "absolute";
     floatingButtonWrapper.style.zIndex = "2147483000";
     floatingButtonWrapper.style.pointerEvents = "auto";
     floatingButtonWrapper.style.display = "flex";
@@ -186,7 +655,6 @@ function ensureFloatingButton() {
     floatingButtonWrapper.style.justifyContent = "center";
     floatingButtonWrapper.style.width = "48px";
     floatingButtonWrapper.style.height = "48px";
-    document.body.append(floatingButtonWrapper);
   }
 
   floatingButtonElement = document.getElementById(BUTTON_ID) ?? buildButton();
@@ -203,8 +671,8 @@ function placeButton(targetContainer, inputNode) {
 
   ensureFloatingButton();
   floatingButtonTargetContainer = targetContainer ?? inputNode;
+  floatingButtonTargetInput = inputNode;
   positionFloatingButton(inputNode, floatingButtonTargetContainer);
-  attachButtonPositionHandler(inputNode);
 }
 
 function positionFloatingButton(inputNode, containerNode = floatingButtonTargetContainer) {
@@ -212,42 +680,30 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     return;
   }
 
-  const attachmentButton =
-    document.querySelector("#composer-plus-btn") ??
-    document.querySelector("[data-testid='composer-plus-btn']") ??
-    containerNode?.querySelector("[data-testid='composer-plus-btn']");
-
-  const target = attachmentButton ?? containerNode ?? inputNode;
-  const rect = target.getBoundingClientRect();
-  const verticalOffset = 15;
-
-  const left = rect.left;
-  const top = rect.bottom + verticalOffset;
-
-  floatingButtonWrapper.style.left = `${left}px`;
-  floatingButtonWrapper.style.top = `${top}px`;
-  floatingButtonWrapper.style.transform = "translate(0, 0)";
-}
-
-function attachButtonPositionHandler(inputNode) {
-  if (floatingButtonPositionHandler) {
+  const target = containerNode ?? inputNode;
+  if (!target) {
     return;
   }
 
-  floatingButtonPositionHandler = () =>
-    positionFloatingButton(inputNode, floatingButtonTargetContainer);
-  window.addEventListener("resize", floatingButtonPositionHandler);
-  window.addEventListener("scroll", floatingButtonPositionHandler, true);
+  const computed = getComputedStyle(target);
+  if (computed.position === "static") {
+    target.style.position = "relative";
+  }
+
+  if (floatingButtonWrapper.parentElement !== target) {
+    target.append(floatingButtonWrapper);
+  }
+
+  floatingButtonWrapper.style.top = "50%";
+  floatingButtonWrapper.style.right = "12px";
+  floatingButtonWrapper.style.transform = "translateY(-50%)";
 }
 
-function detachButtonPositionHandler() {
-  if (!floatingButtonPositionHandler) {
+function refreshFloatingButtonPosition() {
+  if (!floatingButtonTargetInput) {
     return;
   }
-  window.removeEventListener("resize", floatingButtonPositionHandler);
-  window.removeEventListener("scroll", floatingButtonPositionHandler, true);
-  floatingButtonPositionHandler = null;
-  floatingButtonTargetContainer = null;
+  positionFloatingButton(floatingButtonTargetInput, floatingButtonTargetContainer);
 }
 
 function ensureDomObserver() {
@@ -256,6 +712,7 @@ function ensureDomObserver() {
   }
 
   const observer = new MutationObserver(() => {
+    requestSelectionToolbarUpdate();
     const composer = locateComposer();
     debug("Mutation observed", {
       hasComposer: Boolean(composer),
@@ -332,6 +789,7 @@ function locateComposer() {
 function init() {
   const composer = locateComposer();
   debug("Init called", { hasComposer: Boolean(composer) });
+  requestSelectionToolbarUpdate();
   if (composer) {
     placeButton(composer.container, composer.input);
     setupEnhanceTooltip(composer.input, composer.container);
@@ -345,6 +803,7 @@ function init() {
 
 function bootstrap() {
   debug("Bootstrap invoked", { readyState: document.readyState });
+  ensureHighlightObserver();
   if (!init()) {
     const observer = new MutationObserver(() => {
       debug("Bootstrap observer mutation triggered");
@@ -380,13 +839,13 @@ function ensureTooltipResources() {
       .prompanion-tooltip {
         position: absolute;
         transform: translateX(-50%);
-        background: rgba(10, 14, 26, 0.92);
-        color: #ffffff;
+        background: rgba(12, 18, 32, 0.9);
+        color: #e9edff;
         padding: 8px 12px;
         border-radius: 8px;
         font-size: 13px;
         line-height: 1.35;
-        box-shadow: 0 10px 24px rgba(10, 14, 26, 0.28);
+        box-shadow: 0 16px 32px rgba(8, 12, 28, 0.42);
         max-width: 240px;
         text-align: center;
         opacity: 0;
@@ -402,7 +861,7 @@ function ensureTooltipResources() {
         transform: translateX(-50%);
         border-width: 6px;
         border-style: solid;
-        border-color: transparent transparent rgba(10, 14, 26, 0.92) transparent;
+        border-color: transparent transparent rgba(12, 18, 32, 0.9) transparent;
       }
 
       .prompanion-tooltip.is-visible {
@@ -533,28 +992,8 @@ function ensureEnhanceTooltipElement() {
     const action = document.createElement("button");
     action.type = "button";
     action.className = "prompanion-enhance-tooltip__action";
-    action.textContent = "Enhance?";
-    action.addEventListener("click", () => {
-      const promptText = extractInputText();
-      enhanceTooltipDismissed = true;
-      hideEnhanceTooltip();
-      chrome.runtime.sendMessage(
-        {
-          type: "PROMPANION_PREPARE_ENHANCEMENT",
-          prompt: promptText
-        },
-        () => {
-          if (chrome.runtime.lastError) {
-            console.warn("Prompanion: failed to queue enhancement", chrome.runtime.lastError);
-          }
-          chrome.runtime
-            .sendMessage({ type: "PROMPANION_TOGGLE_PANEL" })
-            .catch((error) =>
-              console.error("Prompanion: failed to open sidebar from enhance tooltip", error)
-            );
-        }
-      );
-    });
+    setButtonTextContent(action, "Refine");
+    action.addEventListener("click", handleTooltipEnhanceAction);
 
     enhanceTooltipElement.append(dismiss, action);
   }
@@ -711,6 +1150,16 @@ function detachTooltipResizeHandler() {
   enhanceTooltipResizeHandler = null;
 }
 
+function ensureResizeObserver() {
+  // no-op: deprecated
+}
+
+function attachButtonPositionHandler() {
+  // no-op: deprecated
+}
+
+function detachButtonPositionHandler() {}
+
 const readyState = document.readyState;
 if (readyState === "complete" || readyState === "interactive") {
   bootstrap();
@@ -718,4 +1167,12 @@ if (readyState === "complete" || readyState === "interactive") {
   debug("Waiting for DOMContentLoaded to bootstrap", { readyState });
   document.addEventListener("DOMContentLoaded", bootstrap);
 }
+
+document.addEventListener("selectionchange", handleSelectionChange);
+window.addEventListener("scroll", handleSelectionChange, true);
+window.addEventListener("resize", handleSelectionChange);
+
+window.addEventListener("prompanion-panel-resize", () => {
+  refreshFloatingButtonPosition();
+});
 

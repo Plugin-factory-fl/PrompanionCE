@@ -80,34 +80,40 @@ const defaultState = {
   enhancementsUsed: 3,
   enhancementsLimit: 10,
   activePlatform: "ChatGPT",
-  sideChatModel: "chatgpt",
   originalPrompt:
     "Draft a customer support response thanking them for their feedback and promising a follow-up within 24 hours.",
-  optionA:
-    "Thank the customer for their detailed feedback, acknowledge their concern, confirm a follow-up within 24 hours, and add a reassuring closing line.",
-  optionB:
-    "Open with gratitude, mirror their key point, outline the next step within 24 hours, and end with an invitation to reach out again.",
-  library: createDefaultLibrary(),
-  libraryVersion: LIBRARY_SCHEMA_VERSION,
+  optionA: "",
+  optionB: "",
+  library: [
+    "Summarize the latest sprint retro takeaways for the leadership team.",
+    "Craft a persuasive LinkedIn message pitching our Prompt Enhancer to agency owners.",
+    "Rewrite this technical update for non-technical stakeholders with bullet points."
+  ],
   settings: {
+    tone: "neutral",
+    style: "concise",
+    complexity: 3,
+    apiKey: "",
     model: "chatgpt",
     output: "text",
-    contentType: "research",
-    detailLevel: 3
+    contentType: "research"
   },
-  chatHistory: [
+  conversations: [
     {
-      role: "user",
-      content: "Can you make the tone more upbeat without adding fluff?",
-      timestamp: Date.now() - 1000 * 60 * 5
-    },
+      id: `conv-${Date.now()}`,
+      title: "Welcome",
+      history: [
     {
       role: "agent",
       content:
-        "Absolutely. Try adding an opening hook that celebrates their progress and a closing CTA that nudges a quick reply.",
-      timestamp: Date.now() - 1000 * 60 * 4
+            "Welcome back! Drop any snippet you’d like me to elaborate or clarify, and I’ll help expand it on the spot.",
+          timestamp: Date.now()
     }
   ]
+    }
+  ],
+  activeConversationId: null,
+  pendingSideChat: null
 };
 
 const storage = (() => {
@@ -134,6 +140,7 @@ const storage = (() => {
 
 const stateKey = "prompanion-sidepanel-state";
 let currentState = null;
+let autoChatInFlight = false;
 
 async function loadState() {
   const stored = await storage.get(stateKey);
@@ -150,9 +157,8 @@ async function loadState() {
     ...structuredClone(defaultState),
     ...stored,
     settings: { ...defaultState.settings, ...stored.settings },
-    chatHistory: stored.chatHistory ?? structuredClone(defaultState.chatHistory),
-    library: normalizedLibrary,
-    libraryVersion: storedLibraryVersion
+    conversations: stored.conversations ?? structuredClone(defaultState.conversations),
+    activeConversationId: stored.activeConversationId ?? defaultState.conversations[0].id
   };
 
   if (storedLibraryVersion !== LIBRARY_SCHEMA_VERSION) {
@@ -207,6 +213,8 @@ const contentTypeOptions = {
   ]
 };
 
+const modelOptions = ["chatgpt", "gemini", "claude", "grok"];
+
 const detailLevelLabels = {
   1: "Low",
   2: "Some",
@@ -234,22 +242,47 @@ function renderTabs(container, items, currentValue) {
 }
 
 function renderSettings(settings) {
+  const toneField = document.getElementById("setting-tone");
+  const styleField = document.getElementById("setting-style");
+  const complexityField = document.getElementById("setting-complexity");
+  const apiKeyField = document.getElementById("setting-api-key");
+  const modelButtons = document.querySelectorAll(".model-pill");
   const outputTabs = document.querySelectorAll(".form-tab[data-setting='output']");
+  const contentTabsContainer = document.getElementById("content-type-tabs");
+
+  if (toneField) {
+    toneField.value = settings.tone;
+  }
+  if (styleField) {
+    styleField.value = settings.style;
+  }
+  if (complexityField) {
+    complexityField.value = settings.complexity;
+  }
+  if (apiKeyField) {
+    apiKeyField.value = settings.apiKey ?? "";
+  }
+
+  modelButtons.forEach((button) => {
+    const value = button.dataset.model;
+    button.classList.toggle("is-active", value === settings.model);
+  });
+
   outputTabs.forEach((tab) => {
     const value = tab.dataset.value;
     const isActive = value === settings.output;
     tab.classList.toggle("is-active", isActive);
-    tab.setAttribute("aria-pressed", String(isActive));
+    tab.setAttribute("aria-selected", String(isActive));
   });
 
-  const contentTabsContainer = document.getElementById("content-type-tabs");
   const contentOptions = contentTypeOptions[settings.output] ?? contentTypeOptions.text;
   if (!contentOptions.some((option) => option.value === settings.contentType)) {
     settings.contentType = contentOptions[0]?.value ?? "research";
   }
-  renderTabs(contentTabsContainer, contentOptions, settings.contentType);
+  if (contentTabsContainer) {
+    renderTabs(contentTabsContainer, contentOptions, settings.contentType);
+  }
 
-  document.getElementById("setting-complexity").value = settings.detailLevel;
   updateRangeOutputs();
 }
 
@@ -508,14 +541,52 @@ function renderChat(history) {
   chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
+function renderChatTabs(conversations, activeId) {
+  const tabContainer = document.getElementById("chat-tabs");
+  tabContainer.innerHTML = "";
+
+  conversations.forEach((conversation) => {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = "chat-tab";
+    tab.dataset.id = conversation.id;
+    tab.textContent = conversation.title || "Conversation";
+    tab.setAttribute("role", "tab");
+    if (conversation.id === activeId) {
+      tab.classList.add("is-active");
+      tab.setAttribute("aria-selected", "true");
+    }
+
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "chat-tab__close";
+    close.textContent = "×";
+    close.title = "Close conversation";
+    tab.append(close);
+
+    tabContainer.append(tab);
+  });
+}
+
+function getActiveConversation(state) {
+  return state.conversations.find((c) => c.id === state.activeConversationId) ?? state.conversations[0];
+}
+
+function setActiveConversation(state, conversationId) {
+  state.activeConversationId = conversationId;
+  const active = getActiveConversation(state);
+  renderChat(active?.history ?? []);
+  renderChatTabs(state.conversations, state.activeConversationId);
+}
+
 function updateRangeOutputs() {
   document.querySelectorAll("input[type='range']").forEach((input) => {
-    const output = document.querySelector(`.range-output[data-for='${input.id}']`);
-    if (output) {
+      const output = document.querySelector(`.range-output[data-for='${input.id}']`);
+      if (output) {
       const label = detailLevelLabels[input.value] ?? input.value;
       output.textContent = label;
-    }
-  });
+      }
+    });
 }
 
 async function handleEnhance(state) {
@@ -566,20 +637,40 @@ function registerCopyHandlers() {
       }
     });
   });
+
+  document.querySelectorAll("[data-insert]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const targetId = button.dataset.insert;
+      const field = document.getElementById(targetId);
+      if (!field) {
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(field.value);
+        button.textContent = "Inserted";
+        setTimeout(() => {
+          button.textContent = "Insert";
+        }, 1200);
+      } catch (error) {
+        console.error("Clipboard copy failed", error);
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-regenerate]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const targetId = button.dataset.regenerate;
+      const field = document.getElementById(targetId);
+      if (!field) {
+        return;
+      }
+      field.value = `${field.value}\n\n(Re-generated preview coming soon.)`;
+    });
+  });
 }
 
 function registerReplaceHandlers() {
-  document.querySelectorAll("[data-replace]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const targetId = button.dataset.replace;
-      const replacement = document.getElementById(targetId)?.value;
-      if (!replacement) {
-        return;
-      }
-      const originalField = document.getElementById("original-prompt");
-      originalField.value = replacement;
-    });
-  });
+  // deprecated: handled by registerCopyHandlers for insert/regenerate
 }
 
 function registerLibraryHandlers(stateRef) {
@@ -770,6 +861,7 @@ function registerSettingsHandlers(stateRef) {
   const modelButtons = document.querySelectorAll(".model-pill");
 
   settingsTrigger.addEventListener("click", () => {
+    renderSettings(stateRef.settings);
     settingsDialog.showModal();
   });
 
@@ -779,10 +871,13 @@ function registerSettingsHandlers(stateRef) {
       return;
     }
     stateRef.settings = {
-      model: stateRef.settings.model,
-      output: stateRef.settings.output,
-      contentType: stateRef.settings.contentType,
-      detailLevel: Number(detailSlider.value)
+      tone: document.getElementById("setting-tone").value,
+      style: document.getElementById("setting-style").value,
+      complexity: Number(document.getElementById("setting-complexity").value),
+      apiKey: document.getElementById("setting-api-key").value.trim(),
+      model: stateRef.settings.model ?? "chatgpt",
+      output: stateRef.settings.output ?? "text",
+      contentType: stateRef.settings.contentType ?? "research"
     };
     renderSettings(stateRef.settings);
     await saveState(stateRef);
@@ -834,23 +929,253 @@ function registerSettingsHandlers(stateRef) {
   });
 }
 
+function buildChatApiMessages(history) {
+  return history
+    .map((entry) => {
+      if (!entry?.content) {
+        return null;
+      }
+      const role = entry.role === "agent" ? "assistant" : "user";
+      return { role, content: entry.content };
+    })
+    .filter(Boolean);
+}
+
+async function generateConversationTitle(stateRef, conversation) {
+  const fallback = conversation.history.find((msg) => msg.role === "user")?.content ?? "Conversation";
+  if (!stateRef.settings.apiKey) {
+    return fallback.slice(0, 40);
+  }
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${stateRef.settings.apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: "You summarize chat conversations in 3-5 words for tabs."
+          },
+          {
+            role: "user",
+            content: conversation.history.map((msg) => `${msg.role}: ${msg.content}`).join("\n")
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const data = await response.json();
+    const summary = data.choices?.[0]?.message?.content?.trim();
+    return summary ? summary.slice(0, 60) : fallback.slice(0, 60);
+  } catch (error) {
+    console.error("Failed to summarize conversation", error);
+    return fallback.slice(0, 60);
+  }
+}
+
+async function sendSideChatMessage(stateRef, message) {
+  if (!stateRef.settings.apiKey) {
+    alert("Add your OpenAI API key in settings to use Side Chat.");
+    return stateRef;
+  }
+
+  const activeConversation = getActiveConversation(stateRef);
+  if (!activeConversation) {
+    return stateRef;
+  }
+
+  const now = Date.now();
+  activeConversation.history.push({ role: "user", content: message, timestamp: now });
+  renderChat(activeConversation.history);
+  renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
+  await saveState(stateRef);
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${stateRef.settings.apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-3.5-turbo",
+        messages: buildChatApiMessages(activeConversation.history)
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content?.trim();
+
+    if (reply) {
+      activeConversation.history.push({ role: "agent", content: reply, timestamp: Date.now() });
+      renderChat(activeConversation.history);
+      renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
+      await saveState(stateRef);
+    }
+  } catch (error) {
+    console.error("Side chat failed", error);
+    activeConversation.history.push({
+      role: "agent",
+      content:
+        "I couldn’t reach the model. Check your API key in settings and try again.",
+      timestamp: Date.now()
+    });
+    renderChat(activeConversation.history);
+    renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
+    await saveState(stateRef);
+  }
+
+  return stateRef;
+}
+
+async function triggerAutoSideChat(stateRef, text, { fromPending = false } = {}) {
+  const snippet = typeof text === "string" ? text.trim() : "";
+  if (!snippet || autoChatInFlight || !stateRef) {
+    return;
+  }
+
+  if (fromPending) {
+    const pendingText = stateRef.pendingSideChat?.text?.trim();
+    if (!pendingText || pendingText !== snippet) {
+      return;
+    }
+  }
+
+  autoChatInFlight = true;
+  try {
+    const textarea = document.getElementById("chat-message");
+    if (textarea) {
+      textarea.value = snippet;
+    }
+    await sendSideChatMessage(stateRef, snippet);
+    if (textarea) {
+      textarea.value = "";
+    }
+  } finally {
+    autoChatInFlight = false;
+    if (fromPending && stateRef.pendingSideChat) {
+      stateRef.pendingSideChat = null;
+      try {
+        await saveState(stateRef);
+      } catch (error) {
+        console.warn("Prompanion: failed to clear pending side chat", error);
+      }
+    }
+  }
+}
+
+function processPendingSideChat(stateRef) {
+  const pending = stateRef?.pendingSideChat;
+  if (!pending || typeof pending.text !== "string") {
+    return;
+  }
+  triggerAutoSideChat(stateRef, pending.text, { fromPending: true });
+}
+
 function registerChatHandlers(stateRef) {
   const form = document.getElementById("chat-form");
   const textarea = document.getElementById("chat-message");
-  const adapterSelect = document.getElementById("adapter-select");
+  const resetButton = document.getElementById("chat-reset");
+  const tabsContainer = document.getElementById("chat-tabs");
 
-  const initialModel =
-    (typeof stateRef.sideChatModel === "string" && stateRef.sideChatModel.trim().length
-      ? stateRef.sideChatModel
-      : stateRef.activePlatform?.toLowerCase()) ?? "chatgpt";
-  adapterSelect.value = initialModel;
-  if (adapterSelect.value !== initialModel) {
-    adapterSelect.value = "chatgpt";
+  stateRef.activePlatform = "ChatGPT";
+  if (!stateRef.activeConversationId) {
+    stateRef.activeConversationId = stateRef.conversations[0]?.id;
   }
+    renderStatus(stateRef);
+  const active = getActiveConversation(stateRef);
+  renderChat(active?.history ?? []);
+  renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
 
-  adapterSelect.addEventListener("change", async () => {
-    stateRef.sideChatModel = adapterSelect.value;
+  resetButton.addEventListener("click", async () => {
+    const activeConversation = getActiveConversation(stateRef);
+    if (!activeConversation) {
+      return;
+    }
+
+    if (activeConversation.history.length > 0) {
+      activeConversation.title = await generateConversationTitle(stateRef, activeConversation);
+    }
+
+    const newConversation = {
+      id: `conv-${Date.now()}`,
+      title: "New chat",
+      history: []
+    };
+    stateRef.conversations.push(newConversation);
+    stateRef.activeConversationId = newConversation.id;
+    renderChat(newConversation.history);
+    renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
     await saveState(stateRef);
+  });
+
+  tabsContainer.addEventListener("click", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const tab = target.closest(".chat-tab");
+    if (!tab) {
+      return;
+    }
+
+    const conversationId = tab.dataset.id;
+    if (!conversationId) {
+      return;
+    }
+
+    if (target.classList.contains("chat-tab__close")) {
+      const index = stateRef.conversations.findIndex((conv) => conv.id === conversationId);
+      if (index !== -1) {
+        stateRef.conversations.splice(index, 1);
+        if (stateRef.activeConversationId === conversationId) {
+          const replacement = stateRef.conversations[index] ?? stateRef.conversations[index - 1];
+          stateRef.activeConversationId = replacement?.id ?? null;
+          if (!stateRef.activeConversationId) {
+            const fresh = { id: `conv-${Date.now()}`, title: "New chat", history: [] };
+            stateRef.conversations.push(fresh);
+            stateRef.activeConversationId = fresh.id;
+          }
+        }
+        const active = getActiveConversation(stateRef);
+        renderChat(active?.history ?? []);
+        renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
+        await saveState(stateRef);
+      }
+      return;
+    }
+
+    stateRef.activeConversationId = conversationId;
+    const activeConversation = getActiveConversation(stateRef);
+    renderChat(activeConversation?.history ?? []);
+    renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
+    await saveState(stateRef);
+  });
+
+  textarea.addEventListener("keydown", async (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      const message = textarea.value.trim();
+      if (!message) {
+        return;
+      }
+      textarea.value = "";
+      await sendSideChatMessage(stateRef, message);
+    }
   });
 
   form.addEventListener("submit", async (event) => {
@@ -860,28 +1185,8 @@ function registerChatHandlers(stateRef) {
       return;
     }
 
-    const now = Date.now();
-    stateRef.chatHistory.push({
-      role: "user",
-      content: message,
-      timestamp: now
-    });
-    renderChat(stateRef.chatHistory);
-
     textarea.value = "";
-
-    setTimeout(async () => {
-      stateRef.chatHistory.push({
-        role: "agent",
-        content:
-          "Thanks! I recommend expanding your CTA with a sharper benefit. Click Enhance to preview.",
-        timestamp: Date.now()
-      });
-      renderChat(stateRef.chatHistory);
-      await saveState(stateRef);
-    }, 600);
-
-    await saveState(stateRef);
+    await sendSideChatMessage(stateRef, message);
   });
 }
 
@@ -930,14 +1235,42 @@ function registerSectionActionGuards() {
   });
 }
 
+function initTabs() {
+  const tabs = document.querySelectorAll(".prompt-tab");
+  const tabPanels = document.querySelectorAll(".prompt-tabpanel");
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const target = tab.dataset.tab;
+      tabs.forEach((btn) => {
+        const isActive = btn === tab;
+        btn.classList.toggle("is-active", isActive);
+        btn.setAttribute("aria-selected", String(isActive));
+      });
+      tabPanels.forEach((panel) => {
+        const matches = panel.id === `${target}-panel`;
+        panel.hidden = !matches;
+        panel.classList.toggle("is-active", matches);
+      });
+    });
+  });
+}
+
 async function init() {
   currentState = await loadState();
+
+  if (!currentState.activeConversationId) {
+    currentState.activeConversationId = currentState.conversations[0]?.id;
+  }
+
+  const activeConversation = getActiveConversation(currentState);
 
   renderStatus(currentState);
   renderPrompts(currentState);
   renderSettings(currentState.settings);
   renderLibrary(currentState.library);
-  renderChat(currentState.chatHistory);
+  renderChat(activeConversation?.history ?? []);
+  renderChatTabs(currentState.conversations, currentState.activeConversationId);
 
   registerCopyHandlers();
   registerReplaceHandlers();
@@ -945,7 +1278,9 @@ async function init() {
   registerSettingsHandlers(currentState);
   registerAccountHandlers();
   registerChatHandlers(currentState);
+  initTabs();
   registerSectionActionGuards();
+  processPendingSideChat(currentState);
 
   document.getElementById("enhance-btn").addEventListener("click", async (event) => {
     event.preventDefault();
@@ -979,7 +1314,16 @@ if (chrome?.runtime?.onMessage) {
         Object.assign(currentState, message.state);
         renderPrompts(currentState);
         renderStatus(currentState);
+        processPendingSideChat(currentState);
       }
+    }
+    if (message.type === "PROMPANION_SIDECHAT_DELIVER") {
+      if (!currentState) {
+        return;
+      }
+      triggerAutoSideChat(currentState, message.text, {
+        fromPending: Boolean(message.clearPending)
+      });
     }
   });
 }
