@@ -59,7 +59,7 @@
         "https://chat.openai.com/*",
         "https://*.chat.openai.com/*"
       ],
-      "js": ["Adapters/ChatGPT/adapter.js"],
+      "js": ["Base/AdapterBase.js", "Adapters/ChatGPT/adapter.js"],
       "run_at": "document_idle"
     }
   ],

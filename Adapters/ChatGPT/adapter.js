@@ -1,19 +1,69 @@
-const BUTTON_ID = "prompanion-chatgpt-trigger";
-const BUTTON_CLASS = "prompanion-chatgpt-trigger";
-const SELECTION_TOOLBAR_ID = "prompanion-selection-toolbar";
-const SELECTION_TOOLBAR_VISIBLE_CLASS = "is-visible";
-const HIGHLIGHT_BUTTON_SELECTORS = [
-  "[data-testid='select-to-ask__ask-button']",
-  "[data-testid='select-to-ask__askbutton']",
-  "button[aria-label='Ask ChatGPT']",
-  "button[aria-label='Ask ChatGPT automatically']"
-];
+// ============================================================================
+// CRITICAL: INSERT TEXT MESSAGE LISTENER - MUST BE AT TOP OF FILE
+// ============================================================================
+// Version: 2024-01-15-FIX-INSERT-TEXT
+// This listener is registered IMMEDIATELY when the script loads to ensure
+// it's always available when background script sends PROMPANION_INSERT_TEXT
+// ============================================================================
 
-const BUTTON_SIZE = {
-  wrapper: "44px",
-  element: "39px",
-  icon: "34px"
-};
+(function registerInsertTextListener() {
+  console.log("[Prompanion] ========== REGISTERING INSERT TEXT LISTENER (TOP) ==========");
+  console.log("[Prompanion] Version: 2024-01-15-FIX-INSERT-TEXT");
+  console.log("[Prompanion] chrome available:", typeof chrome !== "undefined");
+  console.log("[Prompanion] chrome.runtime available:", typeof chrome !== "undefined" && typeof chrome.runtime !== "undefined");
+  console.log("[Prompanion] chrome.runtime.onMessage available:", typeof chrome !== "undefined" && typeof chrome.runtime !== "undefined" && typeof chrome.runtime.onMessage !== "undefined");
+  
+  if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.onMessage) {
+    console.error("[Prompanion] ✗ Cannot register listener - chrome.runtime.onMessage not available!");
+    return;
+  }
+  
+  try {
+    chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+      // Only handle PROMPANION_INSERT_TEXT messages
+      if (!message || message.type !== "PROMPANION_INSERT_TEXT") {
+        return false; // Let other listeners handle it
+      }
+      
+      console.log("[Prompanion] ========== INSERT TEXT MESSAGE RECEIVED (TOP LISTENER) ==========");
+      console.log("[Prompanion] Message:", message);
+      console.log("[Prompanion] Handler function exists:", typeof handleInsertTextMessage === "function");
+      
+      // Function declarations are hoisted, so handleInsertTextMessage should be available
+      if (typeof handleInsertTextMessage === "function") {
+        console.log("[Prompanion] Calling handleInsertTextMessage...");
+        try {
+          handleInsertTextMessage(message, sender, sendResponse);
+          return true; // Keep channel open for async response
+        } catch (error) {
+          console.error("[Prompanion] Error calling handleInsertTextMessage:", error);
+          sendResponse({ ok: false, reason: error?.message ?? "HANDLER_ERROR" });
+          return false;
+        }
+      } else {
+        console.error("[Prompanion] handleInsertTextMessage is not a function!");
+        sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
+        return false;
+      }
+    });
+    
+    console.log("[Prompanion] ✓✓✓ INSERT TEXT LISTENER REGISTERED SUCCESSFULLY ✓✓✓");
+  } catch (error) {
+    console.error("[Prompanion] ✗✗✗ FAILED TO REGISTER LISTENER ✗✗✗", error);
+  }
+})();
+
+console.log("[Prompanion] ========== ADAPTER.JS LOADING ==========");
+console.log("[Prompanion] Timestamp:", new Date().toISOString());
+console.log("[Prompanion] Location:", window.location.href);
+
+// Import constants from AdapterBase
+const BUTTON_ID = AdapterBase.BUTTON_ID;
+const BUTTON_CLASS = AdapterBase.BUTTON_CLASS;
+const SELECTION_TOOLBAR_ID = AdapterBase.SELECTION_TOOLBAR_ID;
+const SELECTION_TOOLBAR_VISIBLE_CLASS = AdapterBase.SELECTION_TOOLBAR_VISIBLE_CLASS;
+const HIGHLIGHT_BUTTON_SELECTORS = AdapterBase.HIGHLIGHT_BUTTON_SELECTORS;
+const BUTTON_SIZE = AdapterBase.BUTTON_SIZE;
 let domObserverStarted = false;
 const tooltipRegistry = new WeakMap();
 
@@ -137,47 +187,63 @@ const styles = `
   }
 
   #${SELECTION_TOOLBAR_ID} {
-    position: absolute;
-    display: inline-flex;
+    position: fixed;
+    display: flex;
     align-items: center;
-    gap: 0;
-    background: rgba(12, 18, 32, 0.95);
-    color: #f5f8ff;
-    border-radius: 9999px;
-    box-shadow: 0 12px 28px rgba(8, 12, 28, 0.45);
-    padding: 0;
-    margin: 0;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: rgba(12, 18, 32, 0.9);
+    color: #e9edff;
+    box-shadow: 0 18px 40px rgba(8, 12, 28, 0.45);
     opacity: 0;
     pointer-events: none;
-    transform: translateY(-6px);
-    transition: opacity 140ms ease, transform 140ms ease;
+    transition: opacity 140ms ease;
     z-index: 2147483647;
   }
 
   #${SELECTION_TOOLBAR_ID}.${SELECTION_TOOLBAR_VISIBLE_CLASS} {
     opacity: 1;
     pointer-events: auto;
-    transform: translateY(0);
   }
 
-  #${SELECTION_TOOLBAR_ID} .prompanion-selection-toolbar__button {
+  #${SELECTION_TOOLBAR_ID} button {
     border: none;
-    background: transparent;
-    color: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 8px 16px;
-    border-radius: 9999px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
     cursor: pointer;
   }
 
-  #${SELECTION_TOOLBAR_ID} .prompanion-selection-toolbar__button:hover,
-  #${SELECTION_TOOLBAR_ID} .prompanion-selection-toolbar__button:focus-visible {
-    background: rgba(255, 255, 255, 0.12);
-    outline: none;
+  #${SELECTION_TOOLBAR_ID} .prompanion-selection-toolbar__dismiss {
+    width: 24px;
+    height: 24px;
+    border-radius: 12px;
+    background: transparent;
+    color: rgba(233, 237, 255, 0.6);
+    display: grid;
+    place-items: center;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  #${SELECTION_TOOLBAR_ID} .prompanion-selection-toolbar__dismiss:hover {
+    background: rgba(233, 237, 255, 0.14);
+    color: #ffffff;
+  }
+
+  #${SELECTION_TOOLBAR_ID} .prompanion-selection-toolbar__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    border-radius: 9999px;
+    background: #3a7bff;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 10px 26px rgba(58, 123, 255, 0.35);
+  }
+
+  #${SELECTION_TOOLBAR_ID} .prompanion-selection-toolbar__button:hover {
+    background: #2957c7;
   }
 `;
 
@@ -254,8 +320,24 @@ function selectionWithinComposer(selection) {
 
 function ensureSelectionToolbar() {
   if (selectionToolbarElement) return selectionToolbarElement;
+  
+  // CRITICAL: Ensure styles are injected before creating the toolbar element
+  ensureStyle();
+  
   const toolbar = document.createElement("div");
   toolbar.id = SELECTION_TOOLBAR_ID;
+  
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "prompanion-selection-toolbar__dismiss";
+  dismiss.textContent = "×";
+  dismiss.setAttribute("aria-label", "Dismiss");
+  dismiss.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    hideSelectionToolbar();
+  });
+  
   const button = document.createElement("button");
   button.type = "button";
   button.className = "prompanion-selection-toolbar__button";
@@ -263,7 +345,15 @@ function ensureSelectionToolbar() {
   button.addEventListener("pointerdown", (e) => e.preventDefault());
   button.addEventListener("mousedown", (e) => e.stopPropagation());
   button.addEventListener("click", handleSelectionToolbarAction);
-  toolbar.append(button);
+  
+  toolbar.append(dismiss, button);
+  
+  // Verify document.body exists before appending
+  if (!document.body) {
+    console.error("[Prompanion] Cannot create selection toolbar: document.body not available");
+    return null;
+  }
+  
   document.body.append(toolbar);
   selectionToolbarElement = toolbar;
   selectionToolbarButton = button;
@@ -273,7 +363,9 @@ function ensureSelectionToolbar() {
 function hideSelectionToolbar() {
   if (selectionToolbarElement) {
     selectionToolbarElement.classList.remove(SELECTION_TOOLBAR_VISIBLE_CLASS);
-    selectionToolbarElement.style.visibility = "";
+    // Clear inline styles that might interfere
+    selectionToolbarElement.style.opacity = "";
+    selectionToolbarElement.style.pointerEvents = "";
   }
   selectionToolbarText = "";
 }
@@ -292,7 +384,9 @@ function getSelectionRect(selection) {
 }
 
 function requestSelectionToolbarUpdate() {
-  if (selectionUpdateRaf !== null) return;
+  if (selectionUpdateRaf !== null) {
+    return;
+  }
   selectionUpdateRaf = window.requestAnimationFrame(() => {
     selectionUpdateRaf = null;
     updateSelectionToolbar();
@@ -302,34 +396,96 @@ function requestSelectionToolbarUpdate() {
 function updateSelectionToolbar() {
   const selection = window.getSelection();
   const text = selection?.toString().trim();
+  
+  console.log("[Prompanion] updateSelectionToolbar called", {
+    hasSelection: !!selection,
+    isCollapsed: selection?.isCollapsed,
+    textLength: text?.length,
+    textPreview: text?.substring(0, 30),
+    inComposer: selection ? selectionWithinComposer(selection) : false,
+    targetsAssistant: selection ? selectionTargetsAssistant(selection) : false
+  });
+  
   if (!selection || selection.isCollapsed || !text || selectionWithinComposer(selection) || 
       !selectionTargetsAssistant(selection)) {
+    console.log("[Prompanion] Hiding toolbar - conditions not met");
     hideSelectionToolbar();
     return;
   }
-  const highlightButton = getHighlightButton();
+  
+  console.log("[Prompanion] Showing toolbar - all conditions met");
   const rangeRect = getSelectionRect(selection);
-  if (!highlightButton || !rangeRect) {
+  if (!rangeRect) {
     hideSelectionToolbar();
     return;
   }
 
   const toolbar = ensureSelectionToolbar();
-  if (selectionToolbarButton) {
-    selectionToolbarButton.disabled = highlightButton.disabled ?? false;
+  if (!toolbar) {
+    console.error("[Prompanion] Failed to create selection toolbar");
+    return;
   }
   selectionToolbarText = text;
-  toolbar.style.visibility = "hidden";
-  toolbar.classList.add(SELECTION_TOOLBAR_VISIBLE_CLASS);
-
-  const { offsetWidth: w, offsetHeight: h } = toolbar;
+  
+  // Position tooltip BELOW the selection to avoid conflict with ChatGPT's native button above
+  // Measure toolbar dimensions by temporarily positioning offscreen (but keep opacity 0 via class)
+  toolbar.classList.remove(SELECTION_TOOLBAR_VISIBLE_CLASS);
+  toolbar.style.position = "fixed";
+  toolbar.style.left = "-9999px";
+  toolbar.style.top = "0";
+  toolbar.style.transform = "translate(-50%, 0)";
+  toolbar.style.opacity = "0";
+  toolbar.style.pointerEvents = "none";
+  toolbar.style.display = "flex"; // Ensure display is set for accurate measurement
+  
+  // Force multiple reflows to ensure styles are fully applied before measuring
+  void toolbar.offsetWidth; // Force layout recalculation
+  void toolbar.offsetHeight; // Force another reflow to ensure styles applied
+  
+  let w = toolbar.offsetWidth;
+  let h = toolbar.offsetHeight;
+  
+  // Verify we got valid dimensions
+  if (!w || !h) {
+    console.warn("[Prompanion] Toolbar has invalid dimensions:", { w, h }, "retrying...");
+    // Force another reflow and remeasure
+    void toolbar.offsetWidth;
+    w = toolbar.offsetWidth;
+    h = toolbar.offsetHeight;
+    if (!w || !h) {
+      console.error("[Prompanion] Toolbar dimensions still invalid, cannot position tooltip");
+      return;
+    }
+  }
+  
   const { clientWidth: vw, clientHeight: vh } = document.documentElement;
-  const { left: hl, width: hw, height: hh } = highlightButton.getBoundingClientRect();
-  let left = Math.max(window.scrollX + 8, Math.min(window.scrollX + vw - w - 8, hl + hw / 2 + window.scrollX - w / 2));
-  let top = Math.max(window.scrollY + 8, Math.min(window.scrollY + vh - h - 8, rangeRect.bottom + window.scrollY + hh + 8));
+  const selectionCenterX = rangeRect.left + rangeRect.width / 2;
+  const selectionBottom = rangeRect.bottom;
+  
+  // Calculate horizontal position (centered on selection, constrained to viewport)
+  let left = Math.max(w / 2 + 8, Math.min(vw - w / 2 - 8, selectionCenterX));
+  
+  // Calculate vertical position (BELOW selection with 8px gap)
+  let top = selectionBottom + 8;
+  
+  // Ensure tooltip doesn't go below viewport (with 8px margin)
+  const maxTop = vh - h - 8;
+  if (top > maxTop) {
+    // If it would go below viewport, position it above instead (but this should be rare)
+    top = Math.max(8, rangeRect.top - h - 8);
+    toolbar.style.transform = "translate(-50%, -100%)";
+  } else {
+    toolbar.style.transform = "translate(-50%, 0)";
+  }
+  
+  // Apply final positioning
   toolbar.style.left = `${Math.round(left)}px`;
   toolbar.style.top = `${Math.round(top)}px`;
-  toolbar.style.visibility = "";
+  
+  // Show the tooltip with opacity transition
+  toolbar.style.opacity = "";
+  toolbar.style.pointerEvents = "";
+  toolbar.classList.add(SELECTION_TOOLBAR_VISIBLE_CLASS);
 }
 
 function submitSelectionToSideChat(text) {
@@ -400,27 +556,169 @@ function requestPromptEnhancement(promptText) {
   });
 }
 
+/**
+ * Finds the active composer input node
+ * @returns {HTMLElement|null} The composer input node or null if not found
+ */
+function findComposerNode() {
+  // Try tracked nodes first
+  let composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
+  if (composerNode) {
+    return composerNode;
+  }
+
+  // Fallback: locate composer using selectors
+  const composer = locateComposer();
+  if (composer?.input) {
+    return composer.input;
+  }
+
+  // Last resort: query for common selectors
+  const selectors = [
+    "[data-testid='textbox'][contenteditable='true']",
+    "div[contenteditable='true']",
+    "[data-testid='conversation-turn-textbox'] textarea:not([readonly])"
+  ];
+
+  for (const selector of selectors) {
+    const element = document.querySelector(selector);
+    if (element instanceof HTMLElement) {
+      return element;
+    }
+  }
+
+  return null;
+}
+
 function setComposerText(node, text) {
-  if (!node) return false;
+  console.log("[Prompanion] setComposerText called with node:", node, "text:", text);
+  if (!node) {
+    console.log("[Prompanion] setComposerText: no node provided");
+    return false;
+  }
   if (node instanceof HTMLTextAreaElement) {
+    console.log("[Prompanion] setComposerText: using textarea method");
     node.value = text;
     node.dispatchEvent(new Event("input", { bubbles: true }));
     return true;
   }
   if (node.isContentEditable) {
+    console.log("[Prompanion] setComposerText: node is contentEditable, class:", node.className);
     node.focus();
-    node.textContent = text;
-    const selection = window.getSelection();
-    if (selection) {
+    
+    // Method 1: Try to find ProseMirror view and use its API
+    let pmView = null;
+    
+    console.log("[Prompanion] Searching for ProseMirror view...");
+    console.log("[Prompanion] node.pmViewDesc:", node.pmViewDesc);
+    console.log("[Prompanion] node.parentElement:", node.parentElement);
+    
+    if (node.pmViewDesc?.pmView) {
+      pmView = node.pmViewDesc.pmView;
+      console.log("[Prompanion] Found ProseMirror view via node.pmViewDesc");
+    } else if (node.parentElement?.pmViewDesc?.pmView) {
+      pmView = node.parentElement.pmViewDesc.pmView;
+      console.log("[Prompanion] Found ProseMirror view via parent.pmViewDesc");
+    } else {
+      // Walk up the DOM to find ProseMirror view
+      let current = node;
+      let depth = 0;
+      while (current && !pmView && depth < 10) {
+        if (current.pmViewDesc?.pmView) {
+          pmView = current.pmViewDesc.pmView;
+          console.log("[Prompanion] Found ProseMirror view at depth", depth);
+        }
+        current = current.parentElement;
+        depth++;
+      }
+    }
+    
+    if (pmView && pmView.state && pmView.dispatch) {
+      console.log("[Prompanion] Attempting ProseMirror transaction method");
+      try {
+        const pmState = pmView.state;
+        const tr = pmState.tr;
+        const schema = pmState.schema;
+        const textNode = schema.text(text);
+        tr.replaceWith(0, pmState.doc.content.size, textNode);
+        pmView.dispatch(tr);
+        console.log("[Prompanion] Successfully set text via ProseMirror transaction");
+        return true;
+      } catch (e) {
+        console.warn("[Prompanion] ProseMirror transaction failed:", e);
+      }
+    } else {
+      console.log("[Prompanion] ProseMirror view not found or invalid");
+    }
+    
+    // Method 2: Select all and simulate keyboard input
+    console.log("[Prompanion] Attempting keyboard simulation method");
+    try {
+      const selection = window.getSelection();
       selection.removeAllRanges();
       const range = document.createRange();
       range.selectNodeContents(node);
-      range.collapse(false);
       selection.addRange(range);
+      console.log("[Prompanion] Selected all text in node");
+      
+      // Simulate Cmd+A (select all) then typing
+      const keyDownEvent = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        key: "a",
+        code: "KeyA",
+        metaKey: true,
+        ctrlKey: false
+      });
+      node.dispatchEvent(keyDownEvent);
+      
+      const keyUpEvent = new KeyboardEvent("keyup", {
+        bubbles: true,
+        cancelable: true,
+        key: "a",
+        code: "KeyA",
+        metaKey: true,
+        ctrlKey: false
+      });
+      node.dispatchEvent(keyUpEvent);
+      
+      // Now simulate typing the new text
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const inputEvent = new InputEvent("beforeinput", {
+          bubbles: true,
+          cancelable: true,
+          inputType: "insertText",
+          data: char
+        });
+        node.dispatchEvent(inputEvent);
+        
+        if (!inputEvent.defaultPrevented) {
+          const inputEvent2 = new InputEvent("input", {
+            bubbles: true,
+            cancelable: false,
+            inputType: "insertText",
+            data: char
+          });
+          node.dispatchEvent(inputEvent2);
+        }
+      }
+      
+      // Also set textContent as fallback
+      node.textContent = text;
+      
+      console.log("[Prompanion] Dispatched keyboard simulation events");
+      return true;
+    } catch (e) {
+      console.warn("[Prompanion] Keyboard simulation method failed:", e);
+      // Final fallback
+      node.textContent = text;
+      node.dispatchEvent(new InputEvent("input", { bubbles: true, data: text, inputType: "insertText" }));
+      console.log("[Prompanion] Used final fallback: direct textContent");
+      return true;
     }
-    node.dispatchEvent(new InputEvent("input", { bubbles: true, data: text, inputType: "insertText" }));
-    return true;
   }
+  console.log("[Prompanion] setComposerText: node is not contentEditable or textarea");
   return false;
 }
 
@@ -539,6 +837,159 @@ function init() {
   ensureDomObserver();
   return false;
 }
+
+/**
+ * Finds the active composer input node
+ * @returns {HTMLElement|null} The composer input node or null if not found
+ */
+function findComposerNode() {
+  // Try tracked nodes first
+  let composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
+  if (composerNode) {
+    return composerNode;
+  }
+
+  // Fallback: locate composer using locateComposer
+  const composer = locateComposer();
+  if (composer?.input) {
+    return composer.input;
+  }
+
+  // Last resort: query for common selectors
+  const selectors = [
+    "[data-testid='textbox'][contenteditable='true']",
+    "div[contenteditable='true']",
+    "[data-testid='conversation-turn-textbox'] textarea:not([readonly])"
+  ];
+
+  for (const selector of selectors) {
+    const element = document.querySelector(selector);
+    if (element instanceof HTMLElement) {
+      return element;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Handles insert text message from background script
+ * @param {Object} message - Message object with text property
+ * @param {Object} sender - Message sender
+ * @param {Function} sendResponse - Response callback
+ */
+function handleInsertTextMessage(message, sender, sendResponse) {
+  try {
+    const textToInsert = typeof message.text === "string" ? message.text.trim() : "";
+    console.log("[Prompanion] ========== INSERT TEXT REQUEST ==========");
+    console.log("[Prompanion] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
+    console.log("[Prompanion] Text length:", textToInsert.length);
+    
+    if (!textToInsert) {
+      console.log("[Prompanion] Insert failed: EMPTY_TEXT");
+      sendResponse({ ok: false, reason: "EMPTY_TEXT" });
+      return;
+    }
+
+    console.log("[Prompanion] Searching for composer node...");
+    const composerNode = findComposerNode();
+    console.log("[Prompanion] Composer node found:", composerNode);
+    console.log("[Prompanion] Node type:", composerNode?.constructor?.name);
+    console.log("[Prompanion] Node isContentEditable:", composerNode?.isContentEditable);
+    console.log("[Prompanion] Node tagName:", composerNode?.tagName);
+    console.log("[Prompanion] Node className:", composerNode?.className);
+    console.log("[Prompanion] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
+    console.log("[Prompanion] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
+    
+    if (!composerNode) {
+      console.log("[Prompanion] Insert failed: NO_COMPOSER_NODE");
+      sendResponse({ ok: false, reason: "NO_COMPOSER_NODE" });
+      return;
+    }
+
+    console.log("[Prompanion] Calling setComposerText...");
+    const success = setComposerText(composerNode, textToInsert);
+    console.log("[Prompanion] setComposerText returned:", success);
+    
+    // Verify insertion
+    const currentValue = composerNode.value || composerNode.textContent || "";
+    const textInserted = currentValue.includes(textToInsert.substring(0, Math.min(20, textToInsert.length)));
+    console.log("[Prompanion] Verification - text appears in node:", textInserted);
+    console.log("[Prompanion] Current node value:", currentValue.substring(0, 100));
+    
+    if (success && textInserted) {
+      console.log("[Prompanion] Insert succeeded!");
+      sendResponse({ ok: true });
+    } else if (success && !textInserted) {
+      console.warn("[Prompanion] setComposerText returned true but text not verified in node");
+      sendResponse({ ok: false, reason: "INSERTION_NOT_VERIFIED" });
+    } else {
+      console.log("[Prompanion] Insert failed: SET_TEXT_FAILED");
+      sendResponse({ ok: false, reason: "SET_TEXT_FAILED" });
+    }
+  } catch (error) {
+    console.error("[Prompanion] Insert text handler failed", error);
+    console.error("[Prompanion] Error stack:", error.stack);
+    sendResponse({ ok: false, reason: error?.message ?? "UNKNOWN" });
+  }
+}
+
+// Handler is now defined - verify it's available
+console.log("[Prompanion] Handler function defined:", typeof handleInsertTextMessage === "function");
+
+// Set up message listener for insert text requests - MUST BE BEFORE bootstrap() is called
+(function() {
+  console.log("[Prompanion] ========== SETTING UP MESSAGE LISTENER (IMMEDIATE) ==========");
+  console.log("[Prompanion] File version: 2024-01-INSERT-TEXT-FIX");
+  
+  if (typeof chrome === "undefined") {
+    console.error("[Prompanion] chrome is undefined!");
+    return;
+  }
+  
+  if (!chrome.runtime) {
+    console.error("[Prompanion] chrome.runtime is undefined!");
+    return;
+  }
+  
+  if (!chrome.runtime.onMessage) {
+    console.error("[Prompanion] chrome.runtime.onMessage is undefined!");
+    return;
+  }
+  
+  console.log("[Prompanion] All chrome APIs available, registering listener...");
+  
+  try {
+    chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+      console.log("[Prompanion] ========== MESSAGE RECEIVED IN ADAPTER ==========");
+      console.log("[Prompanion] Message type:", message?.type);
+      
+      if (!message || typeof message !== "object") {
+        console.log("[Prompanion] Invalid message, returning false");
+        return false;
+      }
+
+      if (message.type === "PROMPANION_INSERT_TEXT") {
+        console.log("[Prompanion] PROMPANION_INSERT_TEXT received! Calling handler...");
+        try {
+          handleInsertTextMessage(message, sender, sendResponse);
+          return true; // Keep channel open for async response
+        } catch (error) {
+          console.error("[Prompanion] Handler error:", error);
+          sendResponse({ ok: false, reason: error?.message ?? "HANDLER_ERROR" });
+          return true;
+        }
+      }
+      
+      return false;
+    });
+    
+    console.log("[Prompanion] ✓ Message listener registered successfully!");
+  } catch (error) {
+    console.error("[Prompanion] ✗ Failed to register listener:", error);
+    console.error("[Prompanion] Error:", error.message, error.stack);
+  }
+})();
 
 function bootstrap() {
   ensureHighlightObserver();
@@ -720,7 +1171,6 @@ function handleRefineButtonClick(e) {
   e.preventDefault();
   e.stopPropagation();
   if (enhanceActionInFlight) {
-    console.log("[Prompanion] Refine action already in flight, ignoring");
     return;
   }
   const composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
@@ -732,7 +1182,6 @@ function handleRefineButtonClick(e) {
   const promptText = extractInputText().trim();
   console.log("[Prompanion] Prompt text:", promptText);
   if (!promptText) {
-    console.log("[Prompanion] No prompt text, returning");
     return;
   }
   enhanceActionInFlight = true;
@@ -741,15 +1190,20 @@ function handleRefineButtonClick(e) {
   console.log("[Prompanion] Requesting prompt enhancement...");
   requestPromptEnhancement(promptText)
     .then((result) => {
-      console.log("[Prompanion] Enhancement result:", result);
-      const refinedText = result?.ok && typeof result.optionA === "string" && result.optionA.trim()
-        ? result.optionA.trim() : promptText;
-      console.log("[Prompanion] Setting refined text:", refinedText);
-      const success = setComposerText(composerNode, refinedText);
-      console.log("[Prompanion] setComposerText success:", success);
+      if (!result || !result.ok) {
+        enhanceActionInFlight = false;
+        return;
+      }
+      const refinedText = result.optionA && typeof result.optionA === "string" && result.optionA.trim()
+        ? result.optionA.trim() 
+        : promptText;
+      setComposerText(composerNode, refinedText);
+      enhanceActionInFlight = false;
     })
-    .catch((error) => console.error("Prompanion: refine request threw", error))
-    .finally(() => { enhanceActionInFlight = false; });
+    .catch((error) => {
+      console.error("Prompanion: refine request threw", error);
+      enhanceActionInFlight = false;
+    });
 }
 
 function bindInputEvents(input) {
@@ -846,68 +1300,67 @@ function detachTooltipResizeHandler() {
   enhanceTooltipResizeHandler = null;
 }
 
+// Backup message listener registration (IIFE to ensure it runs immediately)
+(function registerInsertTextListener() {
+  console.log("[Prompanion] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
+  console.log("[Prompanion] Current time:", new Date().toISOString());
+  
+  if (typeof chrome === "undefined") {
+    console.error("[Prompanion] chrome is undefined in backup registration");
+    return;
+  }
+  
+  if (!chrome.runtime || !chrome.runtime.onMessage) {
+    console.error("[Prompanion] chrome.runtime.onMessage not available in backup registration");
+    return;
+  }
+  
+  try {
+    chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+      if (message && message.type === "PROMPANION_INSERT_TEXT") {
+        console.log("[Prompanion] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
+        if (typeof handleInsertTextMessage === "function") {
+          handleInsertTextMessage(message, sender, sendResponse);
+        } else {
+          console.error("[Prompanion] handleInsertTextMessage is not a function!");
+          sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
+        }
+        return true;
+      }
+      return false;
+    });
+    console.log("[Prompanion] ✓ Backup listener registered successfully");
+  } catch (error) {
+    console.error("[Prompanion] ✗ Backup listener registration failed:", error);
+  }
+})();
+
 const readyState = document.readyState;
 if (readyState === "complete" || readyState === "interactive") {
   bootstrap();
 } else {
   document.addEventListener("DOMContentLoaded", bootstrap);
 }
-console.log("[Prompanion] Registering selection change event listeners");
 
+console.log("[Prompanion] Registering selection change event listeners");
 document.addEventListener("selectionchange", handleSelectionChange);
 window.addEventListener("scroll", handleSelectionChange, true);
 window.addEventListener("resize", handleSelectionChange);
 console.log("[Prompanion] Selection change event listeners registered");
+
+// Verify message listener is registered
+console.log("[Prompanion] ========== VERIFYING MESSAGE LISTENER ==========");
+if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
+  console.log("[Prompanion] chrome.runtime.onMessage is available");
+  console.log("[Prompanion] chrome.runtime.id:", chrome.runtime.id);
+  console.log("[Prompanion] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
+} else {
+  console.error("[Prompanion] chrome.runtime.onMessage is NOT available at this point!");
+}
+
 window.addEventListener("prompanion-panel-resize", () => {
   refreshFloatingButtonPosition();
 });
-
-document.addEventListener("click", (e) => {
-  const tooltipVisible = enhanceTooltipElement?.classList.contains("is-visible");
-  if (tooltipVisible) {
-    console.log("[Prompanion] ========== CLICK DETECTED (tooltip visible) ==========");
-    const button = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
-    const buttonRect = button?.getBoundingClientRect();
-    const clickX = e.clientX;
-    const clickY = e.clientY;
-    const inButtonBounds = buttonRect && clickX >= buttonRect.left && clickX <= buttonRect.right && 
-                           clickY >= buttonRect.top && clickY <= buttonRect.bottom;
-    const clickedButton = e.target.closest(".prompanion-enhance-tooltip__action");
-    const clickedTooltip = e.target.closest(".prompanion-enhance-tooltip");
-    
-    console.log("[Prompanion] Target:", e.target);
-    console.log("[Prompanion] Click coordinates:", clickX, clickY);
-    console.log("[Prompanion] Button bounds:", buttonRect);
-    console.log("[Prompanion] Click in button bounds:", inButtonBounds);
-    console.log("[Prompanion] clickedButton (closest):", clickedButton);
-    console.log("[Prompanion] clickedTooltip (closest):", clickedTooltip);
-    
-    if (clickedButton || inButtonBounds) {
-      console.log("[Prompanion] ========== CLICK ON TOOLTIP/BUTTON CONFIRMED ==========");
-      if (typeof handleRefineButtonClick === "function") {
-        console.log("[Prompanion] Calling handleRefineButtonClick from global listener");
-        handleRefineButtonClick(e);
-      } else {
-        console.error("[Prompanion] handleRefineButtonClick is not a function!");
-      }
-    }
-  }
-}, true);
-
-window.addEventListener("click", (e) => {
-  if (enhanceTooltipElement?.classList.contains("is-visible")) {
-    console.log("[Prompanion] ========== WINDOW CLICK DETECTED (tooltip visible) ==========");
-    console.log("[Prompanion] Target:", e.target);
-    const button = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
-    const clickedButton = e.target.closest(".prompanion-enhance-tooltip__action");
-    if (clickedButton || button === e.target) {
-      console.log("[Prompanion] ========== WINDOW CLICK ON BUTTON ==========");
-      if (typeof handleRefineButtonClick === "function") {
-        handleRefineButtonClick(e);
-      }
-    }
-  }
-}, true);
 
 document.addEventListener("mousedown", (e) => {
   if (enhanceTooltipElement?.classList.contains("is-visible")) {
@@ -937,9 +1390,6 @@ document.addEventListener("mousedown", (e) => {
         tooltipClickInProgress = false;
         console.log("[Prompanion] tooltipClickInProgress flag cleared");
         document.removeEventListener("click", clickHandler, true);
-        if (buttonRef && !buttonRef.isConnected) {
-          console.error("[Prompanion] BUTTON WAS REMOVED FROM DOM!");
-        }
       }, 300);
     }
   }
