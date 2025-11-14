@@ -162,11 +162,8 @@ export async function handleEnhance(state, dependencies = {}) {
  * Registers event handlers for copy, insert, and regenerate buttons
  */
 export function registerCopyHandlers() {
+  // Register copy button handlers (if they exist)
   const copyButtons = document.querySelectorAll("[data-copy]");
-  if (!copyButtons.length) {
-    return;
-  }
-  
   copyButtons.forEach((button) => {
     button.addEventListener("click", async () => {
       const targetId = button.dataset.copy;
@@ -186,6 +183,7 @@ export function registerCopyHandlers() {
     });
   });
 
+  // Register insert button handlers (if they exist)
   const insertButtons = document.querySelectorAll("[data-insert]");
   insertButtons.forEach((button) => {
     button.addEventListener("click", async () => {
@@ -206,89 +204,106 @@ export function registerCopyHandlers() {
     });
   });
 
-  const regenerateButtons = document.querySelectorAll("[data-regenerate]");
-  if (!regenerateButtons.length) {
-    console.warn("Prompanion: No regenerate buttons found");
-    return;
+  // Register regenerate button handlers using document-level event delegation
+  // This ensures handlers work regardless of when elements are created or section state
+  // Remove any existing handler to prevent duplicates
+  if (document._prompanionRegenerateHandler) {
+    document.removeEventListener("click", document._prompanionRegenerateHandler, true);
   }
-  
-  regenerateButtons.forEach((button) => {
-    button.addEventListener("click", async () => {
-      const targetId = button.dataset.regenerate;
-      if (!targetId) {
-        console.error("Prompanion: Regenerate button missing data-regenerate attribute");
-        return;
+
+  const regenerateHandler = async (event) => {
+    // Check if click target is a regenerate button or inside one
+    const button = event.target.closest("[data-regenerate]");
+    if (!button) {
+      return;
+    }
+
+    // Only handle clicks within the prompt preview section
+    const promptPreview = button.closest(".prompt-preview");
+    if (!promptPreview) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const targetId = button.dataset.regenerate;
+    if (!targetId) {
+      console.error("Prompanion: Regenerate button missing data-regenerate attribute");
+      return;
+    }
+
+    const originalField = document.getElementById("original-prompt");
+    if (!originalField) {
+      console.error("Prompanion: original-prompt field not found");
+      return;
+    }
+
+    const originalPrompt = originalField.value.trim();
+    if (!originalPrompt) {
+      alert("No original prompt to regenerate. Please enter a prompt in the Original field first.");
+      return;
+    }
+
+    // Prevent multiple simultaneous regenerations
+    if (button.disabled) {
+      return;
+    }
+
+    const originalButtonText = button.textContent;
+    button.disabled = true;
+    button.textContent = "Regenerating...";
+
+    try {
+      // Determine which option (a or b) based on targetId
+      const option = targetId === "option-a" ? "a" : targetId === "option-b" ? "b" : null;
+      if (!option) {
+        throw new Error(`Invalid option: ${targetId}`);
       }
       
-      const field = document.getElementById(targetId);
-      if (!field) {
-        console.error(`Prompanion: Field with id "${targetId}" not found`);
-        return;
-      }
-
-      const currentPrompt = field.value.trim();
-      if (!currentPrompt) {
-        alert("No prompt to regenerate. Please enhance a prompt first.");
-        return;
-      }
-
-      const originalButtonText = button.textContent;
-      button.disabled = true;
-      button.textContent = "Regenerating...";
-
-      try {
-        // Determine which option (a or b) based on targetId
-        const option = targetId === "option-a" ? "a" : targetId === "option-b" ? "b" : null;
-        if (!option) {
-          throw new Error(`Invalid option: ${targetId}`);
-        }
-        
-        // Call background script to regenerate
-        const response = await new Promise((resolve, reject) => {
-          chrome.runtime.sendMessage(
-            {
-              type: "PROMPANION_REGENERATE_ENHANCEMENT",
-              prompt: currentPrompt,
-              option: option
-            },
-            (response) => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-                return;
-              }
-              if (!response) {
-                reject(new Error("No response from background script"));
-                return;
-              }
-              resolve(response);
+      // Call background script to regenerate using the original prompt
+      const response = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(
+          {
+            type: "PROMPANION_REGENERATE_ENHANCEMENT",
+            prompt: originalPrompt,
+            option: option
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
             }
-          );
-        });
+            if (!response) {
+              reject(new Error("No response from background script"));
+              return;
+            }
+            resolve(response);
+          }
+        );
+      });
 
-        if (!response || !response.ok) {
-          throw new Error(response?.reason || "Failed to regenerate enhancement");
-        }
-
-        // Update the field with regenerated prompt
-        if (response.regenerated) {
-          field.value = response.regenerated;
-          // Trigger input event to notify any listeners
-          field.dispatchEvent(new Event("input", { bubbles: true }));
-        } else {
-          throw new Error("No regenerated prompt received");
-        }
-      } catch (error) {
-        console.error("Prompanion: regeneration failed", error);
-        const errorMessage = error.message?.includes("API key") 
-          ? "Please add your OpenAI API key in settings to use prompt regeneration."
-          : error.message || "Failed to regenerate prompt. Please try again.";
-        alert(errorMessage);
-      } finally {
-        button.disabled = false;
-        button.textContent = originalButtonText;
+      if (!response || !response.ok) {
+        throw new Error(response?.reason || "Failed to regenerate enhancement");
       }
-    });
-  });
+
+      // The storage listener will automatically update the UI when state is saved
+      // No need to manually update the field here
+    } catch (error) {
+      console.error("Prompanion: regeneration failed", error);
+      const errorMessage = error.message?.includes("API key") 
+        ? "Please add your OpenAI API key in settings to use prompt regeneration."
+        : error.message || "Failed to regenerate prompt. Please try again.";
+      alert(errorMessage);
+    } finally {
+      button.disabled = false;
+      button.textContent = originalButtonText;
+    }
+  };
+
+  // Store handler reference and attach with capture phase for maximum reliability
+  document._prompanionRegenerateHandler = regenerateHandler;
+  document.addEventListener("click", regenerateHandler, true);
 }
 
 /**
