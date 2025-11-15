@@ -333,7 +333,7 @@ function ensureSelectionToolbar() {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "prompanion-selection-toolbar__button";
-  button.textContent = "Ask Prompanion";
+  button.textContent = "Elaborate";
   button.addEventListener("pointerdown", (e) => e.preventDefault());
   button.addEventListener("mousedown", (e) => e.stopPropagation());
   button.addEventListener("click", handleSelectionToolbarAction);

@@ -150,8 +150,13 @@ function buildChatApiMessages(history) {
  * @param {Object} conversation - Conversation object
  * @returns {Promise<string>} Generated conversation title
  */
-async function generateConversationTitle(stateRef, conversation) {
-  const fallback = conversation.history.find((msg) => msg.role === "user")?.content ?? "Conversation";
+export async function generateConversationTitle(stateRef, conversation) {
+  // Filter out welcome message and system messages for context
+  const contextualMessages = conversation.history.filter(
+    (msg) => msg.role !== "agent" || (msg.content && !msg.content.includes("Welcome to the Side Chat"))
+  );
+  
+  const fallback = contextualMessages.find((msg) => msg.role === "user")?.content ?? "Conversation";
   if (!stateRef.settings.apiKey) {
     return fallback.slice(0, 40);
   }
@@ -172,7 +177,7 @@ async function generateConversationTitle(stateRef, conversation) {
           },
           {
             role: "user",
-            content: conversation.history.map((msg) => `${msg.role}: ${msg.content}`).join("\n")
+            content: contextualMessages.map((msg) => `${msg.role}: ${msg.content}`).join("\n")
           }
         ]
       })
@@ -240,6 +245,32 @@ export async function sendSideChatMessage(stateRef, message, dependencies) {
     if (reply) {
       activeConversation.history.push({ role: "agent", content: reply, timestamp: Date.now() });
       renderChat(activeConversation.history);
+      
+      // Auto-generate title if conversation doesn't have one yet or is still "New chat"
+      // Generate after we have at least 1 user message + 1 agent response (2 messages total, excluding welcome)
+      const nonWelcomeMessages = activeConversation.history.filter(
+        (msg) => !(msg.role === "agent" && msg.content && msg.content.includes("Welcome to the Side Chat"))
+      );
+      const needsTitle = 
+        !activeConversation.title || 
+        activeConversation.title === "New chat" ||
+        activeConversation.title === "Conversation";
+      
+      if (needsTitle && nonWelcomeMessages.length >= 2) {
+        // Generate title asynchronously (don't wait for it to complete)
+        generateConversationTitle(stateRef, activeConversation).then((title) => {
+          if (title && title !== activeConversation.title) {
+            activeConversation.title = title;
+            renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
+            saveState(stateRef).catch((error) => {
+              console.warn("Failed to save state after title generation:", error);
+            });
+          }
+        }).catch((error) => {
+          console.warn("Failed to generate conversation title:", error);
+        });
+      }
+      
       renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
       await saveState(stateRef);
     }
@@ -260,13 +291,31 @@ export async function sendSideChatMessage(stateRef, message, dependencies) {
 }
 
 /**
+ * Creates a new conversation with the welcome message
+ * @returns {Object} New conversation object
+ */
+function createNewConversation() {
+  return {
+    id: `conv-${Date.now()}`,
+    title: "New chat",
+    history: [
+      {
+        role: "agent",
+        content: WELCOME_MESSAGE,
+        timestamp: Date.now()
+      }
+    ]
+  };
+}
+
+/**
  * Automatically triggers a side chat message (used for pending messages)
  * @param {Object} stateRef - Reference to application state
  * @param {string} text - Text to send
- * @param {Object} options - Options object with fromPending flag
+ * @param {Object} options - Options object with fromPending and startFresh flags
  * @param {Object} dependencies - Required dependencies (saveState)
  */
-export async function triggerAutoSideChat(stateRef, text, { fromPending = false } = {}, dependencies = {}) {
+export async function triggerAutoSideChat(stateRef, text, { fromPending = false, startFresh = false } = {}, dependencies = {}) {
   const { saveState } = dependencies;
   const snippet = typeof text === "string" ? text.trim() : "";
   if (!snippet || autoChatInFlight || !stateRef) {
@@ -278,6 +327,17 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false 
     if (!pendingText || pendingText !== snippet) {
       return;
     }
+  }
+
+  // If startFresh is true, create a new conversation before sending the message
+  if (startFresh) {
+    const newConversation = createNewConversation();
+    stateRef.conversations.push(newConversation);
+    stateRef.activeConversationId = newConversation.id;
+    const activeConversation = getActiveConversation(stateRef);
+    renderChat(activeConversation?.history ?? []);
+    renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
+    await saveState(stateRef);
   }
 
   autoChatInFlight = true;
@@ -314,6 +374,32 @@ export function processPendingSideChat(stateRef, dependencies = {}) {
     return;
   }
   triggerAutoSideChat(stateRef, pending.text, { fromPending: true }, dependencies);
+}
+
+/**
+ * Opens/expands the Side Chat section in the sidepanel
+ * @param {number} retries - Number of retry attempts if element not found
+ */
+export function openSideChatSection(retries = 5) {
+  const chatSection = document.querySelector(".panel__section--chat details");
+  if (chatSection) {
+    if (!chatSection.open) {
+      chatSection.open = true;
+    }
+    // Ensure it's visible
+    setTimeout(() => {
+      chatSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 50);
+    return true;
+  } else if (retries > 0) {
+    // Retry if DOM not ready yet
+    setTimeout(() => {
+      openSideChatSection(retries - 1);
+    }, 100);
+    return false;
+  }
+  console.warn("[SideChat] Could not find Side Chat section element");
+  return false;
 }
 
 /**

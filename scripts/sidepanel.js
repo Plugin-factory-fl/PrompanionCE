@@ -22,7 +22,8 @@ import {
   triggerAutoSideChat,
   processPendingSideChat,
   registerChatHandlers,
-  isFreshConversation
+  isFreshConversation,
+  openSideChatSection
 } from "../Source/sideChat.js";
 import {
   LIBRARY_SCHEMA_VERSION,
@@ -279,6 +280,12 @@ async function init() {
   });
   initTabs();
   registerSectionActionGuards();
+  
+  // Check if there's a pending side chat message and open section if needed
+  if (currentState.pendingSideChat?.text) {
+    openSideChatSection();
+  }
+  
   processPendingSideChat(currentState, { saveState });
 
   registerEnhanceButton(currentState, {
@@ -387,9 +394,20 @@ if (chrome?.runtime?.onMessage) {
       if (!currentState) {
         return;
       }
-      triggerAutoSideChat(currentState, message.text, {
-        fromPending: Boolean(message.clearPending)
-      }, { saveState });
+      
+      // IMPORTANT: Open the Side Chat section FIRST before sending the message
+      // This ensures the user can see the interaction happening
+      openSideChatSection();
+      
+      // Wait for DOM to update and section to expand, then send the message
+      // We need enough time for the section to visually open
+      // IMPORTANT: startFresh=true creates a new conversation each time Elaborate is pressed
+      setTimeout(() => {
+        triggerAutoSideChat(currentState, message.text, {
+          fromPending: Boolean(message.clearPending),
+          startFresh: true // Always start a fresh conversation when Elaborate button is pressed
+        }, { saveState });
+      }, 200);
     }
   });
 }

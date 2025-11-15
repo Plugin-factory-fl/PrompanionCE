@@ -12,7 +12,7 @@
 
 /* Chat Window */
 .chat-window {
-  height: 220px;
+  height: 431px; /* Increased another 40% from 308px */
   overflow-y: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
