@@ -53,14 +53,49 @@
       "js": ["scripts/injector.js"],
       "run_at": "document_idle"
     },
+      {
+        "matches": [
+          "https://chatgpt.com/*",
+          "https://*.chatgpt.com/*",
+          "https://chat.openai.com/*",
+          "https://*.chat.openai.com/*"
+        ],
+        "js": ["Base/AdapterBase.js", "Adapters/ChatGPT/adapter.js"],
+        "run_at": "document_idle"
+      },
+      {
+        "matches": [
+          "https://grok.com/*",
+          "https://*.grok.com/*",
+          "https://x.com/*",
+          "https://*.x.com/*"
+        ],
+        "js": ["Base/AdapterBase.js", "Adapters/Grok/adapter.js"],
+        "run_at": "document_idle"
+      },
     {
       "matches": [
-        "https://chatgpt.com/*",
-        "https://*.chatgpt.com/*",
-        "https://chat.openai.com/*",
-        "https://*.chat.openai.com/*"
+        "https://claude.ai/*",
+        "https://*.claude.ai/*"
       ],
-      "js": ["Base/AdapterBase.js", "Adapters/ChatGPT/adapter.js"],
+      "js": ["Base/AdapterBase.js", "Adapters/Claude/adapter.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://gemini.google.com/*",
+        "https://*.gemini.google.com/*"
+      ],
+      "js": ["Base/AdapterBase.js", "Adapters/Gemini/adapter.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.perplexity.ai/*",
+        "https://perplexity.ai/*",
+        "https://*.perplexity.ai/*"
+      ],
+      "js": ["Base/AdapterBase.js", "Adapters/Perplexity/adapter.js"],
       "run_at": "document_idle"
     }
   ],

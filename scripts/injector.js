@@ -80,6 +80,7 @@ function ensureStyles() {
       opacity: 1;
     }
 
+    /* Only apply margin to body, not both html and body, to avoid doubling the push */
     body.${PANEL_PUSH_CLASS} {
       margin-right: min(546px, 94vw);
       transition: margin-right 160ms ease-in-out;
@@ -140,20 +141,109 @@ function notifyPanelResize() {
   window.dispatchEvent(new CustomEvent("prompanion-panel-resize"));
 }
 
+
+/**
+ * Finds Gemini's main layout container
+ * @returns {HTMLElement|null} The main element or null
+ */
+function findGeminiMainContainer() {
+  // Target the main element directly - simpler and more reliable
+  const container = document.querySelector('#app-root > main') ||
+                    document.querySelector('#app-root main') ||
+                    document.querySelector('main');
+  return container;
+}
+
+/**
+ * Checks if the current site supports content pushing
+ * Some sites (like Gemini) have layouts that don't respond well to margin changes
+ * @returns {boolean} True if pushing should be attempted
+ */
+function shouldPushContent() {
+  const hostname = window.location.hostname;
+  // Gemini uses a special container, so we handle it separately
+  if (hostname.includes('gemini.google.com')) {
+    return true; // We'll handle Gemini specially
+  }
+  return true;
+}
+
+/**
+ * Applies push effect to Gemini's main container
+ * @param {boolean} shouldPush - Whether to apply or remove the push
+ */
+function applyGeminiPush(shouldPush) {
+  const container = findGeminiMainContainer();
+  if (!container) {
+    // If container not found, fall back to standard behavior
+    console.log('[Prompanion] Gemini main container not found, using overlay mode');
+    return false;
+  }
+  
+  const panelWidthCalc = 'min(546px, 94vw)';
+  
+  if (shouldPush) {
+    // Store original margin-right if it exists
+    const computedStyle = window.getComputedStyle(container);
+    const currentMarginRight = computedStyle.marginRight;
+    
+    if (!container.dataset.prompanionOriginalMarginRight) {
+      container.dataset.prompanionOriginalMarginRight = currentMarginRight || '0px';
+    }
+    
+    // Try margin-right first - simple and effective
+    container.style.setProperty('margin-right', panelWidthCalc, 'important');
+    container.style.setProperty('transition', 'margin-right 160ms ease-in-out');
+    container.dataset.prompanionPushed = 'true';
+    
+    console.log('[Prompanion] Applied push to Gemini main container:', container);
+  } else {
+    // Restore original margin-right
+    if (container.dataset.prompanionPushed === 'true') {
+      const originalMarginRight = container.dataset.prompanionOriginalMarginRight;
+      
+      if (originalMarginRight && originalMarginRight !== '0px') {
+        container.style.setProperty('margin-right', originalMarginRight, 'important');
+      } else {
+        container.style.removeProperty('margin-right');
+      }
+      
+      container.style.removeProperty('transition');
+      delete container.dataset.prompanionPushed;
+      delete container.dataset.prompanionOriginalMarginRight;
+      
+      console.log('[Prompanion] Removed push from Gemini main container');
+    }
+  }
+  
+  return true; // Container found and handled
+}
+
 /**
  * Toggles the side panel visibility
  */
 function togglePanel() {
   const container = createPanel();
   const willShow = !container.classList.contains(PANEL_VISIBLE_CLASS);
+  const hostname = window.location.hostname;
+  const isGemini = hostname.includes('gemini.google.com');
+  
   container.classList.toggle(PANEL_VISIBLE_CLASS, willShow);
-  if (willShow) {
-    document.documentElement.classList.add(PANEL_PUSH_CLASS);
-    document.body.classList.add(PANEL_PUSH_CLASS);
+  
+  if (isGemini) {
+    // Handle Gemini specially using its main container
+    applyGeminiPush(willShow);
   } else {
-    document.documentElement.classList.remove(PANEL_PUSH_CLASS);
-    document.body.classList.remove(PANEL_PUSH_CLASS);
+    // Standard push behavior for other sites
+    if (shouldPushContent() && document.body) {
+      if (willShow) {
+        document.body.classList.add(PANEL_PUSH_CLASS);
+      } else {
+        document.body.classList.remove(PANEL_PUSH_CLASS);
+      }
+    }
   }
+  
   requestAnimationFrame(() => {
     updatePanelOffset(container, willShow);
     notifyPanelResize();
@@ -167,8 +257,19 @@ function togglePanel() {
 function openPanel() {
   const container = createPanel();
   container.classList.add(PANEL_VISIBLE_CLASS);
-  document.documentElement.classList.add(PANEL_PUSH_CLASS);
-  document.body.classList.add(PANEL_PUSH_CLASS);
+  const hostname = window.location.hostname;
+  const isGemini = hostname.includes('gemini.google.com');
+  
+  if (isGemini) {
+    // Handle Gemini specially using its main container
+    applyGeminiPush(true);
+  } else {
+    // Standard push behavior for other sites
+    if (shouldPushContent() && document.body) {
+      document.body.classList.add(PANEL_PUSH_CLASS);
+    }
+  }
+  
   requestAnimationFrame(() => {
     updatePanelOffset(container, true);
     notifyPanelResize();
@@ -182,8 +283,19 @@ function openPanel() {
  */
 function closePanel(container) {
   container.classList.remove(PANEL_VISIBLE_CLASS);
-  document.documentElement.classList.remove(PANEL_PUSH_CLASS);
-  document.body.classList.remove(PANEL_PUSH_CLASS);
+  const hostname = window.location.hostname;
+  const isGemini = hostname.includes('gemini.google.com');
+  
+  if (isGemini) {
+    // Handle Gemini specially using its main container
+    applyGeminiPush(false);
+  } else {
+    // Standard push behavior for other sites
+    if (shouldPushContent() && document.body) {
+      document.body.classList.remove(PANEL_PUSH_CLASS);
+    }
+  }
+  
   requestAnimationFrame(() => {
     updatePanelOffset(container, false);
     notifyPanelResize();
