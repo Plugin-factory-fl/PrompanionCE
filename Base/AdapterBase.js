@@ -216,6 +216,290 @@ class AdapterBase {
     tooltip.style.top = `${rect.bottom + window.scrollY + 5}px`;
     tooltip.style.left = `${rect.left + rect.width / 2 + window.scrollX}px`;
   }
+  
+  // ============================================================================
+  // Generic DOM Utilities
+  // ============================================================================
+  // These utilities provide generic DOM manipulation functions that work
+  // across all platforms and can be used by any adapter.
+  // ============================================================================
+  
+  /**
+   * Converts a DOM node to an HTMLElement
+   * Handles text nodes by returning their parent element
+   * @param {Node} node - The DOM node to convert
+   * @returns {HTMLElement|null} The element or null if not found
+   */
+  static getElementFromNode(node) {
+    if (!node) return null;
+    if (node.nodeType === Node.TEXT_NODE) return node.parentElement;
+    return node instanceof HTMLElement ? node : null;
+  }
+  
+  /**
+   * Gets the bounding rectangle from a Selection object
+   * Falls back to clientRects if getBoundingClientRect fails
+   * @param {Selection} selection - The Selection object
+   * @returns {DOMRect|null} The bounding rectangle or null if not available
+   */
+  static getSelectionRect(selection) {
+    if (!selection?.rangeCount) return null;
+    try {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      if (rect?.width || rect?.height) return rect;
+      const rects = range.getClientRects();
+      return rects[0] || null;
+    } catch {
+      return null;
+    }
+  }
+  
+  /**
+   * Sets button text content intelligently using TreeWalker
+   * Preserves existing DOM structure by updating text nodes rather than replacing content
+   * @param {HTMLElement} button - The button element
+   * @param {string} text - The text to set
+   */
+  static setButtonTextContent(button, text) {
+    const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      if (node.textContent?.trim()) {
+        node.textContent = text;
+        return;
+      }
+    }
+    button.textContent = text;
+  }
+  
+  /**
+   * Injects CSS styles into the document head
+   * Creates or updates a style element with the given ID
+   * @param {string} styleId - The ID for the style element
+   * @param {string} cssContent - The CSS content to inject
+   */
+  static injectStyle(styleId, cssContent) {
+    let style = document.getElementById(styleId);
+    if (!style) {
+      style = document.createElement("style");
+      style.id = styleId;
+      document.head.append(style);
+    }
+    if (style.textContent !== cssContent) {
+      style.textContent = cssContent;
+    }
+  }
+  
+  // ============================================================================
+  // Generic Message Listener System
+  // ============================================================================
+  // This system provides unified message handling for all adapters.
+  // It consolidates duplicate listener registrations and provides
+  // helper methods for sending messages with error handling.
+  // ============================================================================
+  
+  // Internal message handler registry
+  static _messageHandlers = new Map();
+  static _listenerRegistered = false;
+  
+  /**
+   * Registers a message handler for a specific message type
+   * @param {string} messageType - The message type to handle (e.g., "PROMPANION_INSERT_TEXT")
+   * @param {Function} handler - The handler function (message, sender, sendResponse) => void
+   */
+  static registerMessageHandler(messageType, handler) {
+    if (typeof messageType !== "string" || typeof handler !== "function") {
+      console.error("[AdapterBase] Invalid message handler registration:", { messageType, handler });
+      return;
+    }
+    
+    this._messageHandlers.set(messageType, handler);
+    console.log(`[AdapterBase] Registered handler for message type: ${messageType}`);
+    
+    // Ensure listener is registered
+    this._ensureMessageListener();
+  }
+  
+  /**
+   * Unregisters a message handler for a specific message type
+   * @param {string} messageType - The message type to unregister
+   */
+  static unregisterMessageHandler(messageType) {
+    this._messageHandlers.delete(messageType);
+    console.log(`[AdapterBase] Unregistered handler for message type: ${messageType}`);
+  }
+  
+  /**
+   * Ensures the message listener is registered (singleton pattern)
+   * @private
+   */
+  static _ensureMessageListener() {
+    if (this._listenerRegistered) return;
+    
+    if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.onMessage) {
+      console.error("[AdapterBase] Cannot register message listener - chrome.runtime.onMessage not available");
+      return;
+    }
+    
+    try {
+      chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        // Validate message
+        if (!message || typeof message !== "object" || !message.type) {
+          return false; // Let other listeners handle it
+        }
+        
+        const handler = this._messageHandlers.get(message.type);
+        if (!handler) {
+          return false; // No handler for this message type
+        }
+        
+        try {
+          // Track if sendResponse was called
+          let responseSent = false;
+          let responseValue = null;
+          const wrappedSendResponse = (response) => {
+            if (responseSent) {
+              console.warn(`[AdapterBase] Handler for ${message.type} called sendResponse multiple times`);
+              return false;
+            }
+            responseSent = true;
+            responseValue = response;
+            try {
+              return sendResponse(response);
+            } catch (e) {
+              console.error(`[AdapterBase] sendResponse failed for ${message.type}:`, e);
+              return false;
+            }
+          };
+          
+          // Call the handler
+          const result = handler(message, sender, wrappedSendResponse);
+          
+          // If handler returns true, keep channel open for async response
+          // If handler returns false/undefined, close channel
+          // If handler returns a Promise, wait for it
+          if (result === true) {
+            // Handler wants to keep channel open for async response
+            // But if sendResponse was already called synchronously, we should return false
+            // Chrome allows calling sendResponse before or after returning true
+            if (responseSent) {
+              // sendResponse was called synchronously, but handler returned true
+              // This is fine - Chrome will still deliver the response
+              console.log(`[AdapterBase] Handler for ${message.type} called sendResponse synchronously but returned true`);
+            }
+            return true; // Keep channel open
+          } else if (result && typeof result.then === "function") {
+            // Promise-based handler
+            result
+              .then((response) => {
+                if (response !== undefined) {
+                  sendResponse(response);
+                }
+              })
+              .catch((error) => {
+                console.error(`[AdapterBase] Handler error for ${message.type}:`, error);
+                sendResponse({ ok: false, reason: error?.message ?? "HANDLER_ERROR" });
+              });
+            return true; // Keep channel open for promise
+          } else {
+            // Handler returned false/undefined
+            if (!responseSent) {
+              console.warn(`[AdapterBase] Handler for ${message.type} didn't call sendResponse and returned ${result}`);
+              try {
+                sendResponse({ ok: false, reason: "NO_RESPONSE" });
+              } catch (e) {
+                // Channel may already be closed
+                console.error(`[AdapterBase] Failed to send NO_RESPONSE for ${message.type}:`, e);
+              }
+            } else {
+              // sendResponse was called and handler returned false/undefined
+              // This is correct - close the channel
+              console.log(`[AdapterBase] Handler for ${message.type} returned ${result}, response sent:`, responseValue);
+            }
+            return false; // Close channel
+          }
+        } catch (error) {
+          console.error(`[AdapterBase] Handler error for ${message.type}:`, error);
+          try {
+            if (!responseSent) {
+              sendResponse({ ok: false, reason: error?.message ?? "HANDLER_ERROR" });
+            }
+          } catch (e) {
+            // sendResponse may have already been called or channel closed
+            console.error(`[AdapterBase] Failed to send error response for ${message.type}:`, e);
+          }
+          return false;
+        }
+      });
+      
+      this._listenerRegistered = true;
+      console.log("[AdapterBase] ✓ Message listener registered successfully");
+    } catch (error) {
+      console.error("[AdapterBase] ✗ Failed to register message listener:", error);
+    }
+  }
+  
+  /**
+   * Sends a message to the background script
+   * @param {Object} message - The message object (must have 'type' property)
+   * @param {Function} [callback] - Optional callback for response
+   * @returns {Promise} Promise that resolves with the response
+   */
+  static sendMessage(message, callback) {
+    if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) {
+      const error = new Error("chrome.runtime.sendMessage not available");
+      console.error("[AdapterBase] Cannot send message:", error);
+      if (callback) {
+        callback({ ok: false, reason: "CHROME_RUNTIME_UNAVAILABLE" });
+      }
+      return Promise.reject(error);
+    }
+    
+    if (!message || typeof message !== "object" || !message.type) {
+      const error = new Error("Invalid message: must have 'type' property");
+      console.error("[AdapterBase] Invalid message:", error);
+      if (callback) {
+        callback({ ok: false, reason: "INVALID_MESSAGE" });
+      }
+      return Promise.reject(error);
+    }
+    
+    return new Promise((resolve, reject) => {
+      try {
+        chrome.runtime.sendMessage(message, (response) => {
+          if (chrome.runtime.lastError) {
+            const error = chrome.runtime.lastError;
+            console.warn(`[AdapterBase] Message send failed (${message.type}):`, error);
+            if (callback) {
+              callback({ ok: false, reason: error.message ?? "MESSAGE_SEND_FAILED" });
+            }
+            reject(error);
+            return;
+          }
+          
+          if (callback) {
+            callback(response ?? { ok: false });
+          }
+          resolve(response ?? { ok: false });
+        });
+      } catch (error) {
+        console.error(`[AdapterBase] Exception sending message (${message.type}):`, error);
+        if (callback) {
+          callback({ ok: false, reason: error?.message ?? "EXCEPTION" });
+        }
+        reject(error);
+      }
+    });
+  }
+  
+  /**
+   * Convenience method to send a toggle panel message
+   * @returns {Promise} Promise that resolves with the response
+   */
+  static togglePanel() {
+    return this.sendMessage({ type: "PROMPANION_TOGGLE_PANEL" });
+  }
 }
 
 // Export for use in adapters

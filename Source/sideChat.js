@@ -6,6 +6,27 @@
 let autoChatInFlight = false;
 
 /**
+ * Welcome message content for new conversations
+ */
+const WELCOME_MESSAGE = "Welcome to the Side Chat! This is where you can ask me questions to elaborate on ideas you aren't clear on. I open up automatically when you highlight any text response from your LLM in the browser and click the \"Elaborate\" button. I'm here to help!";
+
+/**
+ * Checks if a conversation is fresh (only contains the welcome message)
+ * @param {Object} conversation - Conversation object to check
+ * @returns {boolean} True if conversation is fresh (unused)
+ */
+export function isFreshConversation(conversation) {
+  if (!conversation || !Array.isArray(conversation.history)) {
+    return false;
+  }
+  return (
+    conversation.history.length === 1 &&
+    conversation.history[0]?.role === "agent" &&
+    conversation.history[0]?.content === WELCOME_MESSAGE
+  );
+}
+
+/**
  * Formats a timestamp for display
  * @param {number} timestamp - Unix timestamp in milliseconds
  * @returns {string} Formatted timestamp string
@@ -332,10 +353,30 @@ export function registerChatHandlers(stateRef, dependencies = {}) {
       activeConversation.title = await generateConversationTitle(stateRef, activeConversation);
     }
 
+    // Check if there's already a fresh conversation (only welcome message)
+    const existingFreshConversation = stateRef.conversations.find((conv) => 
+      isFreshConversation(conv)
+    );
+
+    if (existingFreshConversation) {
+      // Use the existing fresh conversation instead of creating a new one
+      stateRef.activeConversationId = existingFreshConversation.id;
+      renderChat(existingFreshConversation.history);
+      renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
+      await saveState(stateRef);
+      return;
+    }
+
     const newConversation = {
       id: `conv-${Date.now()}`,
       title: "New chat",
-      history: []
+      history: [
+        {
+          role: "agent",
+          content: WELCOME_MESSAGE,
+          timestamp: Date.now()
+        }
+      ]
     };
     stateRef.conversations.push(newConversation);
     stateRef.activeConversationId = newConversation.id;
@@ -368,7 +409,17 @@ export function registerChatHandlers(stateRef, dependencies = {}) {
           const replacement = stateRef.conversations[index] ?? stateRef.conversations[index - 1];
           stateRef.activeConversationId = replacement?.id ?? null;
           if (!stateRef.activeConversationId) {
-            const fresh = { id: `conv-${Date.now()}`, title: "New chat", history: [] };
+            const fresh = {
+              id: `conv-${Date.now()}`,
+              title: "New chat",
+              history: [
+                {
+                  role: "agent",
+                  content: WELCOME_MESSAGE,
+                  timestamp: Date.now()
+                }
+              ]
+            };
             stateRef.conversations.push(fresh);
             stateRef.activeConversationId = fresh.id;
           }

@@ -6,52 +6,49 @@
 // it's always available when background script sends PROMPANION_INSERT_TEXT
 // ============================================================================
 
-(function registerInsertTextListener() {
-  console.log("[Prompanion] ========== REGISTERING INSERT TEXT LISTENER (TOP) ==========");
-  console.log("[Prompanion] Version: 2024-01-15-FIX-INSERT-TEXT");
-  console.log("[Prompanion] chrome available:", typeof chrome !== "undefined");
-  console.log("[Prompanion] chrome.runtime available:", typeof chrome !== "undefined" && typeof chrome.runtime !== "undefined");
-  console.log("[Prompanion] chrome.runtime.onMessage available:", typeof chrome !== "undefined" && typeof chrome.runtime !== "undefined" && typeof chrome.runtime.onMessage !== "undefined");
-  
+(function registerInsertTextListenerImmediately() {
   if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.onMessage) {
-    console.error("[Prompanion] ✗ Cannot register listener - chrome.runtime.onMessage not available!");
+    console.error("[Prompanion] Cannot register insert text listener - chrome.runtime.onMessage not available");
     return;
   }
   
-  try {
-    chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
-      // Only handle PROMPANION_INSERT_TEXT messages
-      if (!message || message.type !== "PROMPANION_INSERT_TEXT") {
-        return false; // Let other listeners handle it
-      }
-      
-      console.log("[Prompanion] ========== INSERT TEXT MESSAGE RECEIVED (TOP LISTENER) ==========");
-      console.log("[Prompanion] Message:", message);
-      console.log("[Prompanion] Handler function exists:", typeof handleInsertTextMessage === "function");
-      
-      // Function declarations are hoisted, so handleInsertTextMessage should be available
-      if (typeof handleInsertTextMessage === "function") {
-        console.log("[Prompanion] Calling handleInsertTextMessage...");
-        try {
-          handleInsertTextMessage(message, sender, sendResponse);
-          return true; // Keep channel open for async response
-        } catch (error) {
-          console.error("[Prompanion] Error calling handleInsertTextMessage:", error);
-          sendResponse({ ok: false, reason: error?.message ?? "HANDLER_ERROR" });
-          return false;
-        }
-      } else {
-        console.error("[Prompanion] handleInsertTextMessage is not a function!");
-        sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
-        return false;
-      }
-    });
+  let insertTextHandler = null;
+  
+  chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+    if (!message || message.type !== "PROMPANION_INSERT_TEXT") {
+      return false;
+    }
     
-    console.log("[Prompanion] ✓✓✓ INSERT TEXT LISTENER REGISTERED SUCCESSFULLY ✓✓✓");
-  } catch (error) {
-    console.error("[Prompanion] ✗✗✗ FAILED TO REGISTER LISTENER ✗✗✗", error);
-  }
+    const handler = insertTextHandler || (typeof handleInsertTextMessage === "function" ? handleInsertTextMessage : null);
+    
+    if (!handler) {
+      console.error("[Prompanion] handleInsertTextMessage is not available yet!");
+      try {
+        sendResponse({ ok: false, reason: "HANDLER_NOT_READY" });
+      } catch (e) {}
+      return false;
+    }
+    
+    try {
+      const result = handler(message, sender, sendResponse);
+      return result === true;
+    } catch (error) {
+      console.error("[Prompanion] Error in handleInsertTextMessage:", error);
+      try {
+        sendResponse({ ok: false, reason: error?.message ?? "HANDLER_ERROR" });
+      } catch (e) {}
+      return false;
+    }
+  });
+  
+  window._prompanionSetInsertTextHandler = function(handler) {
+    insertTextHandler = handler;
+    console.log("[Prompanion] Insert text handler reference updated");
+  };
+  
+  console.log("[Prompanion] ✓ Direct PROMPANION_INSERT_TEXT listener registered at top of file");
 })();
+
 
 console.log("[Prompanion] ========== ADAPTER.JS LOADING ==========");
 console.log("[Prompanion] Timestamp:", new Date().toISOString());
@@ -257,11 +254,6 @@ function ensureStyle() {
   if (style.textContent !== styles) style.textContent = styles;
 }
 
-function getElementFromNode(node) {
-  if (!node) return null;
-  if (node.nodeType === Node.TEXT_NODE) return node.parentElement;
-  return node instanceof HTMLElement ? node : null;
-}
 
 function getHighlightButton() {
   for (const selector of HIGHLIGHT_BUTTON_SELECTORS) {
@@ -274,7 +266,7 @@ function getHighlightButton() {
 }
 
 function nodeInAssistantMessage(node) {
-  const element = getElementFromNode(node);
+  const element = AdapterBase.getElementFromNode(node);
   if (!element) return false;
   return !!(
     element.closest("[data-message-author-role='assistant']") ||
@@ -305,7 +297,7 @@ function ensureHighlightObserver() {
 }
 
 function nodeInComposer(node) {
-  const element = getElementFromNode(node);
+  const element = AdapterBase.getElementFromNode(node);
   if (!element) return false;
   return !!(
     element.closest("[data-testid='conversation-turn-textbox']") ||
@@ -370,18 +362,6 @@ function hideSelectionToolbar() {
   selectionToolbarText = "";
 }
 
-function getSelectionRect(selection) {
-  if (!selection?.rangeCount) return null;
-  try {
-    const range = selection.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    if (rect?.width || rect?.height) return rect;
-    const rects = range.getClientRects();
-    return rects[0] || null;
-  } catch {
-    return null;
-  }
-}
 
 function requestSelectionToolbarUpdate() {
   if (selectionUpdateRaf !== null) {
@@ -414,7 +394,7 @@ function updateSelectionToolbar() {
   }
   
   console.log("[Prompanion] Showing toolbar - all conditions met");
-  const rangeRect = getSelectionRect(selection);
+  const rangeRect = AdapterBase.getSelectionRect(selection);
   if (!rangeRect) {
     hideSelectionToolbar();
     return;
@@ -454,7 +434,7 @@ function updateSelectionToolbar() {
     h = toolbar.offsetHeight;
     if (!w || !h) {
       console.error("[Prompanion] Toolbar dimensions still invalid, cannot position tooltip");
-      return;
+      return false; // sendResponse called synchronously, close channel
     }
   }
   
@@ -493,12 +473,13 @@ function submitSelectionToSideChat(text) {
   if (!snippet || selectionAskInFlight) return;
   selectionAskInFlight = true;
   try {
-    chrome.runtime.sendMessage({ type: "PROMPANION_SIDECHAT_REQUEST", text: snippet }, (response) => {
-      if (chrome.runtime.lastError) {
-        console.warn("Prompanion: failed to request sidechat from selection", chrome.runtime.lastError);
-      } else if (!response?.ok) {
+    AdapterBase.sendMessage({ type: "PROMPANION_SIDECHAT_REQUEST", text: snippet }, (response) => {
+      if (!response?.ok) {
         console.warn("Prompanion: sidechat request rejected", response?.reason);
       }
+      selectionAskInFlight = false;
+    }).catch((error) => {
+      console.warn("Prompanion: failed to request sidechat from selection", error);
       selectionAskInFlight = false;
     });
   } catch (error) {
@@ -520,17 +501,6 @@ function handleSelectionChange() {
   requestSelectionToolbarUpdate();
 }
 
-function setButtonTextContent(button, text) {
-  const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
-  while (walker.nextNode()) {
-    const node = walker.currentNode;
-    if (node.textContent?.trim()) {
-      node.textContent = text;
-      return;
-    }
-  }
-  button.textContent = text;
-}
 
 function createIcon() {
   const icon = document.createElement("span");
@@ -543,19 +513,12 @@ function createIcon() {
 }
 
 function requestPromptEnhancement(promptText) {
-  return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: "PROMPANION_PREPARE_ENHANCEMENT", prompt: promptText, openPanel: false },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          console.warn("Prompanion: enhancement request failed", chrome.runtime.lastError);
-          resolve({ ok: false });
-          return;
-        }
-        resolve(response ?? { ok: false });
-      });
-  });
+  return AdapterBase.sendMessage({ type: "PROMPANION_PREPARE_ENHANCEMENT", prompt: promptText, openPanel: false })
+    .catch((error) => {
+      console.warn("Prompanion: enhancement request failed", error);
+      return { ok: false };
+    });
 }
-
 /**
  * Finds the active composer input node
  * @returns {HTMLElement|null} The composer input node or null if not found
@@ -730,7 +693,7 @@ function buildButton() {
   button.className = BUTTON_CLASS;
   button.append(createIcon());
   attachTooltip(button);
-  button.addEventListener("click", () => chrome.runtime.sendMessage({ type: "PROMPANION_TOGGLE_PANEL" })
+  button.addEventListener("click", () => AdapterBase.togglePanel()
     .catch((e) => console.error("Prompanion: failed to open sidebar from ChatGPT adapter", e)));
   button.addEventListener("mouseenter", () => showTooltip(button));
   button.addEventListener("focus", () => showTooltip(button));
@@ -888,7 +851,7 @@ function handleInsertTextMessage(message, sender, sendResponse) {
     if (!textToInsert) {
       console.log("[Prompanion] Insert failed: EMPTY_TEXT");
       sendResponse({ ok: false, reason: "EMPTY_TEXT" });
-      return;
+      return false; // sendResponse called synchronously, close channel
     }
 
     console.log("[Prompanion] Searching for composer node...");
@@ -904,7 +867,7 @@ function handleInsertTextMessage(message, sender, sendResponse) {
     if (!composerNode) {
       console.log("[Prompanion] Insert failed: NO_COMPOSER_NODE");
       sendResponse({ ok: false, reason: "NO_COMPOSER_NODE" });
-      return;
+      return false; // sendResponse called synchronously, close channel
     }
 
     console.log("[Prompanion] Calling setComposerText...");
@@ -935,61 +898,11 @@ function handleInsertTextMessage(message, sender, sendResponse) {
 }
 
 // Handler is now defined - verify it's available
+if (typeof window._prompanionSetInsertTextHandler === "function") {
+  window._prompanionSetInsertTextHandler(handleInsertTextMessage);
+}
 console.log("[Prompanion] Handler function defined:", typeof handleInsertTextMessage === "function");
 
-// Set up message listener for insert text requests - MUST BE BEFORE bootstrap() is called
-(function() {
-  console.log("[Prompanion] ========== SETTING UP MESSAGE LISTENER (IMMEDIATE) ==========");
-  console.log("[Prompanion] File version: 2024-01-INSERT-TEXT-FIX");
-  
-  if (typeof chrome === "undefined") {
-    console.error("[Prompanion] chrome is undefined!");
-    return;
-  }
-  
-  if (!chrome.runtime) {
-    console.error("[Prompanion] chrome.runtime is undefined!");
-    return;
-  }
-  
-  if (!chrome.runtime.onMessage) {
-    console.error("[Prompanion] chrome.runtime.onMessage is undefined!");
-    return;
-  }
-  
-  console.log("[Prompanion] All chrome APIs available, registering listener...");
-  
-  try {
-    chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
-      console.log("[Prompanion] ========== MESSAGE RECEIVED IN ADAPTER ==========");
-      console.log("[Prompanion] Message type:", message?.type);
-      
-      if (!message || typeof message !== "object") {
-        console.log("[Prompanion] Invalid message, returning false");
-        return false;
-      }
-
-      if (message.type === "PROMPANION_INSERT_TEXT") {
-        console.log("[Prompanion] PROMPANION_INSERT_TEXT received! Calling handler...");
-        try {
-          handleInsertTextMessage(message, sender, sendResponse);
-          return true; // Keep channel open for async response
-        } catch (error) {
-          console.error("[Prompanion] Handler error:", error);
-          sendResponse({ ok: false, reason: error?.message ?? "HANDLER_ERROR" });
-          return true;
-        }
-      }
-      
-      return false;
-    });
-    
-    console.log("[Prompanion] ✓ Message listener registered successfully!");
-  } catch (error) {
-    console.error("[Prompanion] ✗ Failed to register listener:", error);
-    console.error("[Prompanion] Error:", error.message, error.stack);
-  }
-})();
 
 function bootstrap() {
   ensureHighlightObserver();
@@ -1149,7 +1062,7 @@ function ensureEnhanceTooltipElement() {
     const action = document.createElement("button");
     action.type = "button";
     action.className = "prompanion-enhance-tooltip__action";
-    setButtonTextContent(action, "Refine");
+    AdapterBase.setButtonTextContent(action, "Refine");
     console.log("[Prompanion] Attaching click handler to Refine button");
     console.log("[Prompanion] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
     action.addEventListener("click", handleRefineButtonClick);
@@ -1300,40 +1213,6 @@ function detachTooltipResizeHandler() {
   enhanceTooltipResizeHandler = null;
 }
 
-// Backup message listener registration (IIFE to ensure it runs immediately)
-(function registerInsertTextListener() {
-  console.log("[Prompanion] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
-  console.log("[Prompanion] Current time:", new Date().toISOString());
-  
-  if (typeof chrome === "undefined") {
-    console.error("[Prompanion] chrome is undefined in backup registration");
-    return;
-  }
-  
-  if (!chrome.runtime || !chrome.runtime.onMessage) {
-    console.error("[Prompanion] chrome.runtime.onMessage not available in backup registration");
-    return;
-  }
-  
-  try {
-    chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
-      if (message && message.type === "PROMPANION_INSERT_TEXT") {
-        console.log("[Prompanion] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
-        if (typeof handleInsertTextMessage === "function") {
-          handleInsertTextMessage(message, sender, sendResponse);
-        } else {
-          console.error("[Prompanion] handleInsertTextMessage is not a function!");
-          sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
-        }
-        return true;
-      }
-      return false;
-    });
-    console.log("[Prompanion] ✓ Backup listener registered successfully");
-  } catch (error) {
-    console.error("[Prompanion] ✗ Backup listener registration failed:", error);
-  }
-})();
 
 const readyState = document.readyState;
 if (readyState === "complete" || readyState === "interactive") {

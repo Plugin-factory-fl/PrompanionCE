@@ -353,9 +353,20 @@ export function registerLibraryHandlers(stateRef, dependencies = {}) {
   const { saveState, LIBRARY_SCHEMA_VERSION } = dependencies;
   const container = document.getElementById("prompt-library");
   const addFolderButton = document.getElementById("add-folder");
+  const infoButton = document.getElementById("library-info-btn");
+  const infoDialog = document.getElementById("library-info-dialog");
 
   if (!container || !addFolderButton || !saveState) {
     return;
+  }
+
+  // Register info button handler
+  if (infoButton && infoDialog) {
+    infoButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      infoDialog.showModal();
+    });
   }
 
   if (!Number.isFinite(stateRef.libraryVersion)) {
