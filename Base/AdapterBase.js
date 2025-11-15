@@ -500,6 +500,189 @@ class AdapterBase {
   static togglePanel() {
     return this.sendMessage({ type: "PROMPANION_TOGGLE_PANEL" });
   }
+
+  /**
+   * Sets text content in an editable element (textarea or contentEditable)
+   * Attempts multiple methods to ensure compatibility with various editors (including ProseMirror)
+   * @param {HTMLElement} node - The editable element (textarea or contentEditable)
+   * @param {string} text - The text to insert
+   * @param {Object} options - Optional configuration
+   * @param {boolean} options.verbose - Whether to log detailed debug information
+   * @returns {boolean} True if text was set successfully, false otherwise
+   */
+  static setEditableElementText(node, text, options = {}) {
+    const verbose = options.verbose || false;
+    
+    if (verbose) {
+      console.log("[AdapterBase] setEditableElementText called with node:", node, "text:", text);
+    }
+    
+    if (!node) {
+      if (verbose) {
+        console.log("[AdapterBase] setEditableElementText: no node provided");
+      }
+      return false;
+    }
+    
+    // Method 1: Handle HTMLTextAreaElement
+    if (node instanceof HTMLTextAreaElement) {
+      if (verbose) {
+        console.log("[AdapterBase] setEditableElementText: using textarea method");
+      }
+      node.value = text;
+      node.dispatchEvent(new Event("input", { bubbles: true }));
+      return true;
+    }
+    
+    // Method 2: Handle contentEditable elements
+    if (node.isContentEditable) {
+      if (verbose) {
+        console.log("[AdapterBase] setEditableElementText: node is contentEditable, class:", node.className);
+      }
+      node.focus();
+      
+      // Try ProseMirror API first (generic pattern - ProseMirror is used by many editors)
+      let pmView = null;
+      
+      if (verbose) {
+        console.log("[AdapterBase] Searching for ProseMirror view...");
+      }
+      
+      if (node.pmViewDesc?.pmView) {
+        pmView = node.pmViewDesc.pmView;
+        if (verbose) {
+          console.log("[AdapterBase] Found ProseMirror view via node.pmViewDesc");
+        }
+      } else if (node.parentElement?.pmViewDesc?.pmView) {
+        pmView = node.parentElement.pmViewDesc.pmView;
+        if (verbose) {
+          console.log("[AdapterBase] Found ProseMirror view via parent.pmViewDesc");
+        }
+      } else {
+        // Walk up the DOM to find ProseMirror view
+        let current = node;
+        let depth = 0;
+        while (current && !pmView && depth < 10) {
+          if (current.pmViewDesc?.pmView) {
+            pmView = current.pmViewDesc.pmView;
+            if (verbose) {
+              console.log("[AdapterBase] Found ProseMirror view at depth", depth);
+            }
+          }
+          current = current.parentElement;
+          depth++;
+        }
+      }
+      
+      // Use ProseMirror transaction if available
+      if (pmView && pmView.state && pmView.dispatch) {
+        if (verbose) {
+          console.log("[AdapterBase] Attempting ProseMirror transaction method");
+        }
+        try {
+          const pmState = pmView.state;
+          const tr = pmState.tr;
+          const schema = pmState.schema;
+          const textNode = schema.text(text);
+          tr.replaceWith(0, pmState.doc.content.size, textNode);
+          pmView.dispatch(tr);
+          if (verbose) {
+            console.log("[AdapterBase] Successfully set text via ProseMirror transaction");
+          }
+          return true;
+        } catch (e) {
+          if (verbose) {
+            console.warn("[AdapterBase] ProseMirror transaction failed:", e);
+          }
+        }
+      } else if (verbose) {
+        console.log("[AdapterBase] ProseMirror view not found or invalid");
+      }
+      
+      // Method 3: Keyboard simulation (generic fallback)
+      if (verbose) {
+        console.log("[AdapterBase] Attempting keyboard simulation method");
+      }
+      try {
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        selection.addRange(range);
+        
+        if (verbose) {
+          console.log("[AdapterBase] Selected all text in node");
+        }
+        
+        // Simulate Cmd+A (select all) then typing
+        const keyDownEvent = new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "a",
+          code: "KeyA",
+          metaKey: true,
+          ctrlKey: false
+        });
+        node.dispatchEvent(keyDownEvent);
+        
+        const keyUpEvent = new KeyboardEvent("keyup", {
+          bubbles: true,
+          cancelable: true,
+          key: "a",
+          code: "KeyA",
+          metaKey: true,
+          ctrlKey: false
+        });
+        node.dispatchEvent(keyUpEvent);
+        
+        // Simulate typing the new text character by character
+        for (let i = 0; i < text.length; i++) {
+          const char = text[i];
+          const inputEvent = new InputEvent("beforeinput", {
+            bubbles: true,
+            cancelable: true,
+            inputType: "insertText",
+            data: char
+          });
+          node.dispatchEvent(inputEvent);
+          
+          if (!inputEvent.defaultPrevented) {
+            const inputEvent2 = new InputEvent("input", {
+              bubbles: true,
+              cancelable: false,
+              inputType: "insertText",
+              data: char
+            });
+            node.dispatchEvent(inputEvent2);
+          }
+        }
+        
+        // Also set textContent as fallback
+        node.textContent = text;
+        
+        if (verbose) {
+          console.log("[AdapterBase] Dispatched keyboard simulation events");
+        }
+        return true;
+      } catch (e) {
+        if (verbose) {
+          console.warn("[AdapterBase] Keyboard simulation method failed:", e);
+        }
+        // Final fallback: direct textContent
+        node.textContent = text;
+        node.dispatchEvent(new InputEvent("input", { bubbles: true, data: text, inputType: "insertText" }));
+        if (verbose) {
+          console.log("[AdapterBase] Used final fallback: direct textContent");
+        }
+        return true;
+      }
+    }
+    
+    if (verbose) {
+      console.log("[AdapterBase] setEditableElementText: node is not contentEditable or textarea");
+    }
+    return false;
+  }
 }
 
 // Export for use in adapters

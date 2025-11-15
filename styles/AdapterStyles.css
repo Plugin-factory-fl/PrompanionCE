@@ -1,0 +1,165 @@
+/* Prompanion Adapter Styles - Shared across all adapters */
+
+/* Button Styles */
+.prompanion-chatgpt-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: linear-gradient(135deg, #10152b, #1f2a44);
+  box-shadow: 0 6px 16px rgba(31, 42, 68, 0.25);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.prompanion-chatgpt-trigger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(31, 42, 68, 0.3);
+}
+
+.prompanion-chatgpt-trigger:focus-visible {
+  outline: 2px solid #246bff;
+  outline-offset: 2px;
+}
+
+.prompanion-chatgpt-trigger__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: block;
+  background-color: #162036;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* Enhance Tooltip Styles */
+.prompanion-enhance-tooltip {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(12, 18, 32, 0.9);
+  color: #e9edff;
+  box-shadow: 0 18px 40px rgba(8, 12, 28, 0.45);
+  transform: translate(-50%, 6px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease;
+  z-index: 2147483000;
+}
+
+.prompanion-enhance-tooltip.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+
+.prompanion-enhance-tooltip button {
+  border: none;
+  cursor: pointer;
+}
+
+.prompanion-enhance-tooltip__dismiss {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(233, 237, 255, 0.6);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.prompanion-enhance-tooltip__dismiss:hover {
+  background: rgba(233, 237, 255, 0.14);
+  color: #ffffff;
+}
+
+.prompanion-enhance-tooltip__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  background: #3a7bff;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 26px rgba(58, 123, 255, 0.35);
+}
+
+.prompanion-enhance-tooltip__action:hover {
+  background: #2957c7;
+}
+
+/* Selection Toolbar Styles */
+#prompanion-selection-toolbar {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(12, 18, 32, 0.9);
+  color: #e9edff;
+  box-shadow: 0 18px 40px rgba(8, 12, 28, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+  z-index: 2147483647;
+}
+
+#prompanion-selection-toolbar.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#prompanion-selection-toolbar button {
+  border: none;
+  cursor: pointer;
+}
+
+#prompanion-selection-toolbar .prompanion-selection-toolbar__dismiss {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(233, 237, 255, 0.6);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  line-height: 1;
+}
+
+#prompanion-selection-toolbar .prompanion-selection-toolbar__dismiss:hover {
+  background: rgba(233, 237, 255, 0.14);
+  color: #ffffff;
+}
+
+#prompanion-selection-toolbar .prompanion-selection-toolbar__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  background: #3a7bff;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 26px rgba(58, 123, 255, 0.35);
+}
+
+#prompanion-selection-toolbar .prompanion-selection-toolbar__button:hover {
+  background: #2957c7;
+}
+
+
