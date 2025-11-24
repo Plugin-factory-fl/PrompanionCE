@@ -337,8 +337,14 @@ function createIcon() {
 function requestPromptEnhancement(promptText) {
   return AdapterBase.sendMessage({ type: "PROMPANION_PREPARE_ENHANCEMENT", prompt: promptText, openPanel: false })
     .catch((error) => {
-      console.warn("Prompanion Grok: enhancement request failed", error);
-      return { ok: false };
+      const errorMessage = error?.message || "";
+      if (errorMessage.includes("Extension context invalidated")) {
+        console.error("[Prompanion Grok] Extension context invalidated - user should reload page");
+        // The notification is already shown by AdapterBase._showContextInvalidatedNotification()
+      } else {
+        console.warn("[Prompanion Grok] Enhancement request failed:", error);
+      }
+      return { ok: false, reason: errorMessage || "UNKNOWN_ERROR" };
     });
 }
 
@@ -848,6 +854,9 @@ function handleRefineButtonClick(e) {
     .then((result) => {
       if (!result || !result.ok) {
         enhanceActionInFlight = false;
+        if (result?.reason === "EXTENSION_CONTEXT_INVALIDATED") {
+          console.error("[Prompanion Grok] Cannot enhance prompt - extension context invalidated. Please reload the page.");
+        }
         return;
       }
       const refinedText = result.optionA && typeof result.optionA === "string" && result.optionA.trim()

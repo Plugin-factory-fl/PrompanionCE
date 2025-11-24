@@ -17,8 +17,6 @@
   --settings-border-soft: rgba(148, 163, 184, 0.18);
   --settings-focus-outline: rgba(32, 212, 176, 0.45);
   --settings-active-bg: rgba(32, 212, 176, 0.18);
-  --settings-upload-bg: rgba(12, 18, 32, 0.6);
-  --settings-upload-border: rgba(226, 232, 240, 0.35);
   --settings-transition-speed: 140ms;
   --settings-transition-ease: ease;
 }
@@ -225,30 +223,6 @@ input[type="range"]:focus-visible {
   outline-offset: 2px;
 }
 
-/* Form Field Upload */
-.form-field__upload {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 24px;
-  border-radius: var(--radius-md);
-  background: var(--settings-upload-bg);
-  border: 2px dashed var(--settings-upload-border);
-  color: rgba(226, 232, 240, 0.85);
-  cursor: not-allowed;
-  min-height: 128px;
-  width: 100%;
-  transition: border-color var(--settings-transition-speed) var(--settings-transition-ease),
-              background-color var(--settings-transition-speed) var(--settings-transition-ease);
-}
-
-.form-field__upload:not([disabled]):hover {
-  border-color: rgba(226, 232, 240, 0.5);
-  background: rgba(12, 18, 32, 0.75);
-}
 
 /* Modal Dark Theme for Settings */
 .modal--dark .form-field__label,
@@ -321,9 +295,5 @@ input[type="range"]:focus-visible {
     font-size: 12px;
   }
 
-  .form-field__upload {
-    padding: 16px;
-    min-height: 100px;
-  }
 }
 

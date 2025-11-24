@@ -345,6 +345,27 @@ export async function openLibraryDialog(options = {}) {
 }
 
 /**
+ * Helper function to send messages to background script
+ * @param {Object} message - Message object to send
+ * @returns {Promise<Object>} Response from background script
+ */
+function sendChromeMessage(message) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      if (!response) {
+        reject(new Error("No response from background script"));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
+/**
  * Registers event handlers for the prompt library
  * @param {Object} stateRef - Reference to current state object
  * @param {Object} dependencies - Required dependencies (saveState, LIBRARY_SCHEMA_VERSION)
@@ -472,7 +493,57 @@ export function registerLibraryHandlers(stateRef, dependencies = {}) {
     }
 
     if (action === "use") {
-      document.getElementById("original-prompt").value = prompt;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const button = actionTarget;
+      if (!button || button.disabled) {
+        return;
+      }
+
+      const textToInsert = prompt.trim();
+      if (!textToInsert) {
+        alert("No text to insert. The prompt is empty.");
+        return;
+      }
+
+      const originalButtonText = button.textContent;
+      button.disabled = true;
+      button.textContent = "Inserting...";
+
+      (async () => {
+        try {
+          console.log("[Prompanion Library] ========== SENDING INSERT TEXT MESSAGE ==========");
+          console.log("[Prompanion Library] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
+          console.log("[Prompanion Library] Text length:", textToInsert.length);
+          
+          const response = await sendChromeMessage({
+            type: "PROMPANION_INSERT_TEXT",
+            text: textToInsert
+          });
+
+          console.log("[Prompanion Library] Received response:", response);
+
+          if (!response || !response.ok) {
+            console.error("[Prompanion Library] Insert failed:", response?.reason);
+            throw new Error(response?.reason || "Failed to insert text into the LLM");
+          }
+
+          console.log("[Prompanion Library] Insert succeeded!");
+          button.textContent = "Inserted";
+          setTimeout(() => {
+            button.textContent = originalButtonText;
+          }, 1200);
+        } catch (error) {
+          console.error("[Prompanion Library] Insert failed with error:", error);
+          console.error("[Prompanion Library] Error message:", error.message);
+          const errorMessage = error.message || "Failed to insert text. Please make sure the LLM chat is open and try again.";
+          alert(errorMessage);
+          button.textContent = originalButtonText;
+        } finally {
+          button.disabled = false;
+        }
+      })();
       return;
     }
 

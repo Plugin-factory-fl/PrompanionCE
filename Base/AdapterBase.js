@@ -441,6 +441,23 @@ class AdapterBase {
   }
   
   /**
+   * Checks if the extension context is still valid
+   * @returns {boolean} True if context is valid, false otherwise
+   */
+  static isExtensionContextValid() {
+    try {
+      if (typeof chrome === "undefined" || !chrome.runtime) {
+        return false;
+      }
+      // Try to access runtime.id - this will throw if context is invalidated
+      const id = chrome.runtime.id;
+      return typeof id === "string" && id.length > 0;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
    * Sends a message to the background script
    * @param {Object} message - The message object (must have 'type' property)
    * @param {Function} [callback] - Optional callback for response
@@ -452,6 +469,16 @@ class AdapterBase {
       console.error("[AdapterBase] Cannot send message:", error);
       if (callback) {
         callback({ ok: false, reason: "CHROME_RUNTIME_UNAVAILABLE" });
+      }
+      return Promise.reject(error);
+    }
+    
+    // Check if extension context is still valid
+    if (!this.isExtensionContextValid()) {
+      const error = new Error("Extension context invalidated. Please reload the page.");
+      console.error("[AdapterBase] Extension context invalidated:", error);
+      if (callback) {
+        callback({ ok: false, reason: "EXTENSION_CONTEXT_INVALIDATED" });
       }
       return Promise.reject(error);
     }
@@ -470,9 +497,28 @@ class AdapterBase {
         chrome.runtime.sendMessage(message, (response) => {
           if (chrome.runtime.lastError) {
             const error = chrome.runtime.lastError;
+            const errorMessage = error.message || "";
+            
+            // Check for extension context invalidated error
+            if (errorMessage.includes("Extension context invalidated") || 
+                errorMessage.includes("message port closed") ||
+                errorMessage.includes("Could not establish connection")) {
+              const contextError = new Error("Extension context invalidated. Please reload the page to continue using Prompanion.");
+              console.error(`[AdapterBase] Extension context invalidated (${message.type}):`, contextError);
+              
+              // Show user-friendly notification
+              this._showContextInvalidatedNotification();
+              
+              if (callback) {
+                callback({ ok: false, reason: "EXTENSION_CONTEXT_INVALIDATED" });
+              }
+              reject(contextError);
+              return;
+            }
+            
             console.warn(`[AdapterBase] Message send failed (${message.type}):`, error);
             if (callback) {
-              callback({ ok: false, reason: error.message ?? "MESSAGE_SEND_FAILED" });
+              callback({ ok: false, reason: errorMessage || "MESSAGE_SEND_FAILED" });
             }
             reject(error);
             return;
@@ -484,13 +530,100 @@ class AdapterBase {
           resolve(response ?? { ok: false });
         });
       } catch (error) {
+        const errorMessage = error?.message || "";
+        
+        // Check for extension context invalidated error in exception
+        if (errorMessage.includes("Extension context invalidated") || 
+            errorMessage.includes("message port closed") ||
+            errorMessage.includes("Could not establish connection")) {
+          const contextError = new Error("Extension context invalidated. Please reload the page to continue using Prompanion.");
+          console.error(`[AdapterBase] Extension context invalidated (${message.type}):`, contextError);
+          
+          // Show user-friendly notification
+          this._showContextInvalidatedNotification();
+          
+          if (callback) {
+            callback({ ok: false, reason: "EXTENSION_CONTEXT_INVALIDATED" });
+          }
+          reject(contextError);
+          return;
+        }
+        
         console.error(`[AdapterBase] Exception sending message (${message.type}):`, error);
         if (callback) {
-          callback({ ok: false, reason: error?.message ?? "EXCEPTION" });
+          callback({ ok: false, reason: errorMessage || "EXCEPTION" });
         }
         reject(error);
       }
     });
+  }
+
+  /**
+   * Shows a user-friendly notification when extension context is invalidated
+   * @private
+   */
+  static _showContextInvalidatedNotification() {
+    // Check if notification already exists
+    if (document.getElementById("prompanion-context-invalidated-notification")) {
+      return;
+    }
+
+    const notification = document.createElement("div");
+    notification.id = "prompanion-context-invalidated-notification";
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #ff4444;
+      color: white;
+      padding: 16px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 2147483647;
+      max-width: 400px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    `;
+    
+    notification.innerHTML = `
+      <div style="font-weight: 600; margin-bottom: 8px;">Prompanion Extension Reloaded</div>
+      <div style="opacity: 0.95;">Please reload this page to continue using Prompanion features.</div>
+      <button id="prompanion-reload-page" style="
+        margin-top: 12px;
+        padding: 8px 16px;
+        background: white;
+        color: #ff4444;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+      ">Reload Page</button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Add click handler for reload button
+    const reloadButton = notification.querySelector("#prompanion-reload-page");
+    if (reloadButton) {
+      reloadButton.addEventListener("click", () => {
+        window.location.reload();
+      });
+    }
+    
+    // Auto-remove after 10 seconds
+    setTimeout(() => {
+      if (notification.parentElement) {
+        notification.style.opacity = "0";
+        notification.style.transition = "opacity 0.3s ease";
+        setTimeout(() => {
+          if (notification.parentElement) {
+            notification.remove();
+          }
+        }, 300);
+      }
+    }, 10000);
   }
   
   /**

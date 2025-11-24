@@ -1,68 +1,29 @@
 // ============================================================================
-// CRITICAL: INSERT TEXT MESSAGE LISTENER - MUST BE AT TOP OF FILE
+// Message listener registration moved to AdapterBase
 // ============================================================================
-// Version: 2024-01-15-FIX-INSERT-TEXT
-// This listener is registered IMMEDIATELY when the script loads to ensure
-// it's always available when background script sends PROMPANION_INSERT_TEXT
+// The message listener system is now handled by AdapterBase.registerMessageHandler()
+// This eliminates duplicate listener registrations and provides unified message handling.
 // ============================================================================
-
-(function registerInsertTextListenerImmediately() {
-  if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.onMessage) {
-    console.error("[Prompanion] Cannot register insert text listener - chrome.runtime.onMessage not available");
-    return;
-  }
-  
-  let insertTextHandler = null;
-  
-  chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
-    if (!message || message.type !== "PROMPANION_INSERT_TEXT") {
-      return false;
-    }
-    
-    const handler = insertTextHandler || (typeof handleInsertTextMessage === "function" ? handleInsertTextMessage : null);
-    
-    if (!handler) {
-      console.error("[Prompanion] handleInsertTextMessage is not available yet!");
-      try {
-        sendResponse({ ok: false, reason: "HANDLER_NOT_READY" });
-      } catch (e) {}
-      return false;
-    }
-    
-    try {
-      const result = handler(message, sender, sendResponse);
-      return result === true;
-    } catch (error) {
-      console.error("[Prompanion] Error in handleInsertTextMessage:", error);
-      try {
-        sendResponse({ ok: false, reason: error?.message ?? "HANDLER_ERROR" });
-      } catch (e) {}
-      return false;
-    }
-  });
-  
-  window._prompanionSetInsertTextHandler = function(handler) {
-    insertTextHandler = handler;
-    console.log("[Prompanion] Insert text handler reference updated");
-  };
-  
-  console.log("[Prompanion] ✓ Direct PROMPANION_INSERT_TEXT listener registered at top of file");
-})();
-
 
 console.log("[Prompanion] ========== ADAPTER.JS LOADING ==========");
 console.log("[Prompanion] Timestamp:", new Date().toISOString());
 console.log("[Prompanion] Location:", window.location.href);
 
 // Import constants from AdapterBase
+if (typeof AdapterBase === "undefined") {
+  console.error("[Prompanion] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
+  throw new Error("AdapterBase must be loaded before adapter.js");
+}
+
 const BUTTON_ID = AdapterBase.BUTTON_ID;
 const BUTTON_CLASS = AdapterBase.BUTTON_CLASS;
 const SELECTION_TOOLBAR_ID = AdapterBase.SELECTION_TOOLBAR_ID;
 const SELECTION_TOOLBAR_VISIBLE_CLASS = AdapterBase.SELECTION_TOOLBAR_VISIBLE_CLASS;
 const HIGHLIGHT_BUTTON_SELECTORS = AdapterBase.HIGHLIGHT_BUTTON_SELECTORS;
 const BUTTON_SIZE = AdapterBase.BUTTON_SIZE;
+
+console.log("[Prompanion] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
 let domObserverStarted = false;
-const tooltipRegistry = new WeakMap();
 
 let enhanceTooltipElement = null;
 let enhanceTooltipTimer = null;
@@ -83,177 +44,30 @@ let selectionToolbarText = "";
 let selectionUpdateRaf = null;
 let highlightObserver = null;
 
-const styles = `
-  .${BUTTON_CLASS} {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    border-radius: 50%;
-    width: ${BUTTON_SIZE.wrapper};
-    height: ${BUTTON_SIZE.wrapper};
-    padding: 0;
-    background: linear-gradient(135deg, #10152b, #1f2a44);
-    box-shadow: 0 6px 16px rgba(31, 42, 68, 0.25);
-    cursor: pointer;
-    transition: transform 120ms ease, box-shadow 120ms ease;
-  }
+// Generic styles moved to styles/AdapterStyles.css
+// Styles are loaded via ensureStyle() function
 
-  .${BUTTON_CLASS}:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 18px rgba(31, 42, 68, 0.3);
-  }
-
-  .${BUTTON_CLASS}:focus-visible {
-    outline: 2px solid #246bff;
-    outline-offset: 2px;
-  }
-
-  .${BUTTON_CLASS}__icon {
-    width: ${BUTTON_SIZE.icon};
-    height: ${BUTTON_SIZE.icon};
-    border-radius: 50%;
-    display: block;
-    background-color: #162036;
-    background-position: center;
-    background-repeat: no-repeat;
-    background-size: cover;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
-  }
-
-  .prompanion-enhance-tooltip {
-    position: fixed;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-radius: 12px;
-    background: rgba(12, 18, 32, 0.9);
-    color: #e9edff;
-    box-shadow: 0 18px 40px rgba(8, 12, 28, 0.45);
-    transform: translate(-50%, 6px);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 140ms ease, transform 140ms ease;
-    z-index: 2147483000;
-  }
-
-  .prompanion-enhance-tooltip.is-visible {
-    opacity: 1;
-    transform: translate(-50%, 0);
-    pointer-events: auto;
-  }
-
-  .prompanion-enhance-tooltip button {
-    border: none;
-    cursor: pointer;
-  }
-
-  .prompanion-enhance-tooltip__dismiss {
-    width: 24px;
-    height: 24px;
-    border-radius: 12px;
-    background: transparent;
-    color: rgba(233, 237, 255, 0.6);
-    display: grid;
-    place-items: center;
-    font-size: 14px;
-    line-height: 1;
-  }
-
-  .prompanion-enhance-tooltip__dismiss:hover {
-    background: rgba(233, 237, 255, 0.14);
-    color: #ffffff;
-  }
-
-  .prompanion-enhance-tooltip__action {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 6px 12px;
-    border-radius: 9999px;
-    background: #3a7bff;
-    color: #ffffff;
-    font-size: 13px;
-    font-weight: 600;
-    box-shadow: 0 10px 26px rgba(58, 123, 255, 0.35);
-  }
-
-  .prompanion-enhance-tooltip__action:hover {
-    background: #2957c7;
-  }
-
-  #${SELECTION_TOOLBAR_ID} {
-    position: fixed;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-radius: 12px;
-    background: rgba(12, 18, 32, 0.9);
-    color: #e9edff;
-    box-shadow: 0 18px 40px rgba(8, 12, 28, 0.45);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 140ms ease;
-    z-index: 2147483647;
-  }
-
-  #${SELECTION_TOOLBAR_ID}.${SELECTION_TOOLBAR_VISIBLE_CLASS} {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  #${SELECTION_TOOLBAR_ID} button {
-    border: none;
-    cursor: pointer;
-  }
-
-  #${SELECTION_TOOLBAR_ID} .prompanion-selection-toolbar__dismiss {
-    width: 24px;
-    height: 24px;
-    border-radius: 12px;
-    background: transparent;
-    color: rgba(233, 237, 255, 0.6);
-    display: grid;
-    place-items: center;
-    font-size: 14px;
-    line-height: 1;
-  }
-
-  #${SELECTION_TOOLBAR_ID} .prompanion-selection-toolbar__dismiss:hover {
-    background: rgba(233, 237, 255, 0.14);
-    color: #ffffff;
-  }
-
-  #${SELECTION_TOOLBAR_ID} .prompanion-selection-toolbar__button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 6px 12px;
-    border-radius: 9999px;
-    background: #3a7bff;
-    color: #ffffff;
-    font-size: 13px;
-    font-weight: 600;
-    box-shadow: 0 10px 26px rgba(58, 123, 255, 0.35);
-  }
-
-  #${SELECTION_TOOLBAR_ID} .prompanion-selection-toolbar__button:hover {
-    background: #2957c7;
-  }
-`;
+// Generic DOM utilities have been moved to AdapterBase
+// Use AdapterBase.injectStyle(), AdapterBase.getElementFromNode(), etc.
 
 function ensureStyle() {
-  let style = document.getElementById(`${BUTTON_ID}-style`);
-  if (!style) {
-    style = document.createElement("style");
-    style.id = `${BUTTON_ID}-style`;
-    document.head.append(style);
+  // Load generic adapter styles from external CSS file
+  const styleId = "prompanion-adapter-styles";
+  let styleElement = document.getElementById(styleId);
+  
+  if (!styleElement) {
+    // Load CSS file from extension
+    const cssUrl = chrome.runtime.getURL("/styles/AdapterStyles.css");
+    const link = document.createElement("link");
+    link.id = styleId;
+    link.rel = "stylesheet";
+    link.type = "text/css";
+    link.href = cssUrl;
+    document.head.appendChild(link);
   }
-  if (style.textContent !== styles) style.textContent = styles;
 }
 
+// Generic DOM utilities removed - use AdapterBase.getElementFromNode(), etc.
 
 function getHighlightButton() {
   for (const selector of HIGHLIGHT_BUTTON_SELECTORS) {
@@ -362,6 +176,7 @@ function hideSelectionToolbar() {
   selectionToolbarText = "";
 }
 
+// Generic getSelectionRect removed - use AdapterBase.getSelectionRect()
 
 function requestSelectionToolbarUpdate() {
   if (selectionUpdateRaf !== null) {
@@ -434,7 +249,7 @@ function updateSelectionToolbar() {
     h = toolbar.offsetHeight;
     if (!w || !h) {
       console.error("[Prompanion] Toolbar dimensions still invalid, cannot position tooltip");
-      return false; // sendResponse called synchronously, close channel
+      return;
     }
   }
   
@@ -473,7 +288,14 @@ function submitSelectionToSideChat(text) {
   if (!snippet || selectionAskInFlight) return;
   selectionAskInFlight = true;
   try {
-    AdapterBase.sendMessage({ type: "PROMPANION_SIDECHAT_REQUEST", text: snippet }, (response) => {
+    AdapterBase.sendMessage({ 
+      type: "PROMPANION_SIDECHAT_REQUEST", 
+      text: snippet,
+      chatHistory: chatHistory 
+    }, (response) => {
+    // Extract chat history from ChatGPT interface (use ChatGPT-specific method for better accuracy)
+    const chatHistory = captureGPTChatHistory(20);
+    console.log("[Prompanion ChatGPT] Sending to side chat with", chatHistory.length, "messages of context");
       if (!response?.ok) {
         console.warn("Prompanion: sidechat request rejected", response?.reason);
       }
@@ -501,6 +323,7 @@ function handleSelectionChange() {
   requestSelectionToolbarUpdate();
 }
 
+// Generic setButtonTextContent removed - use AdapterBase.setButtonTextContent()
 
 function createIcon() {
   const icon = document.createElement("span");
@@ -519,6 +342,7 @@ function requestPromptEnhancement(promptText) {
       return { ok: false };
     });
 }
+
 /**
  * Finds the active composer input node
  * @returns {HTMLElement|null} The composer input node or null if not found
@@ -553,136 +377,10 @@ function findComposerNode() {
   return null;
 }
 
+// Generic text insertion moved to AdapterBase.setEditableElementText()
+// This wrapper maintains ChatGPT-specific logging
 function setComposerText(node, text) {
-  console.log("[Prompanion] setComposerText called with node:", node, "text:", text);
-  if (!node) {
-    console.log("[Prompanion] setComposerText: no node provided");
-    return false;
-  }
-  if (node instanceof HTMLTextAreaElement) {
-    console.log("[Prompanion] setComposerText: using textarea method");
-    node.value = text;
-    node.dispatchEvent(new Event("input", { bubbles: true }));
-    return true;
-  }
-  if (node.isContentEditable) {
-    console.log("[Prompanion] setComposerText: node is contentEditable, class:", node.className);
-    node.focus();
-    
-    // Method 1: Try to find ProseMirror view and use its API
-    let pmView = null;
-    
-    console.log("[Prompanion] Searching for ProseMirror view...");
-    console.log("[Prompanion] node.pmViewDesc:", node.pmViewDesc);
-    console.log("[Prompanion] node.parentElement:", node.parentElement);
-    
-    if (node.pmViewDesc?.pmView) {
-      pmView = node.pmViewDesc.pmView;
-      console.log("[Prompanion] Found ProseMirror view via node.pmViewDesc");
-    } else if (node.parentElement?.pmViewDesc?.pmView) {
-      pmView = node.parentElement.pmViewDesc.pmView;
-      console.log("[Prompanion] Found ProseMirror view via parent.pmViewDesc");
-    } else {
-      // Walk up the DOM to find ProseMirror view
-      let current = node;
-      let depth = 0;
-      while (current && !pmView && depth < 10) {
-        if (current.pmViewDesc?.pmView) {
-          pmView = current.pmViewDesc.pmView;
-          console.log("[Prompanion] Found ProseMirror view at depth", depth);
-        }
-        current = current.parentElement;
-        depth++;
-      }
-    }
-    
-    if (pmView && pmView.state && pmView.dispatch) {
-      console.log("[Prompanion] Attempting ProseMirror transaction method");
-      try {
-        const pmState = pmView.state;
-        const tr = pmState.tr;
-        const schema = pmState.schema;
-        const textNode = schema.text(text);
-        tr.replaceWith(0, pmState.doc.content.size, textNode);
-        pmView.dispatch(tr);
-        console.log("[Prompanion] Successfully set text via ProseMirror transaction");
-        return true;
-      } catch (e) {
-        console.warn("[Prompanion] ProseMirror transaction failed:", e);
-      }
-    } else {
-      console.log("[Prompanion] ProseMirror view not found or invalid");
-    }
-    
-    // Method 2: Select all and simulate keyboard input
-    console.log("[Prompanion] Attempting keyboard simulation method");
-    try {
-      const selection = window.getSelection();
-      selection.removeAllRanges();
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      selection.addRange(range);
-      console.log("[Prompanion] Selected all text in node");
-      
-      // Simulate Cmd+A (select all) then typing
-      const keyDownEvent = new KeyboardEvent("keydown", {
-        bubbles: true,
-        cancelable: true,
-        key: "a",
-        code: "KeyA",
-        metaKey: true,
-        ctrlKey: false
-      });
-      node.dispatchEvent(keyDownEvent);
-      
-      const keyUpEvent = new KeyboardEvent("keyup", {
-        bubbles: true,
-        cancelable: true,
-        key: "a",
-        code: "KeyA",
-        metaKey: true,
-        ctrlKey: false
-      });
-      node.dispatchEvent(keyUpEvent);
-      
-      // Now simulate typing the new text
-      for (let i = 0; i < text.length; i++) {
-        const char = text[i];
-        const inputEvent = new InputEvent("beforeinput", {
-          bubbles: true,
-          cancelable: true,
-          inputType: "insertText",
-          data: char
-        });
-        node.dispatchEvent(inputEvent);
-        
-        if (!inputEvent.defaultPrevented) {
-          const inputEvent2 = new InputEvent("input", {
-            bubbles: true,
-            cancelable: false,
-            inputType: "insertText",
-            data: char
-          });
-          node.dispatchEvent(inputEvent2);
-        }
-      }
-      
-      // Also set textContent as fallback
-      node.textContent = text;
-      
-      console.log("[Prompanion] Dispatched keyboard simulation events");
-      return true;
-    } catch (e) {
-      console.warn("[Prompanion] Keyboard simulation method failed:", e);
-      // Final fallback
-      node.textContent = text;
-      node.dispatchEvent(new InputEvent("input", { bubbles: true, data: text, inputType: "insertText" }));
-      console.log("[Prompanion] Used final fallback: direct textContent");
-      return true;
-    }
-  }
-  console.log("[Prompanion] setComposerText: node is not contentEditable or textarea");
-  return false;
+  return AdapterBase.setEditableElementText(node, text, { verbose: true });
 }
 
 function buildButton() {
@@ -692,13 +390,14 @@ function buildButton() {
   button.type = "button";
   button.className = BUTTON_CLASS;
   button.append(createIcon());
-  attachTooltip(button);
+  // Use AdapterBase for generic hover tooltip
+  AdapterBase.attachTooltip(button, "Open Prompanion to enhance your prompts for the best response.", BUTTON_ID);
   button.addEventListener("click", () => AdapterBase.togglePanel()
     .catch((e) => console.error("Prompanion: failed to open sidebar from ChatGPT adapter", e)));
-  button.addEventListener("mouseenter", () => showTooltip(button));
-  button.addEventListener("focus", () => showTooltip(button));
-  button.addEventListener("mouseleave", () => hideTooltip(button));
-  button.addEventListener("blur", () => hideTooltip(button));
+  button.addEventListener("mouseenter", () => AdapterBase.showTooltip(button, BUTTON_ID));
+  button.addEventListener("focus", () => AdapterBase.showTooltip(button, BUTTON_ID));
+  button.addEventListener("mouseleave", () => AdapterBase.hideTooltip(button));
+  button.addEventListener("blur", () => AdapterBase.hideTooltip(button));
   return button;
 }
 
@@ -890,19 +589,18 @@ function handleInsertTextMessage(message, sender, sendResponse) {
       console.log("[Prompanion] Insert failed: SET_TEXT_FAILED");
       sendResponse({ ok: false, reason: "SET_TEXT_FAILED" });
     }
+    return false; // sendResponse called synchronously, close channel
   } catch (error) {
     console.error("[Prompanion] Insert text handler failed", error);
     console.error("[Prompanion] Error stack:", error.stack);
     sendResponse({ ok: false, reason: error?.message ?? "UNKNOWN" });
+    return false; // sendResponse called synchronously, close channel
   }
 }
 
-// Handler is now defined - verify it's available
-if (typeof window._prompanionSetInsertTextHandler === "function") {
-  window._prompanionSetInsertTextHandler(handleInsertTextMessage);
-}
-console.log("[Prompanion] Handler function defined:", typeof handleInsertTextMessage === "function");
-
+// Register message handler using AdapterBase (must be after handleInsertTextMessage is defined)
+console.log("[Prompanion] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
+AdapterBase.registerMessageHandler("PROMPANION_INSERT_TEXT", handleInsertTextMessage);
 
 function bootstrap() {
   ensureHighlightObserver();
@@ -916,110 +614,8 @@ function bootstrap() {
   }
 }
 
-function attachTooltip(button) {
-  ensureTooltipResources();
-  tooltipRegistry.set(button, { text: "Open Prompanion to enhance your prompts for the best response." });
-}
-
-function ensureTooltipResources() {
-  if (!document.getElementById(`${BUTTON_ID}-tooltip-style`)) {
-    const style = document.createElement("style");
-    style.id = `${BUTTON_ID}-tooltip-style`;
-    style.textContent = `
-      #${BUTTON_ID}-tooltip-layer {
-        position: fixed;
-        inset: 0;
-        pointer-events: none;
-        z-index: 2147483647;
-      }
-
-      .prompanion-tooltip {
-        position: absolute;
-        transform: translateX(-50%);
-        background: rgba(12, 18, 32, 0.9);
-        color: #e9edff;
-        padding: 8px 12px;
-        border-radius: 8px;
-        font-size: 13px;
-        line-height: 1.35;
-        box-shadow: 0 16px 32px rgba(8, 12, 28, 0.42);
-        max-width: 240px;
-        text-align: center;
-        opacity: 0;
-        transition: opacity 140ms ease, transform 140ms ease;
-        pointer-events: none;
-      }
-
-      .prompanion-tooltip::after {
-        content: "";
-        position: absolute;
-        top: -6px;
-        left: 50%;
-        transform: translateX(-50%);
-        border-width: 6px;
-        border-style: solid;
-        border-color: transparent transparent rgba(12, 18, 32, 0.9) transparent;
-      }
-
-      .prompanion-tooltip.is-visible {
-        opacity: 1;
-        transform: translate(-50%, 0);
-      }
-
-      .prompanion-visually-hidden {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
-      }
-    `;
-    document.head.append(style);
-  }
-
-  if (!document.getElementById(`${BUTTON_ID}-tooltip-layer`)) {
-    const container = document.createElement("div");
-    container.id = `${BUTTON_ID}-tooltip-layer`;
-    document.body.append(container);
-  }
-}
-
-function showTooltip(button) {
-  const data = tooltipRegistry.get(button);
-  const container = document.getElementById(`${BUTTON_ID}-tooltip-layer`);
-  if (!data || !container) return;
-  let tooltip = button._prompanionTooltip;
-  if (!tooltip) {
-    tooltip = document.createElement("div");
-    tooltip.className = "prompanion-tooltip";
-    tooltip.setAttribute("role", "tooltip");
-    const text = document.createElement("span");
-    text.textContent = data.text;
-    const hidden = document.createElement("span");
-    hidden.className = "prompanion-visually-hidden";
-    hidden.textContent = data.text;
-    tooltip.append(text, hidden);
-    button._prompanionTooltip = tooltip;
-    container.append(tooltip);
-  }
-  positionTooltip(button, tooltip);
-  tooltip.classList.add("is-visible");
-}
-
-function hideTooltip(button) {
-  const tooltip = button._prompanionTooltip;
-  tooltip?.classList.remove("is-visible");
-}
-
-function positionTooltip(button, tooltip) {
-  const rect = button.getBoundingClientRect();
-  tooltip.style.top = `${rect.bottom + window.scrollY + 5}px`;
-  tooltip.style.left = `${rect.left + rect.width / 2 + window.scrollX}px`;
-}
+// Generic tooltip functions have been moved to AdapterBase
+// Use AdapterBase.attachTooltip(), AdapterBase.showTooltip(), etc.
 
 function setupEnhanceTooltip(input, container) {
   if (!input || enhanceTooltipActiveTextarea === input) return;
@@ -1213,6 +809,40 @@ function detachTooltipResizeHandler() {
   enhanceTooltipResizeHandler = null;
 }
 
+// Backup message listener registration (IIFE to ensure it runs immediately)
+(function registerInsertTextListener() {
+  console.log("[Prompanion] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
+  console.log("[Prompanion] Current time:", new Date().toISOString());
+  
+  if (typeof chrome === "undefined") {
+    console.error("[Prompanion] chrome is undefined in backup registration");
+    return;
+  }
+  
+  if (!chrome.runtime || !chrome.runtime.onMessage) {
+    console.error("[Prompanion] chrome.runtime.onMessage not available in backup registration");
+    return;
+  }
+  
+  try {
+    chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+      if (message && message.type === "PROMPANION_INSERT_TEXT") {
+        console.log("[Prompanion] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
+        if (typeof handleInsertTextMessage === "function") {
+          handleInsertTextMessage(message, sender, sendResponse);
+        } else {
+          console.error("[Prompanion] handleInsertTextMessage is not a function!");
+          sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
+        }
+        return true;
+      }
+      return false;
+    });
+    console.log("[Prompanion] ✓ Backup listener registered successfully");
+  } catch (error) {
+    console.error("[Prompanion] ✗ Backup listener registration failed:", error);
+  }
+})();
 
 const readyState = document.readyState;
 if (readyState === "complete" || readyState === "interactive") {

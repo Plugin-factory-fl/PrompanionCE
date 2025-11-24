@@ -69,26 +69,22 @@
             </div>
 
             <div class="prompt-preview">
-              <div class="prompt-preview__column prompt-preview__column--original">
-                <div class="prompt-preview__column-header">
-                  <h3>Original - This is the prompt that we will enhance for better responses.</h3>
-                </div>
-                <div class="prompt-feedback" style="visibility: hidden; pointer-events: none;">
-                  <div style="width: 28px; height: 28px;"></div>
-                  <div style="width: 28px; height: 28px;"></div>
-                </div>
-                <textarea class="prompt-textarea" id="original-prompt" placeholder="Enter your prompt here..."></textarea>
-                <div class="prompt-preview__actions">
-                  <button class="btn btn--primary" id="enhance-btn">Enhance Prompt</button>
+              <div class="prompt-preview__header">
+                <div class="prompt-tabs" role="tablist">
+                  <button class="prompt-tab" role="tab" data-tab="original" aria-selected="false">Original</button>
+                  <button class="prompt-tab is-active" role="tab" data-tab="option-a" aria-selected="true">Option A</button>
+                  <button class="prompt-tab" role="tab" data-tab="option-b" aria-selected="false">Option B</button>
                 </div>
               </div>
-              <div class="prompt-preview__column prompt-preview__column--tabs">
-                <div class="prompt-preview__column-header prompt-preview__column-header--tabs">
-                  <div class="prompt-tabs" role="tablist">
-                    <button class="prompt-tab is-active" role="tab" data-tab="option-a" aria-selected="true">Option A</button>
-                    <button class="prompt-tab" role="tab" data-tab="option-b" aria-selected="false">Option B</button>
+              
+              <div class="prompt-preview__content">
+                <div class="prompt-tabpanel" id="original-panel" role="tabpanel" hidden>
+                  <textarea class="prompt-textarea" id="original-prompt" placeholder="Enter your prompt here..."></textarea>
+                  <div class="prompt-preview__actions">
+                    <button class="btn btn--primary" id="enhance-btn">Enhance Prompt</button>
                   </div>
                 </div>
+                
                 <div class="prompt-tabpanel is-active" id="option-a-panel" role="tabpanel">
                   <div class="prompt-feedback" data-option="a">
                     <button class="btn btn--ghost btn--icon prompt-feedback__up" aria-label="Option A thumbs up">
@@ -108,6 +104,7 @@
                     <button class="btn btn--ghost" data-regenerate="option-a">Regenerate</button>
                   </div>
                 </div>
+                
                 <div class="prompt-tabpanel" id="option-b-panel" role="tabpanel" hidden>
                   <div class="prompt-feedback" data-option="b">
                     <button class="btn btn--ghost btn--icon prompt-feedback__up" aria-label="Option B thumbs up">
@@ -216,47 +213,24 @@
             <span class="form-field__label">Generation Output Type</span>
             <div class="form-tabs" role="tablist" aria-label="Generation output type">
               <button class="form-tab" data-setting="output" data-value="text" type="button">
-                Text Generation
+                Text
               </button>
               <button class="form-tab" data-setting="output" data-value="image" type="button">
-                Image Generation
+                Image
               </button>
               <button class="form-tab" data-setting="output" data-value="video" type="button">
-                Video Generation
+                Video
+              </button>
+              <button class="form-tab" data-setting="output" data-value="code" type="button">
+                Code
               </button>
             </div>
           </div>
 
-          <div class="form-field form-field--tabs">
-            <span class="form-field__label">Content Type</span>
-            <div class="form-tabs" role="tablist" aria-label="Content type" id="content-type-tabs">
-              <!-- Tabs injected via JS -->
-            </div>
-          </div>
-
           <label class="form-field">
-            <span class="form-field__label">Tone</span>
-            <select id="setting-tone" class="select">
-              <option value="neutral">Neutral</option>
-              <option value="friendly">Friendly</option>
-              <option value="professional">Professional</option>
-              <option value="persuasive">Persuasive</option>
-            </select>
-          </label>
-
-          <label class="form-field">
-            <span class="form-field__label">Style</span>
-            <select id="setting-style" class="select">
-              <option value="concise">Concise</option>
-              <option value="detailed">Detailed</option>
-              <option value="storytelling">Storytelling</option>
-            </select>
-          </label>
-
-          <label class="form-field">
-            <span class="form-field__label">Complexity</span>
-            <input type="range" id="setting-complexity" min="1" max="5" value="3" />
-            <span class="range-output" data-for="setting-complexity">3</span>
+            <span class="form-field__label">Level of Detail</span>
+            <input type="range" id="setting-complexity" min="1" max="3" value="2" />
+            <span class="range-output" data-for="setting-complexity">Medium</span>
           </label>
 
           <label class="form-field">
@@ -270,16 +244,6 @@
             />
             <span class="form-field__hint">Stored locally and used for Side Chat</span>
           </label>
-
-          <div class="form-field form-field--context">
-            <span class="form-field__label">Add in more context</span>
-            <div class="form-field__helper">
-              Drop supporting documents, images, or video clips to guide Prompanion.
-            </div>
-            <button type="button" class="btn btn--primary form-field__upload" disabled>
-              <span aria-hidden="true">+</span> Upload context
-            </button>
-          </div>
         </div>
         <footer class="modal__footer">
           <button class="btn btn--ghost" value="cancel">Cancel</button>
@@ -442,7 +406,7 @@
         <div class="prompt-library__text"></div>
         <div class="prompt-library__actions">
           <button class="btn btn--ghost btn--pill prompt-library__use" data-action="use" type="button">
-            Use
+            Insert
           </button>
           <button class="btn btn--ghost btn--pill prompt-library__copy" data-action="copy" type="button">
             Copy

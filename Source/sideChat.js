@@ -1,9 +1,39 @@
 /**
  * Side Chat Module
  * Handles all functionality related to the Side Chat section of the sidepanel
+ * 
+ * IMPORTANT: This file uses ES6 module syntax (export statements).
+ * It should ONLY be imported by scripts/sidepanel.js in the side panel context.
+ * It should NEVER be loaded as a regular script or content script.
+ * 
+ * This file MUST be loaded as a module (via import() or <script type="module">).
+ * If loaded as a regular script, the export statements will cause a syntax error.
  */
 
+import { formatMessageContent } from "./utils/messageFormatter.js";
+import { showSideChatToast, updateToastToSuccess } from "./utils/toast.js";
+import { callOpenAI, generateConversationTitle as generateTitleWithAPI } from "./utils/openaiClient.js";
+
 let autoChatInFlight = false;
+let pendingSideChatProcessing = false;
+
+/**
+ * Checks if we're in the correct sidepanel context
+ * @returns {boolean} True if in sidepanel context
+ */
+function isInSidepanelContext() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return false;
+  }
+  
+  // Check for sidepanel-specific elements
+  return !!(
+    document.getElementById('chat-window') ||
+    document.querySelector('.panel__section--chat') ||
+    window.location?.pathname?.includes('sidepanel') ||
+    window.location?.protocol === 'chrome-extension:'
+  );
+}
 
 /**
  * Welcome message content for new conversations
@@ -43,6 +73,12 @@ function formatTimestamp(timestamp) {
  * @param {Array} history - Array of chat message objects with role, content, and timestamp
  */
 export function renderChat(history) {
+  // Safety check: Ensure we're in the correct context
+  if (!isInSidepanelContext()) {
+    console.warn('[Prompanion] renderChat called outside of sidepanel context');
+    return;
+  }
+  
   const chatWindow = document.getElementById("chat-window");
   if (!chatWindow) {
     return;
@@ -61,7 +97,12 @@ export function renderChat(history) {
 
     const bubble = document.createElement("div");
     bubble.className = "chat-message__bubble";
-    bubble.textContent = entry.content;
+    // Format agent messages with markdown support, keep user messages as plain text
+    if (entry.role === "agent") {
+      bubble.innerHTML = formatMessageContent(entry.content);
+    } else {
+      bubble.textContent = entry.content;
+    }
 
     wrapper.append(meta, bubble);
     chatWindow.append(wrapper);
@@ -76,6 +117,12 @@ export function renderChat(history) {
  * @param {string} activeId - ID of the currently active conversation
  */
 export function renderChatTabs(conversations, activeId) {
+  // Safety check: Ensure we're in the correct context
+  if (!isInSidepanelContext()) {
+    console.warn('[Prompanion] renderChatTabs called outside of sidepanel context');
+    return;
+  }
+  
   const tabContainer = document.getElementById("chat-tabs");
   if (!tabContainer) {
     return;
@@ -130,10 +177,59 @@ export function setActiveConversation(state, conversationId) {
 /**
  * Converts chat history to API message format
  * @param {Array} history - Array of chat message objects
+ * @param {Array} llmChatHistory - Optional array of LLM chat history for context
  * @returns {Array} Array of API message objects with role and content
  */
-function buildChatApiMessages(history) {
-  return history
+function buildChatApiMessages(history, llmChatHistory = []) {
+  const messages = [];
+  
+  // If LLM chat history is provided, add it as context in a system message
+  if (Array.isArray(llmChatHistory) && llmChatHistory.length > 0) {
+    // Format the LLM conversation history as context
+    const contextText = llmChatHistory
+      .map((msg) => {
+        const role = msg.role === "assistant" ? "Assistant" : "User";
+        return `${role}: ${msg.content}`;
+      })
+      .join("\n\n");
+    
+    // Get the user's question (the highlighted text they want to elaborate on)
+    const userQuestion = history.find(msg => msg.role === "user")?.content || "";
+    
+    messages.push({
+      role: "system",
+      content: `You are helping the user elaborate on a specific part of a conversation they had with an AI assistant. 
+
+CRITICAL REQUIREMENTS - YOU MUST FOLLOW THESE:
+1. The user has highlighted text from the conversation below and wants you to elaborate on it
+2. You MUST ALWAYS reference the original conversation context in your response
+3. When discussing the highlighted topic, you MUST explicitly mention relevant details from the conversation (e.g., if the conversation was about Samsung phones and the user highlights "200MP camera", you MUST mention "Samsung" and say something like "In terms of Samsung's 200MP cameras" or "Regarding Samsung's 200MP camera technology")
+4. Your response MUST conclude by connecting back to the original conversation context using phrases like:
+   - "In terms of [specific topic/company/product from the conversation]..."
+   - "Regarding [specific detail from the conversation]..."
+   - "When it comes to [context from conversation]..."
+5. Do NOT provide generic information - always tie it back to the specific conversation context provided
+
+Here is the relevant conversation history for context:
+
+${contextText}
+
+The user wants to elaborate on: "${userQuestion}"
+
+Your response MUST:
+- Directly address the highlighted text
+- Reference and relate back to the original conversation context throughout
+- Mention specific details, companies, products, or topics from the conversation when relevant
+- ALWAYS conclude by connecting your explanation back to the original context using the format: "In terms of [topic/company/product from context], [your explanation]"
+
+Example: If the conversation mentioned "Samsung" and "200MP camera", and the user highlights "200MP camera", you MUST mention Samsung and conclude with something like "In terms of Samsung's 200MP cameras, they are a unique innovation and Samsung achieved this by..."`
+    });
+    
+    console.log("[Prompanion] Added chat history context to API call:", llmChatHistory.length, "messages");
+  }
+  
+  // Add the SideChat conversation history
+  const sideChatMessages = history
     .map((entry) => {
       if (!entry?.content) {
         return null;
@@ -142,6 +238,9 @@ function buildChatApiMessages(history) {
       return { role, content: entry.content };
     })
     .filter(Boolean);
+  
+  messages.push(...sideChatMessages);
+  return messages;
 }
 
 /**
@@ -157,43 +256,13 @@ export async function generateConversationTitle(stateRef, conversation) {
   );
   
   const fallback = contextualMessages.find((msg) => msg.role === "user")?.content ?? "Conversation";
-  if (!stateRef.settings.apiKey) {
-    return fallback.slice(0, 40);
-  }
-
-  try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${stateRef.settings.apiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: "You summarize chat conversations in 3-5 words for tabs."
-          },
-          {
-            role: "user",
-            content: contextualMessages.map((msg) => `${msg.role}: ${msg.content}`).join("\n")
-          }
-        ]
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-
-    const data = await response.json();
-    const summary = data.choices?.[0]?.message?.content?.trim();
-    return summary ? summary.slice(0, 60) : fallback.slice(0, 60);
-  } catch (error) {
-    console.error("Failed to summarize conversation", error);
-    return fallback.slice(0, 60);
-  }
+  
+  const contextualMessagesForAPI = contextualMessages.map((msg) => ({
+    role: msg.role,
+    content: msg.content
+  }));
+  
+  return generateTitleWithAPI(stateRef.settings.apiKey, contextualMessagesForAPI, fallback);
 }
 
 /**
@@ -201,90 +270,141 @@ export async function generateConversationTitle(stateRef, conversation) {
  * @param {Object} stateRef - Reference to application state
  * @param {string} message - Message text to send
  * @param {Object} dependencies - Required dependencies (saveState)
+ * @param {Array} llmChatHistory - Optional LLM chat history for context
  * @returns {Promise<Object>} Updated state reference
  */
-export async function sendSideChatMessage(stateRef, message, dependencies) {
+export async function sendSideChatMessage(stateRef, message, dependencies, llmChatHistory = []) {
+  console.log("[Prompanion] ========== sendSideChatMessage CALLED ==========");
+  console.log("[Prompanion] Message:", message?.substring(0, 50));
+  console.log("[Prompanion] StateRef:", {
+    hasStateRef: !!stateRef,
+    hasSettings: !!stateRef?.settings,
+    hasApiKey: !!stateRef?.settings?.apiKey,
+    hasConversations: !!stateRef?.conversations,
+    conversationsLength: stateRef?.conversations?.length,
+    activeConversationId: stateRef?.activeConversationId
+  });
+  
+  // Safety check: Ensure we're in the correct context
+  if (!isInSidepanelContext()) {
+    console.error('[Prompanion] sendSideChatMessage called outside of sidepanel context');
+    return stateRef;
+  }
+  
   const { saveState } = dependencies;
+  console.log("[Prompanion] Dependencies:", { hasSaveState: typeof saveState === 'function' });
+  
+  // Ensure settings object exists
+  if (!stateRef.settings) {
+    console.error("[Prompanion] stateRef.settings is missing! Initializing...");
+    stateRef.settings = {};
+  }
   
   if (!stateRef.settings.apiKey) {
+    console.error("[Prompanion] No API key found! Settings:", stateRef.settings);
     alert("Add your OpenAI API key in settings to use Side Chat.");
     return stateRef;
   }
 
+  // Get the active conversation - ensure we're using the correct one
   const activeConversation = getActiveConversation(stateRef);
+  console.log("[Prompanion] Active conversation:", {
+    found: !!activeConversation,
+    id: activeConversation?.id,
+    historyLength: activeConversation?.history?.length
+  });
+  
   if (!activeConversation) {
+    console.error("[Prompanion] No active conversation found when sending message");
+    console.error("[Prompanion] StateRef conversations:", stateRef?.conversations);
+    console.error("[Prompanion] Active conversation ID:", stateRef?.activeConversationId);
     return stateRef;
   }
+
+  console.log("[Prompanion] Sending message to conversation:", activeConversation.id, "Current history length:", activeConversation.history.length);
 
   const now = Date.now();
   activeConversation.history.push({ role: "user", content: message, timestamp: now });
   renderChat(activeConversation.history);
   renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
-  await saveState(stateRef);
+  
+  if (!saveState || typeof saveState !== 'function') {
+    console.error("[Prompanion] saveState is not a function in sendSideChatMessage!", typeof saveState);
+    console.error("[Prompanion] Dependencies:", dependencies);
+    // Continue anyway - the message was added to history and rendered
+  } else {
+    await saveState(stateRef);
+  }
+  
+  console.log("[Prompanion] Added user message, new history length:", activeConversation.history.length);
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${stateRef.settings.apiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: buildChatApiMessages(activeConversation.history)
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(await response.text());
+    const apiMessages = buildChatApiMessages(activeConversation.history, llmChatHistory);
+    console.log("[Prompanion] Sending to API with", apiMessages.length, "messages");
+    if (llmChatHistory.length > 0) {
+      console.log("[Prompanion] Chat history context included:", llmChatHistory.length, "messages from LLM conversation");
     }
+    
+    const reply = await callOpenAI(stateRef.settings.apiKey, apiMessages, "gpt-3.5-turbo");
 
-    const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content?.trim();
-
-    if (reply) {
-      activeConversation.history.push({ role: "agent", content: reply, timestamp: Date.now() });
-      renderChat(activeConversation.history);
-      
-      // Auto-generate title if conversation doesn't have one yet or is still "New chat"
-      // Generate after we have at least 1 user message + 1 agent response (2 messages total, excluding welcome)
-      const nonWelcomeMessages = activeConversation.history.filter(
-        (msg) => !(msg.role === "agent" && msg.content && msg.content.includes("Welcome to the Side Chat"))
-      );
-      const needsTitle = 
-        !activeConversation.title || 
-        activeConversation.title === "New chat" ||
-        activeConversation.title === "Conversation";
-      
-      if (needsTitle && nonWelcomeMessages.length >= 2) {
-        // Generate title asynchronously (don't wait for it to complete)
-        generateConversationTitle(stateRef, activeConversation).then((title) => {
-          if (title && title !== activeConversation.title) {
-            activeConversation.title = title;
-            renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
-            saveState(stateRef).catch((error) => {
-              console.warn("Failed to save state after title generation:", error);
-            });
-          }
-        }).catch((error) => {
-          console.warn("Failed to generate conversation title:", error);
-        });
-      }
-      
+    // Re-get the active conversation to ensure we have the latest reference
+    const currentActiveConversation = getActiveConversation(stateRef);
+    if (!currentActiveConversation) {
+      console.error("[Prompanion] No active conversation found when adding response");
+      return stateRef;
+    }
+    
+    // Verify we're adding to the correct conversation
+    if (currentActiveConversation.id !== activeConversation.id) {
+      console.warn("[Prompanion] Active conversation changed during API call, using current one");
+    }
+    
+    currentActiveConversation.history.push({ role: "agent", content: reply, timestamp: Date.now() });
+    renderChat(currentActiveConversation.history);
+    console.log("[Prompanion] Added agent response, final history length:", currentActiveConversation.history.length);
+    
+    // Auto-generate title if conversation doesn't have one yet or is still "New chat"
+    // Generate after we have at least 1 user message + 1 agent response (2 messages total, excluding welcome)
+    const nonWelcomeMessages = currentActiveConversation.history.filter(
+      (msg) => !(msg.role === "agent" && msg.content && msg.content.includes("Welcome to the Side Chat"))
+    );
+    const needsTitle = 
+      !currentActiveConversation.title || 
+      currentActiveConversation.title === "New chat" ||
+      currentActiveConversation.title === "Conversation";
+    
+    if (needsTitle && nonWelcomeMessages.length >= 2) {
+      // Generate title asynchronously (don't wait for it to complete)
+      generateConversationTitle(stateRef, currentActiveConversation).then((title) => {
+        if (title && title !== currentActiveConversation.title) {
+          currentActiveConversation.title = title;
+          renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
+          saveState(stateRef).catch((error) => {
+            console.warn("Failed to save state after title generation:", error);
+          });
+        }
+      }).catch((error) => {
+        console.warn("Failed to generate conversation title:", error);
+      });
+    }
+    
+    renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
+    await saveState(stateRef);
+  } catch (error) {
+    console.error("Side chat failed", error);
+    // Re-get active conversation for error handling
+    const currentActiveConversation = getActiveConversation(stateRef);
+    if (currentActiveConversation) {
+      currentActiveConversation.history.push({
+        role: "agent",
+        content:
+          "I couldn't reach the model. Check your API key in settings and try again.",
+        timestamp: Date.now()
+      });
+      renderChat(currentActiveConversation.history);
       renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
       await saveState(stateRef);
     }
-  } catch (error) {
-    console.error("Side chat failed", error);
-    activeConversation.history.push({
-      role: "agent",
-      content:
-        "I couldn't reach the model. Check your API key in settings and try again.",
-      timestamp: Date.now()
-    });
-    renderChat(activeConversation.history);
-    renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
-    await saveState(stateRef);
   }
 
   return stateRef;
@@ -316,46 +436,175 @@ function createNewConversation() {
  * @param {Object} dependencies - Required dependencies (saveState)
  */
 export async function triggerAutoSideChat(stateRef, text, { fromPending = false, startFresh = false } = {}, dependencies = {}) {
+  // Safety check: Ensure we're in the correct context
+  if (!isInSidepanelContext()) {
+    console.error('[Prompanion] triggerAutoSideChat called outside of sidepanel context');
+    return;
+  }
+  
   const { saveState } = dependencies;
   const snippet = typeof text === "string" ? text.trim() : "";
-  if (!snippet || autoChatInFlight || !stateRef) {
+  
+  console.log("[Prompanion] triggerAutoSideChat called:", {
+    hasText: !!text,
+    textLength: text?.length,
+    snippetLength: snippet.length,
+    hasStateRef: !!stateRef,
+    fromPending,
+    startFresh
+  });
+  
+  if (!snippet || !stateRef) {
+    console.warn("[Prompanion] triggerAutoSideChat: Missing snippet or stateRef", {
+      snippet: snippet?.substring(0, 50),
+      hasStateRef: !!stateRef
+    });
     return;
   }
 
-  if (fromPending) {
-    const pendingText = stateRef.pendingSideChat?.text?.trim();
-    if (!pendingText || pendingText !== snippet) {
-      return;
-    }
+  // Check flight flag BEFORE doing anything to prevent duplicates
+  if (autoChatInFlight) {
+    console.log("[Prompanion] Auto chat already in flight, skipping duplicate trigger");
+    return;
   }
 
-  // If startFresh is true, create a new conversation before sending the message
+  // If startFresh is true, ALWAYS create a new conversation
+  // This ensures each "Elaborate" click gets its own conversation
   if (startFresh) {
+    // When startFresh is true, we don't need to check fromPending
+    // Each Elaborate click is independent and should create its own conversation
+    
+    // Create a completely new conversation with welcome message
     const newConversation = createNewConversation();
     stateRef.conversations.push(newConversation);
     stateRef.activeConversationId = newConversation.id;
+    
+    // Verify we got the correct conversation
     const activeConversation = getActiveConversation(stateRef);
-    renderChat(activeConversation?.history ?? []);
+    if (!activeConversation || activeConversation.id !== newConversation.id) {
+      console.error("[Prompanion] Active conversation mismatch after creating new one");
+      // Force set it
+      stateRef.activeConversationId = newConversation.id;
+    }
+    
+    // Render the new conversation (should show welcome message only)
+    const finalActiveConversation = getActiveConversation(stateRef);
+    if (!finalActiveConversation) {
+      console.error("[Prompanion] Failed to get active conversation after creating new one!");
+      console.error("[Prompanion] StateRef:", {
+        activeConversationId: stateRef.activeConversationId,
+        conversationsLength: stateRef.conversations?.length,
+        newConversationId: newConversation.id
+      });
+      autoChatInFlight = false;
+      return;
+    }
+    
+    renderChat(finalActiveConversation.history ?? []);
     renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
-    await saveState(stateRef);
+    
+    if (saveState && typeof saveState === 'function') {
+      await saveState(stateRef);
+      console.log("[Prompanion] State saved after creating new conversation");
+    } else {
+      console.error("[Prompanion] saveState is not a function!", typeof saveState);
+    }
+    
+    console.log("[Prompanion] Created new conversation for Elaborate:", newConversation.id, "History length:", finalActiveConversation.history?.length || 0);
+  } else {
+    // For non-fresh conversations, check fromPending
+    if (fromPending) {
+      const pendingText = stateRef.pendingSideChat?.text?.trim();
+      if (!pendingText || pendingText !== snippet) {
+        return;
+      }
+    }
   }
 
+  // Extract chat history from pendingSideChat if available
+  const llmChatHistory = Array.isArray(stateRef.pendingSideChat?.chatHistory) 
+    ? stateRef.pendingSideChat.chatHistory 
+    : [];
+
+  // Show toast notification if chat history was retrieved
+  // Show it after the section is opened and conversation is created
+  let toast = null;
+  if (llmChatHistory.length > 0) {
+    console.log("[Prompanion] Chat history retrieved:", llmChatHistory.length, "messages");
+    // Wait a bit for the section to be visible, then show toast
+    setTimeout(() => {
+      toast = showSideChatToast("Retrieving chat history...", "loading", 0); // Don't auto-remove
+      
+      // Update toast to success after a brief delay
+      setTimeout(() => {
+        if (toast && toast.parentElement) {
+          updateToastToSuccess(toast);
+          const textEl = toast.querySelector(".sidechat-toast__text");
+          if (textEl) {
+            textEl.textContent = "Chat History Retrieved!";
+          }
+          // Auto-remove after 3 seconds
+          setTimeout(() => {
+            toast.classList.remove("is-visible");
+            setTimeout(() => {
+              if (toast.parentElement) {
+                toast.remove();
+              }
+            }, 300);
+          }, 3000);
+        }
+      }, 800); // Show loading for at least 800ms
+    }, 300); // Wait for section to open
+  } else {
+    console.log("[Prompanion] No chat history found in pendingSideChat");
+  }
+
+  // Set flight flag BEFORE sending to prevent duplicate sends
+  // This prevents race conditions when multiple Elaborate clicks happen quickly
   autoChatInFlight = true;
   try {
     const textarea = document.getElementById("chat-message");
     if (textarea) {
       textarea.value = snippet;
+      console.log("[Prompanion] Set textarea value:", snippet.substring(0, 50) + "...");
+    } else {
+      console.warn("[Prompanion] Textarea not found! ID: chat-message");
     }
-    await sendSideChatMessage(stateRef, snippet, dependencies);
+    
+    // Verify we have the correct active conversation before sending
+    const verifyActiveConversation = getActiveConversation(stateRef);
+    if (!verifyActiveConversation) {
+      console.error("[Prompanion] No active conversation found before sending message");
+      autoChatInFlight = false;
+      return;
+    }
+    console.log("[Prompanion] Sending message to conversation:", verifyActiveConversation.id, "Snippet length:", snippet.length);
+    
+    console.log("[Prompanion] About to call sendSideChatMessage with:", {
+      snippetLength: snippet.length,
+      hasDependencies: !!dependencies,
+      hasSaveState: typeof dependencies?.saveState === 'function',
+      llmChatHistoryLength: llmChatHistory.length
+    });
+    
+    try {
+      await sendSideChatMessage(stateRef, snippet, dependencies, llmChatHistory);
+      console.log("[Prompanion] Message sent successfully");
+    } catch (error) {
+      console.error("[Prompanion] Error sending message:", error);
+      throw error;
+    }
     if (textarea) {
       textarea.value = "";
     }
   } finally {
     autoChatInFlight = false;
+    // Clear pending side chat after processing (only if fromPending)
     if (fromPending && stateRef.pendingSideChat) {
       stateRef.pendingSideChat = null;
       try {
         await saveState(stateRef);
+        console.log("[Prompanion] Cleared pendingSideChat after processing");
       } catch (error) {
         console.warn("Prompanion: failed to clear pending side chat", error);
       }
@@ -369,11 +618,32 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
  * @param {Object} dependencies - Required dependencies (saveState)
  */
 export function processPendingSideChat(stateRef, dependencies = {}) {
+  // Prevent duplicate processing
+  if (pendingSideChatProcessing) {
+    console.log("[Prompanion] processPendingSideChat already in progress, skipping");
+    return;
+  }
+  
   const pending = stateRef?.pendingSideChat;
   if (!pending || typeof pending.text !== "string") {
     return;
   }
-  triggerAutoSideChat(stateRef, pending.text, { fromPending: true }, dependencies);
+  
+  // Only process if not already in flight (to avoid conflicts with direct calls)
+  if (autoChatInFlight) {
+    console.log("[Prompanion] Auto chat already in flight, skipping pending side chat");
+    return;
+  }
+  
+  // Clear pending immediately to prevent duplicate processing
+  const pendingText = pending.text;
+  stateRef.pendingSideChat = null;
+  
+  pendingSideChatProcessing = true;
+  triggerAutoSideChat(stateRef, pendingText, { fromPending: true }, dependencies)
+    .finally(() => {
+      pendingSideChatProcessing = false;
+    });
 }
 
 /**
@@ -381,6 +651,12 @@ export function processPendingSideChat(stateRef, dependencies = {}) {
  * @param {number} retries - Number of retry attempts if element not found
  */
 export function openSideChatSection(retries = 5) {
+  // Safety check: Ensure we're in the correct context
+  if (!isInSidepanelContext()) {
+    console.warn('[Prompanion] openSideChatSection called outside of sidepanel context');
+    return false;
+  }
+  
   const chatSection = document.querySelector(".panel__section--chat details");
   if (chatSection) {
     if (!chatSection.open) {
@@ -402,12 +678,26 @@ export function openSideChatSection(retries = 5) {
   return false;
 }
 
+// Store handler references to allow removal
+const handlerStore = {
+  resetButton: null,
+  tabsContainer: null,
+  textarea: null,
+  form: null
+};
+
 /**
  * Registers all event handlers for the Side Chat section
  * @param {Object} stateRef - Reference to application state
  * @param {Object} dependencies - Required dependencies (renderStatus, saveState)
  */
 export function registerChatHandlers(stateRef, dependencies = {}) {
+  // Safety check: Ensure we're in the correct context
+  if (!isInSidepanelContext()) {
+    console.warn('[Prompanion] registerChatHandlers called outside of sidepanel context');
+    return;
+  }
+  
   const { renderStatus, saveState } = dependencies;
   const form = document.getElementById("chat-form");
   const textarea = document.getElementById("chat-message");
@@ -416,6 +706,20 @@ export function registerChatHandlers(stateRef, dependencies = {}) {
   
   if (!form || !textarea || !resetButton || !tabsContainer || !saveState) {
     return;
+  }
+
+  // Remove old event listeners if they exist to prevent duplicates
+  if (handlerStore.resetButton) {
+    resetButton.removeEventListener("click", handlerStore.resetButton);
+  }
+  if (handlerStore.tabsContainer) {
+    tabsContainer.removeEventListener("click", handlerStore.tabsContainer);
+  }
+  if (handlerStore.textarea) {
+    textarea.removeEventListener("keydown", handlerStore.textarea);
+  }
+  if (handlerStore.form) {
+    form.removeEventListener("submit", handlerStore.form);
   }
 
   stateRef.activePlatform = "ChatGPT";
@@ -429,7 +733,8 @@ export function registerChatHandlers(stateRef, dependencies = {}) {
   renderChat(active?.history ?? []);
   renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
 
-  resetButton.addEventListener("click", async () => {
+  // Create and store handler
+  handlerStore.resetButton = async () => {
     const activeConversation = getActiveConversation(stateRef);
     if (!activeConversation) {
       return;
@@ -469,9 +774,11 @@ export function registerChatHandlers(stateRef, dependencies = {}) {
     renderChat(newConversation.history);
     renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
     await saveState(stateRef);
-  });
+  };
+  resetButton.addEventListener("click", handlerStore.resetButton);
 
-  tabsContainer.addEventListener("click", async (event) => {
+  // Create and store handler
+  handlerStore.tabsContainer = async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
       return;
@@ -523,9 +830,11 @@ export function registerChatHandlers(stateRef, dependencies = {}) {
     renderChat(activeConversation?.history ?? []);
     renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
     await saveState(stateRef);
-  });
+  };
+  tabsContainer.addEventListener("click", handlerStore.tabsContainer);
 
-  textarea.addEventListener("keydown", async (event) => {
+  // Create and store handler
+  handlerStore.textarea = async (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       const message = textarea.value.trim();
@@ -535,9 +844,11 @@ export function registerChatHandlers(stateRef, dependencies = {}) {
       textarea.value = "";
       await sendSideChatMessage(stateRef, message, { saveState });
     }
-  });
+  };
+  textarea.addEventListener("keydown", handlerStore.textarea);
 
-  form.addEventListener("submit", async (event) => {
+  // Create and store handler
+  handlerStore.form = async (event) => {
     event.preventDefault();
     const message = textarea.value.trim();
     if (!message) {
@@ -546,6 +857,8 @@ export function registerChatHandlers(stateRef, dependencies = {}) {
 
     textarea.value = "";
     await sendSideChatMessage(stateRef, message, { saveState });
-  });
+  };
+  form.addEventListener("submit", handlerStore.form);
 }
+
 

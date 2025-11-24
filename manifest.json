@@ -41,7 +41,6 @@
         "sidepanel.html",
         "styles/sidepanel.css",
         "styles/AdapterStyles.css",
-        "scripts/sidepanel.js",
         "Assets/icons/icon48.png"
       ],
       "matches": ["<all_urls>"]

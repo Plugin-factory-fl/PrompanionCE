@@ -3,26 +3,6 @@
  * Handles all functionality related to the Settings dialog panel
  */
 
-/**
- * Content type options based on output type
- */
-export const contentTypeOptions = {
-  text: [
-    { value: "research", label: "Research" },
-    { value: "instructions", label: "Instructions" },
-    { value: "storytelling", label: "Storytelling" }
-  ],
-  image: [
-    { value: "realistic", label: "Realistic" },
-    { value: "anime", label: "Anime" },
-    { value: "three_d", label: "3D" }
-  ],
-  video: [
-    { value: "realistic", label: "Realistic" },
-    { value: "anime", label: "Anime" },
-    { value: "three_d", label: "3D" }
-  ]
-};
 
 /**
  * Available model options
@@ -34,10 +14,8 @@ export const modelOptions = ["chatgpt", "gemini", "claude", "grok"];
  */
 export const detailLevelLabels = {
   1: "Low",
-  2: "Some",
-  3: "Medium",
-  4: "High",
-  5: "Very High"
+  2: "Medium",
+  3: "High"
 };
 
 /**
@@ -86,20 +64,11 @@ export function renderSettings(settings) {
     return;
   }
   
-  const toneField = document.getElementById("setting-tone");
-  const styleField = document.getElementById("setting-style");
   const complexityField = document.getElementById("setting-complexity");
   const apiKeyField = document.getElementById("setting-api-key");
   const modelButtons = document.querySelectorAll(".model-pill");
   const outputTabs = document.querySelectorAll(".form-tab[data-setting='output']");
-  const contentTabsContainer = document.getElementById("content-type-tabs");
 
-  if (toneField) {
-    toneField.value = settings.tone;
-  }
-  if (styleField) {
-    styleField.value = settings.style;
-  }
   if (complexityField) {
     complexityField.value = settings.complexity;
   }
@@ -119,14 +88,6 @@ export function renderSettings(settings) {
     tab.setAttribute("aria-selected", String(isActive));
   });
 
-  const contentOptions = contentTypeOptions[settings.output] ?? contentTypeOptions.text;
-  if (!contentOptions.some((option) => option.value === settings.contentType)) {
-    settings.contentType = contentOptions[0]?.value ?? "research";
-  }
-  if (contentTabsContainer) {
-    renderTabs(contentTabsContainer, contentOptions, settings.contentType);
-  }
-
   updateRangeOutputs();
 }
 
@@ -140,7 +101,6 @@ export function registerSettingsHandlers(stateRef, dependencies = {}) {
   const settingsDialog = document.getElementById("settings-dialog");
   const settingsTrigger = document.getElementById("open-settings");
   const outputTabs = document.querySelectorAll(".form-tab[data-setting='output']");
-  const contentTabsContainer = document.getElementById("content-type-tabs");
   const detailSlider = document.getElementById("setting-complexity");
   const modelButtons = document.querySelectorAll(".model-pill");
 
@@ -159,13 +119,10 @@ export function registerSettingsHandlers(stateRef, dependencies = {}) {
       return;
     }
     stateRef.settings = {
-      tone: document.getElementById("setting-tone").value,
-      style: document.getElementById("setting-style").value,
       complexity: Number(document.getElementById("setting-complexity").value),
       apiKey: document.getElementById("setting-api-key").value.trim(),
       model: stateRef.settings.model ?? "chatgpt",
-      output: stateRef.settings.output ?? "text",
-      contentType: stateRef.settings.contentType ?? "research"
+      output: stateRef.settings.output ?? "text"
     };
     renderSettings(stateRef.settings);
     await saveState(stateRef);
@@ -191,29 +148,8 @@ export function registerSettingsHandlers(stateRef, dependencies = {}) {
         return;
       }
       stateRef.settings.output = value;
-      const options = contentTypeOptions[value] ?? contentTypeOptions.text;
-      if (!options.some((option) => option.value === stateRef.settings.contentType)) {
-        stateRef.settings.contentType = options[0]?.value ?? "research";
-      }
       renderSettings(stateRef.settings);
     });
-  });
-
-  contentTabsContainer.addEventListener("click", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) {
-      return;
-    }
-    const tab = target.closest(".form-tab");
-    if (!(tab instanceof HTMLButtonElement)) {
-      return;
-    }
-    const value = tab.dataset.value;
-    if (!value) {
-      return;
-    }
-    stateRef.settings.contentType = value;
-    renderSettings(stateRef.settings);
   });
 }
 

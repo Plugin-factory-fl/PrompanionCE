@@ -335,5 +335,168 @@ export class GPTHistoryCatcher extends ChatHistoryExtractor {
 
     return Array.from(messages);
   }
+
+  /**
+   * Captures the current conversation history on-demand
+   * This is called when the user clicks "Elaborate" to get context for SideChat
+   * @param {number} maxMessages - Maximum number of messages to capture (default: 20)
+   * @returns {Array<Object>} Array of message objects with role, content, and timestamp
+   */
+  captureCurrentHistory(maxMessages = 20) {
+    try {
+      const messageElements = this.findMessageElements();
+      const messages = [];
+
+      // Process each message element
+      for (const element of messageElements) {
+        const role = this.detectMessageRole(element);
+        if (!role) {
+          continue;
+        }
+
+        const content = this.extractMessageContent(element, role);
+        if (!content || content.trim().length === 0) {
+          continue;
+        }
+
+        // Try to extract timestamp from element if available
+        // ChatGPT may store timestamps in data attributes or nearby elements
+        let timestamp = Date.now();
+        const timeElement = element.querySelector("time") || element.closest("[data-time]");
+        if (timeElement) {
+          const timeAttr = timeElement.getAttribute("datetime") || timeElement.getAttribute("data-time");
+          if (timeAttr) {
+            const parsedTime = new Date(timeAttr).getTime();
+            if (!isNaN(parsedTime)) {
+              timestamp = parsedTime;
+            }
+          }
+        }
+
+        messages.push({
+          role: role === "assistant" ? "assistant" : "user",
+          content: content.trim(),
+          timestamp: timestamp
+        });
+
+        // Limit to maxMessages
+        if (messages.length >= maxMessages) {
+          break;
+        }
+      }
+
+      // Sort messages by timestamp (oldest first) to maintain conversation order
+      // If timestamps are all the same (Date.now()), maintain DOM order
+      messages.sort((a, b) => {
+        if (a.timestamp !== b.timestamp) {
+          return a.timestamp - b.timestamp;
+        }
+        // If timestamps are equal, maintain order based on DOM position
+        return 0;
+      });
+
+      console.log(`[Prompanion GPT History] Captured ${messages.length} messages for SideChat context`);
+      return messages;
+    } catch (error) {
+      console.error("[Prompanion GPT History] Error capturing current history:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Gets a singleton instance of GPTHistoryCatcher
+   * This ensures we reuse the same instance across calls
+   * @returns {GPTHistoryCatcher} Singleton instance
+   */
+  static getInstance() {
+    if (!GPTHistoryCatcher._instance) {
+      GPTHistoryCatcher._instance = new GPTHistoryCatcher();
+    }
+    return GPTHistoryCatcher._instance;
+  }
+}
+
+/**
+ * Standalone function to capture ChatGPT conversation history on-demand
+ * This can be called directly from adapter.js without requiring ES6 imports
+ * @param {number} maxMessages - Maximum number of messages to capture (default: 20)
+ * @returns {Array<Object>} Array of message objects with role, content, and timestamp
+ */
+export function captureGPTChatHistory(maxMessages = 20) {
+  try {
+    const catcher = GPTHistoryCatcher.getInstance();
+    return catcher.captureCurrentHistory(maxMessages);
+  } catch (error) {
+    console.error("[Prompanion GPT History] Error in standalone capture function:", error);
+    // Fallback: try to capture directly without the class
+    return captureGPTChatHistoryFallback(maxMessages);
+  }
+}
+
+/**
+ * Fallback capture function that works without the class structure
+ * Uses ChatGPT-specific selectors directly
+ * @param {number} maxMessages - Maximum number of messages to capture
+ * @returns {Array<Object>} Array of message objects
+ */
+function captureGPTChatHistoryFallback(maxMessages = 20) {
+  const messages = [];
+  
+  try {
+    // ChatGPT-specific selectors
+    const assistantSelector = "[data-message-author-role='assistant'], [data-testid='assistant-turn']";
+    const userSelector = "[data-message-author-role='user'], [data-testid='user-turn']";
+    
+    const assistantElements = document.querySelectorAll(assistantSelector);
+    const userElements = document.querySelectorAll(userSelector);
+    
+    const allElements = [];
+    assistantElements.forEach(el => allElements.push({ el, role: 'assistant' }));
+    userElements.forEach(el => allElements.push({ el, role: 'user' }));
+    
+    // Sort by DOM position (top to bottom)
+    allElements.sort((a, b) => {
+      const posA = a.el.compareDocumentPosition(b.el);
+      return posA & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
+    
+    for (const { el, role } of allElements) {
+      if (messages.length >= maxMessages) break;
+      
+      // Extract content
+      const contentSelectors = [
+        "[data-message-content]",
+        ".markdown",
+        ".prose",
+        "[class*='markdown']"
+      ];
+      
+      let content = null;
+      for (const selector of contentSelectors) {
+        const contentEl = el.querySelector(selector);
+        if (contentEl) {
+          content = (contentEl.innerText || contentEl.textContent)?.trim();
+          if (content && content.length > 0) break;
+        }
+      }
+      
+      if (!content) {
+        content = (el.innerText || el.textContent)?.trim();
+      }
+      
+      if (content && content.length > 3) {
+        messages.push({
+          role: role === 'assistant' ? 'assistant' : 'user',
+          content: content,
+          timestamp: Date.now()
+        });
+      }
+    }
+    
+    return messages;
+  } catch (error) {
+    console.error("[Prompanion GPT History] Fallback capture failed:", error);
+    return [];
+  }
 }
 

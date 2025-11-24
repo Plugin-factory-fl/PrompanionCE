@@ -20,15 +20,31 @@ function clearTextField(field) {
  * @param {Object} stateRef - Reference to current state object
  */
 export function initPromptEnhancer(stateRef) {
-  stateRef.originalPrompt = "";
-  stateRef.optionA = "";
-  stateRef.optionB = "";
+  // Only clear if we're explicitly initializing, not if there are saved prompts
+  // Check if state has prompts before clearing
+  const hasPrompts = stateRef && (stateRef.originalPrompt || stateRef.optionA || stateRef.optionB);
   
-  requestAnimationFrame(() => {
-    clearTextField(document.getElementById("original-prompt"));
-    clearTextField(document.getElementById("option-a"));
-    clearTextField(document.getElementById("option-b"));
+  console.log("[Prompanion] initPromptEnhancer called:", {
+    hasPrompts,
+    hasOriginalPrompt: !!stateRef?.originalPrompt,
+    hasOptionA: !!stateRef?.optionA,
+    hasOptionB: !!stateRef?.optionB
   });
+  
+  if (!hasPrompts) {
+    console.log("[Prompanion] No prompts in state, clearing fields");
+    stateRef.originalPrompt = "";
+    stateRef.optionA = "";
+    stateRef.optionB = "";
+    
+    requestAnimationFrame(() => {
+      clearTextField(document.getElementById("original-prompt"));
+      clearTextField(document.getElementById("option-a"));
+      clearTextField(document.getElementById("option-b"));
+    });
+  } else {
+    console.log("[Prompanion] Prompts exist in state, NOT clearing - will be rendered separately");
+  }
 }
 
 /**
@@ -36,13 +52,95 @@ export function initPromptEnhancer(stateRef) {
  * @param {Object} prompts - Object containing originalPrompt, optionA, and optionB
  */
 export function renderPrompts({ originalPrompt, optionA, optionB }) {
+  // Wait for DOM to be ready if needed
+  if (document.readyState === "loading") {
+    console.log("[Prompanion] DOM not ready, waiting...");
+    document.addEventListener("DOMContentLoaded", () => renderPrompts({ originalPrompt, optionA, optionB }));
+    return;
+  }
+  
   const originalField = document.getElementById("original-prompt");
   const optionAField = document.getElementById("option-a");
   const optionBField = document.getElementById("option-b");
   
-  if (originalField) originalField.value = originalPrompt ?? "";
-  if (optionAField) optionAField.value = optionA ?? "";
-  if (optionBField) optionBField.value = optionB ?? "";
+  console.log("[Prompanion] renderPrompts called with:", {
+    originalPrompt: originalPrompt?.substring(0, 50) || "(empty)",
+    optionA: optionA?.substring(0, 50) || "(empty)",
+    optionB: optionB?.substring(0, 50) || "(empty)",
+    originalPromptLength: originalPrompt?.length || 0,
+    optionALength: optionA?.length || 0,
+    optionBLength: optionB?.length || 0,
+    hasOriginalField: !!originalField,
+    hasOptionAField: !!optionAField,
+    hasOptionBField: !!optionBField,
+    documentReadyState: document.readyState
+  });
+  
+  // If fields don't exist, try again after a short delay
+  if (!originalField || !optionAField || !optionBField) {
+    console.warn("[Prompanion] DOM fields not found, retrying in 100ms...");
+    setTimeout(() => renderPrompts({ originalPrompt, optionA, optionB }), 100);
+    return;
+  }
+  
+  // DIRECT VALUE ASSIGNMENT - no complex logic
+  if (originalField) {
+    originalField.readOnly = false;
+    originalField.value = originalPrompt || "";
+    console.log("[Prompanion] Set original-prompt, value length:", originalField.value.length);
+  }
+  
+  if (optionAField) {
+    const valueToSet = optionA || "";
+    optionAField.readOnly = true;
+    optionAField.value = valueToSet;
+    // Force multiple updates
+    optionAField.setAttribute("value", valueToSet);
+    if (optionAField.textContent !== undefined) {
+      optionAField.textContent = valueToSet;
+    }
+    console.log("[Prompanion] Set option-a, value length:", valueToSet.length, "field has:", optionAField.value.length);
+    // Verify it stuck
+    setTimeout(() => {
+      if (optionAField.value !== valueToSet) {
+        console.error("[Prompanion] option-a value was lost! Re-setting...");
+        optionAField.value = valueToSet;
+      }
+    }, 10);
+  }
+  
+  if (optionBField) {
+    const valueToSet = optionB || "";
+    optionBField.readOnly = true;
+    optionBField.value = valueToSet;
+    // Force multiple updates
+    optionBField.setAttribute("value", valueToSet);
+    if (optionBField.textContent !== undefined) {
+      optionBField.textContent = valueToSet;
+    }
+    console.log("[Prompanion] Set option-b, value length:", valueToSet.length, "field has:", optionBField.value.length);
+    // Verify it stuck
+    setTimeout(() => {
+      if (optionBField.value !== valueToSet) {
+        console.error("[Prompanion] option-b value was lost! Re-setting...");
+        optionBField.value = valueToSet;
+      }
+    }, 10);
+  }
+  
+  // Force a reflow to ensure values are visible
+  if (originalField) void originalField.offsetHeight;
+  if (optionAField) void optionAField.offsetHeight;
+  if (optionBField) void optionBField.offsetHeight;
+  
+  // Verify the values were actually set
+  setTimeout(() => {
+    console.log("[Prompanion] Verification - field values:", {
+      originalFieldValue: originalField?.value?.substring(0, 50),
+      optionAFieldValue: optionAField?.value?.substring(0, 50),
+      optionBFieldValue: optionBField?.value?.substring(0, 50)
+    });
+  }, 50);
 }
 
 /**
@@ -137,6 +235,15 @@ export async function handleEnhance(state, dependencies = {}) {
       openPanel: false
     });
 
+    console.log("[Prompanion] handleEnhance received response:", {
+      ok: response?.ok,
+      hasOptionA: !!response?.optionA,
+      hasOptionB: !!response?.optionB,
+      error: response?.error,
+      optionA: response?.optionA?.substring(0, 50),
+      optionB: response?.optionB?.substring(0, 50)
+    });
+
     if (!response?.ok) {
       throw new Error(response?.reason || "Failed to generate enhancements");
     }
@@ -159,7 +266,36 @@ export async function handleEnhance(state, dependencies = {}) {
     state.optionB = response.optionB || basePrompt;
     state.enhancementsUsed = enhancementsUsed + 1;
 
+    console.log("[Prompanion] handleEnhance updating state:", {
+      originalPrompt: state.originalPrompt?.substring(0, 50),
+      optionA: state.optionA?.substring(0, 50),
+      optionB: state.optionB?.substring(0, 50),
+      optionALength: state.optionA?.length,
+      optionBLength: state.optionB?.length
+    });
+
+    // Ensure DOM elements exist before rendering
+    const originalField = document.getElementById("original-prompt");
+    const optionAField = document.getElementById("option-a");
+    const optionBField = document.getElementById("option-b");
+    
+    console.log("[Prompanion] DOM elements found:", {
+      hasOriginalField: !!originalField,
+      hasOptionAField: !!optionAField,
+      hasOptionBField: !!optionBField
+    });
+
+    if (!originalField || !optionAField || !optionBField) {
+      console.error("[Prompanion] Missing DOM elements for prompt display!");
+    }
+
     renderPrompts(state);
+    console.log("[Prompanion] renderPrompts called, checking values:", {
+      originalFieldValue: originalField?.value?.substring(0, 50),
+      optionAFieldValue: optionAField?.value?.substring(0, 50),
+      optionBFieldValue: optionBField?.value?.substring(0, 50)
+    });
+    
     if (renderStatus) {
       renderStatus(state);
     }
@@ -336,15 +472,29 @@ export function registerCopyHandlers() {
         throw new Error(`Invalid option: ${targetId}`);
       }
       
+      // Get the current option's text to regenerate (re-word it for better clarity)
+      // If the option is empty, use the original prompt as fallback
+      const currentOptionField = document.getElementById(targetId);
+      const currentOptionText = currentOptionField?.value?.trim();
+      const promptToRegenerate = currentOptionText || originalPrompt;
+      
+      if (!promptToRegenerate) {
+        alert("No prompt to regenerate. Please enhance a prompt first.");
+        return;
+      }
+      
       const response = await sendChromeMessage({
         type: "PROMPANION_REGENERATE_ENHANCEMENT",
-        prompt: originalPrompt,
+        prompt: promptToRegenerate, // Regenerate/re-word the current option's text
         option: option
       });
 
       if (!response || !response.ok) {
         throw new Error(response?.reason || "Failed to regenerate enhancement");
       }
+      
+      // The state will be updated via PROMPANION_STATE_PUSH message from background
+      // No need to manually update here
     } catch (error) {
       console.error("Prompanion: regeneration failed", error);
       alert(getErrorMessage(error, "regeneration"));
@@ -359,7 +509,7 @@ export function registerCopyHandlers() {
 }
 
 /**
- * Initializes tab switching functionality for Option A and Option B tabs
+ * Initializes tab switching functionality for Original, Option A, and Option B tabs
  */
 export function initTabs() {
   const tabs = document.querySelectorAll(".prompt-tab");
@@ -419,26 +569,47 @@ export function handleStateRestore(stateRef, restoredState) {
  * @returns {Object} State object with prompt enhancer fields handled appropriately
  */
 export function handleStatePush(stateRef, newState) {
-  const hasPromptUpdates = newState.originalPrompt !== undefined || 
-                          newState.optionA !== undefined || 
-                          newState.optionB !== undefined;
+  // Check if we have actual prompt content (not just undefined check, but also not empty strings unless explicitly clearing)
+  const hasPromptUpdates = (newState.originalPrompt !== undefined && newState.originalPrompt !== null) || 
+                          (newState.optionA !== undefined && newState.optionA !== null) || 
+                          (newState.optionB !== undefined && newState.optionB !== null);
   
+  // Only update if we have actual content or if we're explicitly clearing (empty strings mean clear)
   if (hasPromptUpdates) {
-    if (newState.originalPrompt !== undefined) {
+    let shouldRender = false;
+    
+    if (newState.originalPrompt !== undefined && newState.originalPrompt !== null) {
       stateRef.originalPrompt = newState.originalPrompt;
+      shouldRender = true;
     }
-    if (newState.optionA !== undefined) {
+    if (newState.optionA !== undefined && newState.optionA !== null) {
       stateRef.optionA = newState.optionA;
+      shouldRender = true;
     }
-    if (newState.optionB !== undefined) {
+    if (newState.optionB !== undefined && newState.optionB !== null) {
       stateRef.optionB = newState.optionB;
+      shouldRender = true;
     }
-    renderPrompts(stateRef);
+    
+    // Only render if we actually updated something
+    if (shouldRender) {
+      console.log("[Prompanion] handleStatePush updating prompts:", {
+        originalPrompt: stateRef.originalPrompt?.substring(0, 50),
+        optionA: stateRef.optionA?.substring(0, 50),
+        optionB: stateRef.optionB?.substring(0, 50)
+      });
+      renderPrompts(stateRef);
+    }
   } else {
-    stateRef.originalPrompt = "";
-    stateRef.optionA = "";
-    stateRef.optionB = "";
-    initPromptEnhancer(stateRef);
+    // Only clear if there are no prompt fields at all in newState
+    // Don't clear if we're just updating other parts of state
+    const hasAnyPromptFields = 'originalPrompt' in newState || 'optionA' in newState || 'optionB' in newState;
+    if (!hasAnyPromptFields) {
+      stateRef.originalPrompt = "";
+      stateRef.optionA = "";
+      stateRef.optionB = "";
+      initPromptEnhancer(stateRef);
+    }
   }
   
   const { originalPrompt, optionA, optionB, ...otherState } = newState;
