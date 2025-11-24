@@ -96,6 +96,58 @@ export function formatMessageContent(text) {
   // Split by double newlines first
   let paragraphs = normalized.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 0);
   
+  // Check for inline numbered lists (like "1. Item 2. Item 3. Item") and split them
+  // This handles cases where numbered items are in the same paragraph
+  const processedParagraphs = [];
+  for (let para of paragraphs) {
+    // First, check if paragraph ends with a colon and might introduce a list
+    // Split on patterns like "Text: 1. Item 2. Item" -> ["Text:", "1. Item 2. Item"]
+    const colonListPattern = /^(.+?:\s*)(\d+\.\s+.+)$/;
+    const colonMatch = para.match(colonListPattern);
+    
+    if (colonMatch && colonMatch[2]) {
+      // Split the intro from the list
+      processedParagraphs.push(colonMatch[1].trim());
+      para = colonMatch[2]; // Continue processing the list part
+    }
+    
+    // Look for patterns like "1. Text 2. Text 3. Text" or "1. **Bold:** Text 2. **Bold:** Text"
+    // Match: number followed by period, optional space, optional bold text, then content
+    const inlineListPattern = /(\d+)\.\s+(\*\*[^*]+\*\*:?\s*)?([^0-9]+?)(?=\s+\d+\.|$)/g;
+    const matches = [...para.matchAll(inlineListPattern)];
+    
+    if (matches.length >= 2) {
+      // This looks like an inline numbered list, split it
+      let lastIndex = 0;
+      for (const match of matches) {
+        // Add any text before the first match
+        if (match.index > lastIndex) {
+          const beforeText = para.substring(lastIndex, match.index).trim();
+          if (beforeText.length > 0) {
+            processedParagraphs.push(beforeText);
+          }
+        }
+        
+        // Add the list item
+        const itemText = match[0].trim();
+        processedParagraphs.push(itemText);
+        lastIndex = match.index + match[0].length;
+      }
+      
+      // Add any remaining text
+      if (lastIndex < para.length) {
+        const remaining = para.substring(lastIndex).trim();
+        if (remaining.length > 0) {
+          processedParagraphs.push(remaining);
+        }
+      }
+    } else {
+      // Not an inline list, keep as-is
+      processedParagraphs.push(para);
+    }
+  }
+  paragraphs = processedParagraphs;
+  
   // If we only have one paragraph and it's very long, try to split it intelligently
   // Look for sentence boundaries after a certain length
   if (paragraphs.length === 1 && paragraphs[0].length > 150) {
@@ -201,7 +253,8 @@ export function formatMessageContent(text) {
     // Check if this paragraph is a list
     const firstLine = lines[0];
     const ulMatch = firstLine.match(/^[\-\*] (.+)$/);
-    const olMatch = firstLine.match(/^(\d+)\. (.+)$/);
+    // Match numbered lists: "1. Text" or "1. **Bold:** Text" (with optional bold prefix)
+    const olMatch = firstLine.match(/^(\d+)\.\s+(\*\*[^*]+\*\*:?\s*)?(.+)$/);
     
     if (ulMatch || olMatch) {
       flushList();
@@ -210,27 +263,85 @@ export function formatMessageContent(text) {
       inList = true;
       
       for (const line of lines) {
-        const itemMatch = isOrdered ? line.match(/^\d+\. (.+)$/) : line.match(/^[\-\*] (.+)$/);
-        if (itemMatch) {
-          let itemText = escapeHtml(itemMatch[1]);
-          // Check for bold in list items
-          const boldMatch = itemText.match(/^\*\*([^*]+)\*\*(.+)$/);
-          if (boldMatch) {
-            listItems.push(`<li><strong>${boldMatch[1]}</strong>${boldMatch[2]}</li>`);
-          } else {
-            // Convert any remaining bold markers
+        if (isOrdered) {
+          // Match numbered list items with optional bold prefix
+          const itemMatch = line.match(/^(\d+)\.\s+(\*\*[^*]+\*\*:?\s*)?(.+)$/);
+          if (itemMatch) {
+            const boldPart = itemMatch[2] || '';
+            const content = itemMatch[3] || '';
+            let itemText = escapeHtml(content);
+            
+            // Handle bold prefix
+            if (boldPart) {
+              const boldText = boldPart.replace(/\*\*/g, '').replace(/:?\s*$/, '');
+              const boldEscaped = escapeHtml(boldText);
+              itemText = `<strong>${boldEscaped}:</strong> ${itemText}`;
+            }
+            
+            // Convert any remaining bold markers in content
             itemText = itemText.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
             listItems.push(`<li>${itemText}</li>`);
+          }
+        } else {
+          const itemMatch = line.match(/^[\-\*] (.+)$/);
+          if (itemMatch) {
+            let itemText = escapeHtml(itemMatch[1]);
+            // Check for bold in list items
+            const boldMatch = itemText.match(/^\*\*([^*]+)\*\*(.+)$/);
+            if (boldMatch) {
+              listItems.push(`<li><strong>${boldMatch[1]}</strong>${boldMatch[2]}</li>`);
+            } else {
+              // Convert any remaining bold markers
+              itemText = itemText.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+              listItems.push(`<li>${itemText}</li>`);
+            }
           }
         }
       }
       continue;
     }
-
+    
     // Regular paragraph - check if it has a headline
     flushList();
     const fullText = lines.join(' ');
     const escaped = escapeHtml(fullText);
+    
+    // Also check if the paragraph contains inline numbered list items
+    // Pattern: "1. Text 2. Text 3. Text" (items separated by spaces)
+    const inlineNumberedListPattern = /^(.+?:\s*)?((?:\d+\.\s+[^0-9]+(?:\s+\d+\.\s+[^0-9]+)*)+)$/;
+    const inlineMatch = fullText.match(inlineNumberedListPattern);
+    if (inlineMatch && inlineMatch[2]) {
+      listType = 'ol';
+      inList = true;
+      
+      // Add intro text if present
+      if (inlineMatch[1]) {
+        const introText = escapeHtml(inlineMatch[1].trim());
+        result.push(`<p class="chat-message__paragraph">${introText}</p>`);
+      }
+      
+      // Extract list items
+      const listItemsText = inlineMatch[2];
+      const itemPattern = /(\d+)\.\s+(\*\*[^*]+\*\*:?\s*)?([^0-9]+?)(?=\s+\d+\.|$)/g;
+      let itemMatch;
+      while ((itemMatch = itemPattern.exec(listItemsText)) !== null) {
+        const boldPart = itemMatch[2] || '';
+        const content = itemMatch[3] || '';
+        let itemText = escapeHtml(content.trim());
+        
+        // Handle bold prefix
+        if (boldPart) {
+          const boldText = boldPart.replace(/\*\*/g, '').replace(/:?\s*$/, '');
+          const boldEscaped = escapeHtml(boldText);
+          itemText = `<strong>${boldEscaped}:</strong> ${itemText}`;
+        }
+        
+        // Convert any remaining bold markers
+        itemText = itemText.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        listItems.push(`<li>${itemText}</li>`);
+      }
+      continue;
+    }
     
     // Check for markdown bold at start
     const markdownBoldMatch = escaped.match(/^\*\*([^*]+)\*\*\s*(.+)$/);
@@ -283,6 +394,9 @@ export function formatMessageContent(text) {
   }
 
   flushList();
-  return result.join('');
+  
+  // Add spacing between elements for better readability
+  // Join with newlines to ensure proper spacing
+  return result.join('\n');
 }
 

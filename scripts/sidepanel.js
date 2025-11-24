@@ -910,20 +910,64 @@ if (chrome?.runtime?.onMessage) {
       }
       
       // Wait for sideChat module to load before using it
-      sideChatLoadPromise.then(() => {
-        // IMPORTANT: Open the Side Chat section FIRST before sending the message
-        // This ensures the user can see the interaction happening
-        openSideChatSection();
+      sideChatLoadPromise.then(async () => {
+        // CRITICAL: Use the text from currentState.pendingSideChat as the source of truth
+        // This ensures we have the latest data, even if message.text is stale
+        const textToSend = currentState.pendingSideChat?.text || message.text;
         
-        // Wait for DOM to update and section to expand, then send the message
-        // We need enough time for the section to visually open
-        // IMPORTANT: startFresh=true creates a new conversation each time Elaborate is pressed
-        setTimeout(() => {
-          triggerAutoSideChat(currentState, message.text, {
-            fromPending: Boolean(message.clearPending),
-            startFresh: true // Always start a fresh conversation when Elaborate button is pressed
-          }, { saveState });
-        }, 200);
+        if (!textToSend || !textToSend.trim()) {
+          console.error("[Prompanion Sidepanel] PROMPANION_SIDECHAT_DELIVER: No valid text to send!", {
+            hasPendingSideChat: !!currentState.pendingSideChat,
+            pendingText: currentState.pendingSideChat?.text?.substring(0, 50),
+            messageText: message.text?.substring(0, 50)
+          });
+          return;
+        }
+        
+        console.log("[Prompanion Sidepanel] Sending text to triggerAutoSideChat:", {
+          textLength: textToSend.length,
+          textPreview: textToSend.substring(0, 50),
+          source: currentState.pendingSideChat?.text ? "pendingSideChat" : "message.text"
+        });
+        
+        // IMPORTANT: Open the Side Chat section FIRST and wait for it to be ready
+        // This ensures the user can see the interaction happening
+        const sectionOpened = await openSideChatSection();
+        
+        if (!sectionOpened) {
+          console.warn("[Prompanion Sidepanel] Failed to open side chat section, proceeding anyway");
+        }
+        
+        // Wait for the section to be fully expanded and DOM to be ready
+        // Use a more robust waiting mechanism
+        await new Promise(resolve => {
+          let attempts = 0;
+          const maxAttempts = 20; // 2 seconds max wait
+          const checkReady = () => {
+            attempts++;
+            const sideChatSection = document.getElementById("side-chat-section");
+            const chatMessage = document.getElementById("chat-message");
+            const detailsElement = document.querySelector(".panel__section--chat details");
+            const isExpanded = detailsElement?.open || detailsElement?.classList.contains("is-expanded");
+            
+            if (isExpanded && chatMessage) {
+              console.log("[Prompanion Sidepanel] Side chat section ready after", attempts * 100, "ms");
+              resolve();
+            } else if (attempts >= maxAttempts) {
+              console.warn("[Prompanion Sidepanel] Side chat section not ready after max attempts, proceeding anyway");
+              resolve();
+            } else {
+              setTimeout(checkReady, 100);
+            }
+          };
+          checkReady();
+        });
+        
+        // Now trigger the auto chat - everything should be ready
+        triggerAutoSideChat(currentState, textToSend, {
+          fromPending: Boolean(message.clearPending),
+          startFresh: true // Always start a fresh conversation when Elaborate button is pressed
+        }, { saveState });
       }).catch((error) => {
         console.error("[Prompanion Sidepanel] Failed to load sideChat for PROMPANION_SIDECHAT_DELIVER:", error);
       });

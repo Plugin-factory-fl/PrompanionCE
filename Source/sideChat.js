@@ -443,21 +443,30 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
   }
   
   const { saveState } = dependencies;
-  const snippet = typeof text === "string" ? text.trim() : "";
+  
+  // CRITICAL: Use pendingSideChat.text as the source of truth if available
+  // This ensures we always have the latest text, even if the text parameter is stale
+  const textToUse = stateRef?.pendingSideChat?.text?.trim() || (typeof text === "string" ? text.trim() : "");
+  const snippet = textToUse;
   
   console.log("[Prompanion] triggerAutoSideChat called:", {
     hasText: !!text,
     textLength: text?.length,
+    hasPendingSideChat: !!stateRef?.pendingSideChat?.text,
+    pendingTextLength: stateRef?.pendingSideChat?.text?.length,
     snippetLength: snippet.length,
     hasStateRef: !!stateRef,
     fromPending,
-    startFresh
+    startFresh,
+    textSource: stateRef?.pendingSideChat?.text ? "pendingSideChat" : "parameter"
   });
   
   if (!snippet || !stateRef) {
-    console.warn("[Prompanion] triggerAutoSideChat: Missing snippet or stateRef", {
+    console.error("[Prompanion] triggerAutoSideChat: Missing snippet or stateRef", {
       snippet: snippet?.substring(0, 50),
-      hasStateRef: !!stateRef
+      hasStateRef: !!stateRef,
+      hasPendingSideChat: !!stateRef?.pendingSideChat,
+      pendingText: stateRef?.pendingSideChat?.text?.substring(0, 50)
     });
     return;
   }
@@ -563,12 +572,32 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
   // This prevents race conditions when multiple Elaborate clicks happen quickly
   autoChatInFlight = true;
   try {
-    const textarea = document.getElementById("chat-message");
+    // Wait for DOM to be ready - retry with exponential backoff
+    let textarea = document.getElementById("chat-message");
+    let attempts = 0;
+    const maxAttempts = 30; // 3 seconds max wait
+    
+    while (!textarea && attempts < maxAttempts) {
+      attempts++;
+      const delay = Math.min(100 * attempts, 200); // Exponential backoff, max 200ms
+      await new Promise(resolve => setTimeout(resolve, delay));
+      textarea = document.getElementById("chat-message");
+      
+      if (textarea) {
+        console.log("[Prompanion] Textarea found after", attempts, "attempts");
+        break;
+      }
+    }
+    
     if (textarea) {
       textarea.value = snippet;
+      // Trigger input event to ensure any listeners are notified
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
       console.log("[Prompanion] Set textarea value:", snippet.substring(0, 50) + "...");
     } else {
-      console.warn("[Prompanion] Textarea not found! ID: chat-message");
+      console.error("[Prompanion] Textarea not found after", maxAttempts, "attempts! ID: chat-message");
+      autoChatInFlight = false;
+      return;
     }
     
     // Verify we have the correct active conversation before sending
@@ -650,31 +679,56 @@ export function processPendingSideChat(stateRef, dependencies = {}) {
  * Opens/expands the Side Chat section in the sidepanel
  * @param {number} retries - Number of retry attempts if element not found
  */
-export function openSideChatSection(retries = 5) {
+export async function openSideChatSection(retries = 10) {
   // Safety check: Ensure we're in the correct context
   if (!isInSidepanelContext()) {
     console.warn('[Prompanion] openSideChatSection called outside of sidepanel context');
     return false;
   }
   
-  const chatSection = document.querySelector(".panel__section--chat details");
-  if (chatSection) {
-    if (!chatSection.open) {
-      chatSection.open = true;
-    }
-    // Ensure it's visible
-    setTimeout(() => {
+  // Wait for DOM to be ready with retries
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const chatSection = document.querySelector(".panel__section--chat details");
+    if (chatSection) {
+      if (!chatSection.open) {
+        chatSection.open = true;
+      }
+      
+      // Wait for the section to be fully expanded
+      await new Promise(resolve => {
+        // Check if already expanded
+        if (chatSection.classList.contains("is-expanded") || chatSection.open) {
+          resolve();
+          return;
+        }
+        
+        // Wait for expansion animation
+        const checkExpanded = () => {
+          if (chatSection.classList.contains("is-expanded") || chatSection.open) {
+            resolve();
+          } else {
+            setTimeout(checkExpanded, 50);
+          }
+        };
+        setTimeout(checkExpanded, 50);
+      });
+      
+      // Ensure it's visible
       chatSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }, 50);
-    return true;
-  } else if (retries > 0) {
-    // Retry if DOM not ready yet
-    setTimeout(() => {
-      openSideChatSection(retries - 1);
-    }, 100);
-    return false;
+      
+      // Small delay to ensure DOM is fully updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      return true;
+    }
+    
+    // Wait before retrying
+    if (attempt < retries - 1) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
   }
-  console.warn("[SideChat] Could not find Side Chat section element");
+  
+  console.warn("[SideChat] Could not find Side Chat section element after", retries, "attempts");
   return false;
 }
 

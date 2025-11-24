@@ -473,6 +473,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
         };
         await writeState(nextState);
+        
+        const tabId = await getTabId(sender);
+        if (tabId) {
+          // Open panel FIRST, then send messages
+          await openPanel(tabId);
+          
+          // Wait a bit for panel to initialize before sending messages
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        
+        // Send state push and sidechat deliver messages
         chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState });
         chrome.runtime.sendMessage({
           type: "PROMPANION_SIDECHAT_DELIVER",
@@ -480,11 +491,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           chatHistory: chatHistory, // Pass history to SideChat
           clearPending: true
         });
-
-        const tabId = await getTabId(sender);
-        if (tabId) {
-          await openPanel(tabId);
-        }
+        
         sendResponse?.({ ok: true });
       } catch (error) {
         console.error("[Prompanion Background] PROMPANION_SIDECHAT_REQUEST error:", error);

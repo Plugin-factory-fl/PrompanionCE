@@ -288,14 +288,15 @@ function submitSelectionToSideChat(text) {
   if (!snippet || selectionAskInFlight) return;
   selectionAskInFlight = true;
   try {
-    // Chat history capture DISABLED - always send empty array to avoid issues
-    const chatHistory = [];
-    
     AdapterBase.sendMessage({ 
       type: "PROMPANION_SIDECHAT_REQUEST", 
       text: snippet,
       chatHistory: chatHistory 
-    }, (response) => {      if (!response?.ok) {
+    }, (response) => {
+    // Extract chat history from ChatGPT interface (use ChatGPT-specific method for better accuracy)
+    const chatHistory = captureGPTChatHistory(20);
+    console.log("[Prompanion ChatGPT] Sending to side chat with", chatHistory.length, "messages of context");
+      if (!response?.ok) {
         console.warn("Prompanion: sidechat request rejected", response?.reason);
       }
       selectionAskInFlight = false;
