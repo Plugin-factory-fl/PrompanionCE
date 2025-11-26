@@ -233,17 +233,6 @@
             <span class="range-output" data-for="setting-complexity">Medium</span>
           </label>
 
-          <label class="form-field">
-            <span class="form-field__label">OpenAI API Key</span>
-            <input
-              type="password"
-              id="setting-api-key"
-              class="account__input"
-              placeholder="sk-..."
-              autocomplete="off"
-            />
-            <span class="form-field__hint">Stored locally and used for Side Chat</span>
-          </label>
         </div>
         <footer class="modal__footer">
           <button class="btn btn--ghost" value="cancel">Cancel</button>
@@ -269,12 +258,83 @@
           </label>
           <label class="form-field">
             <span class="form-field__label">Password</span>
-            <input type="password" class="account__input" name="password" autocomplete="current-password" required />
+            <div class="account__input-wrapper">
+              <input type="password" class="account__input account__input--password" name="password" id="login-password" autocomplete="current-password" required />
+              <button type="button" class="account__password-toggle" data-target="login-password" aria-label="Show password">Show</button>
+            </div>
           </label>
         </div>
         <footer class="modal__footer account__footer">
-          <button class="btn btn--ghost account__cancel" value="cancel">Cancel</button>
-          <button class="btn btn--primary account__submit" value="login">Log In</button>
+          <div class="account__footer-links">
+            <button type="button" class="account__create-link" id="open-create-account">Create Account</button>
+            <button type="button" class="account__forgot-link" id="forgot-password">Forgot Password?</button>
+          </div>
+          <div class="account__footer-buttons">
+            <button class="btn btn--ghost account__cancel" value="cancel">Cancel</button>
+            <button class="btn btn--primary account__submit" value="login">Log In</button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+
+    <!-- Status Popup Dialog -->
+    <dialog id="status-dialog" class="modal modal--dark status-dialog">
+      <div class="modal__content status-dialog__content">
+        <div class="status-dialog__loading" id="status-loading">
+          <div class="status-dialog__spinner"></div>
+        </div>
+        <div class="status-dialog__success" id="status-success" hidden>
+          <svg class="status-dialog__icon status-dialog__icon--success" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+          </svg>
+          <p class="status-dialog__message">Account Created!</p>
+        </div>
+        <div class="status-dialog__error" id="status-error" hidden>
+          <svg class="status-dialog__icon status-dialog__icon--error" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+          </svg>
+          <p class="status-dialog__message" id="status-error-message">Account Creation Failed. Check your internet connection. If the issue persists, contact customer support or try again later.</p>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="create-account-dialog" class="modal modal--dark">
+      <form method="dialog" class="modal__content" id="create-account-form">
+        <header class="modal__header">
+          <h2>Create Prompanion Account</h2>
+          <button class="btn btn--ghost modal__close create-account__cancel" value="cancel" aria-label="Close create account dialog">
+            <svg class="icon icon--close" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7.05 6.34a1 1 0 0 1 1.41 0L12 9.88l3.54-3.54a1 1 0 1 1 1.41 1.41L13.41 11.3l3.54 3.54a1 1 0 0 1-1.41 1.41L12 12.7l-3.54 3.54a1 1 0 0 1-1.41-1.41l3.54-3.54-3.54-3.54a1 1 0 0 1 0-1.41Z" />
+            </svg>
+          </button>
+        </header>
+        <div class="modal__body account__body">
+          <label class="form-field">
+            <span class="form-field__label">Name / Nickname</span>
+            <input type="text" class="account__input" name="name" id="create-account-name" autocomplete="name" />
+          </label>
+          <label class="form-field">
+            <span class="form-field__label">Email</span>
+            <input type="email" class="account__input" name="email" id="create-account-email" autocomplete="email" required />
+          </label>
+          <label class="form-field">
+            <span class="form-field__label">Password</span>
+            <div class="account__input-wrapper">
+              <input type="password" class="account__input account__input--password" name="password" id="create-account-password" autocomplete="new-password" required />
+              <button type="button" class="account__password-toggle" data-target="create-account-password" aria-label="Show password">Show</button>
+            </div>
+          </label>
+          <label class="form-field">
+            <span class="form-field__label">Confirm Password</span>
+            <div class="account__input-wrapper">
+              <input type="password" class="account__input account__input--password" name="confirmPassword" id="create-account-confirm-password" autocomplete="new-password" required />
+              <button type="button" class="account__password-toggle" data-target="create-account-confirm-password" aria-label="Show password">Show</button>
+            </div>
+          </label>
+        </div>
+        <footer class="modal__footer account__footer">
+          <button class="btn btn--ghost create-account__cancel" value="cancel">Cancel</button>
+          <button class="btn btn--primary create-account__submit" value="create">Create Account</button>
         </footer>
       </form>
     </dialog>

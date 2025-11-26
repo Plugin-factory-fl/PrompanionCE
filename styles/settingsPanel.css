@@ -249,7 +249,7 @@ input[type="range"]:focus-visible {
 
 .modal--dark .account__input {
   background: var(--color-surface-light);
-  color: var(--settings-text-inverse);
+  color: #000000;
   box-shadow: 0 8px 20px rgba(5, 7, 13, 0.2);
 }
 
