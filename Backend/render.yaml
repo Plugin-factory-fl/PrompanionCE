@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: prompanion-backend
+    env: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: prompanion-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: chrome-extension://*
+
+databases:
+  - name: prompanion-db
+    plan: starter
+    databaseName: prompanion
+    user: prompanion_user
+
