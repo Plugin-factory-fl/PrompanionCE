@@ -15,7 +15,7 @@ const router = express.Router();
  */
 router.post('/register', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, name } = req.body;
 
     // Validation
     if (!email || !password) {
@@ -39,8 +39,8 @@ router.post('/register', async (req, res) => {
     // Hash password and create user
     const hashedPassword = await hashPassword(password);
     const result = await query(
-      'INSERT INTO users (email, password_hash, created_at) VALUES ($1, $2, NOW()) RETURNING id, email, created_at',
-      [email.toLowerCase(), hashedPassword]
+      'INSERT INTO users (email, password_hash, name, created_at) VALUES ($1, $2, $3, NOW()) RETURNING id, email, name, created_at',
+      [email.toLowerCase(), hashedPassword, name || null]
     );
 
     const user = result.rows[0];
@@ -53,7 +53,8 @@ router.post('/register', async (req, res) => {
       token,
       user: {
         id: user.id,
-        email: user.email
+        email: user.email,
+        name: user.name
       }
     });
   } catch (error) {
