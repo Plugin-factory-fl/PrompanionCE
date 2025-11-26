@@ -3,7 +3,8 @@ services:
     name: prompanion-backend
     env: node
     plan: starter
-    buildCommand: npm install && npm run build
+    rootDir: Backend
+    buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: NODE_ENV
