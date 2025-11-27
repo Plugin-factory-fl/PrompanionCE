@@ -283,19 +283,142 @@ function updateSelectionToolbar() {
   toolbar.classList.add(SELECTION_TOOLBAR_VISIBLE_CLASS);
 }
 
-function submitSelectionToSideChat(text) {
+function captureGPTChatHistory(maxMessages = 20) {
+  const messages = [];
+  
+  try {
+    // ChatGPT-specific selectors
+    const assistantSelector = "[data-message-author-role='assistant'], [data-testid='assistant-turn']";
+    const userSelector = "[data-message-author-role='user'], [data-testid='user-turn']";
+    
+    const assistantElements = Array.from(document.querySelectorAll(assistantSelector));
+    const userElements = Array.from(document.querySelectorAll(userSelector));
+    
+    // Combine and sort by DOM position (maintain conversation order)
+    const allElements = [];
+    assistantElements.forEach(el => {
+      if (el && el.isConnected) {
+        allElements.push({ el, role: 'assistant', position: getElementPosition(el) });
+      }
+    });
+    userElements.forEach(el => {
+      if (el && el.isConnected) {
+        allElements.push({ el, role: 'user', position: getElementPosition(el) });
+      }
+    });
+    
+    // Sort by position in document (top to bottom)
+    allElements.sort((a, b) => a.position - b.position);
+    
+    for (const { el, role } of allElements) {
+      if (messages.length >= maxMessages) break;
+      
+      // Extract content using multiple strategies
+      const contentSelectors = [
+        "[data-message-content]",
+        ".markdown",
+        ".prose",
+        "[class*='markdown']",
+        "div[class*='text']"
+      ];
+      
+      let content = null;
+      for (const selector of contentSelectors) {
+        const contentEl = el.querySelector(selector);
+        if (contentEl) {
+          content = (contentEl.innerText || contentEl.textContent)?.trim();
+          if (content && content.length > 0) break;
+        }
+      }
+      
+      // Fallback: get text from element itself, but filter out UI elements
+      if (!content) {
+        const textNodes = [];
+        const walker = document.createTreeWalker(
+          el,
+          NodeFilter.SHOW_TEXT,
+          {
+            acceptNode: (node) => {
+              const parent = node.parentElement;
+              if (parent && (
+                parent.tagName === "BUTTON" ||
+                parent.tagName === "INPUT" ||
+                parent.closest("button") ||
+                parent.closest("input")
+              )) {
+                return NodeFilter.FILTER_REJECT;
+              }
+              return NodeFilter.FILTER_ACCEPT;
+            }
+          }
+        );
+        
+        let node;
+        while ((node = walker.nextNode())) {
+          const text = node.textContent?.trim();
+          if (text && text.length > 0) {
+            textNodes.push(text);
+          }
+        }
+        
+        if (textNodes.length > 0) {
+          content = textNodes.join(" ").trim();
+        }
+      }
+      
+      // Final fallback
+      if (!content) {
+        content = (el.innerText || el.textContent)?.trim();
+      }
+      
+      // Clean and validate content
+      if (content) {
+        content = content.replace(/\s+/g, " ").trim();
+        
+        // Filter out very short or UI-only content
+        if (content.length > 3 && !/^(copy|regenerate|thumbs up|thumbs down|share)$/i.test(content)) {
+          messages.push({
+            role: role === 'assistant' ? 'assistant' : 'user',
+            content: content,
+            timestamp: Date.now()
+          });
+        }
+      }
+    }
+    
+    console.log(`[Prompanion] Captured ${messages.length} messages from ChatGPT conversation`);
+    return messages;
+  } catch (error) {
+    console.error("[Prompanion] Error capturing GPT chat history:", error);
+    return [];
+  }
+}
+
+function getElementPosition(element) {
+  let position = 0;
+  let node = element;
+  while (node) {
+    position += node.offsetTop || 0;
+    node = node.offsetParent;
+  }
+  return position;
+}
+
+async function submitSelectionToSideChat(text) {
   const snippet = typeof text === "string" ? text.trim() : "";
   if (!snippet || selectionAskInFlight) return;
   selectionAskInFlight = true;
+  
   try {
     // Chat history capture DISABLED - always send empty array to avoid issues
     const chatHistory = [];
-    
+
     AdapterBase.sendMessage({ 
       type: "PROMPANION_SIDECHAT_REQUEST", 
       text: snippet,
       chatHistory: chatHistory 
-    }, (response) => {      if (!response?.ok) {
+    }, (response) => {
+      if (!response?.ok) {
         console.warn("Prompanion: sidechat request rejected", response?.reason);
       }
       selectionAskInFlight = false;
@@ -337,8 +460,14 @@ function createIcon() {
 function requestPromptEnhancement(promptText) {
   return AdapterBase.sendMessage({ type: "PROMPANION_PREPARE_ENHANCEMENT", prompt: promptText, openPanel: false })
     .catch((error) => {
-      console.warn("Prompanion: enhancement request failed", error);
-      return { ok: false };
+      const errorMessage = error?.message || "";
+      if (errorMessage.includes("Extension context invalidated")) {
+        console.error("[Prompanion ChatGPT] Extension context invalidated - user should reload page");
+        // The notification is already shown by AdapterBase._showContextInvalidatedNotification()
+      } else {
+        console.warn("[Prompanion ChatGPT] Enhancement request failed:", error);
+      }
+      return { ok: false, reason: errorMessage || "UNKNOWN_ERROR" };
     });
 }
 
@@ -700,6 +829,9 @@ function handleRefineButtonClick(e) {
     .then((result) => {
       if (!result || !result.ok) {
         enhanceActionInFlight = false;
+        if (result?.reason === "EXTENSION_CONTEXT_INVALIDATED") {
+          console.error("[Prompanion ChatGPT] Cannot enhance prompt - extension context invalidated. Please reload the page.");
+        }
         return;
       }
       const refinedText = result.optionA && typeof result.optionA === "string" && result.optionA.trim()

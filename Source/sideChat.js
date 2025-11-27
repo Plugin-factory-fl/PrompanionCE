@@ -262,7 +262,7 @@ export async function generateConversationTitle(stateRef, conversation) {
     content: msg.content
   }));
   
-  return generateTitleWithAPI(stateRef.settings.apiKey, contextualMessagesForAPI, fallback);
+  return generateTitleWithAPI(contextualMessagesForAPI, fallback);
 }
 
 /**
@@ -279,7 +279,6 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
   console.log("[Prompanion] StateRef:", {
     hasStateRef: !!stateRef,
     hasSettings: !!stateRef?.settings,
-    hasApiKey: !!stateRef?.settings?.apiKey,
     hasConversations: !!stateRef?.conversations,
     conversationsLength: stateRef?.conversations?.length,
     activeConversationId: stateRef?.activeConversationId
@@ -298,12 +297,6 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
   if (!stateRef.settings) {
     console.error("[Prompanion] stateRef.settings is missing! Initializing...");
     stateRef.settings = {};
-  }
-  
-  if (!stateRef.settings.apiKey) {
-    console.error("[Prompanion] No API key found! Settings:", stateRef.settings);
-    alert("Add your OpenAI API key in settings to use Side Chat.");
-    return stateRef;
   }
 
   // Get the active conversation - ensure we're using the correct one
@@ -345,7 +338,26 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
       console.log("[Prompanion] Chat history context included:", llmChatHistory.length, "messages from LLM conversation");
     }
     
-    const reply = await callOpenAI(stateRef.settings.apiKey, apiMessages, "gpt-3.5-turbo");
+    let reply;
+    try {
+      reply = await callOpenAI(apiMessages, llmChatHistory);
+    } catch (error) {
+      console.error("[Prompanion] Side chat API call failed:", error);
+      const errorMessage = error.message || "Failed to get response";
+      
+      // Check for authentication errors
+      if (errorMessage.includes("No authentication token") || errorMessage.includes("Authentication failed")) {
+        alert("Please log in to your Prompanion account to use Side Chat. Click the account button in the header to log in.");
+        return stateRef;
+      }
+      
+      // Show error message to user
+      const errorMsg = { role: "agent", content: `Error: ${errorMessage}`, timestamp: Date.now() };
+      currentActiveConversation.history.push(errorMsg);
+      renderChat(currentActiveConversation.history);
+      await saveState(stateRef);
+      return stateRef;
+    }
 
     // Re-get the active conversation to ensure we have the latest reference
     const currentActiveConversation = getActiveConversation(stateRef);

@@ -248,16 +248,16 @@ export async function handleEnhance(state, dependencies = {}) {
       throw new Error(response?.reason || "Failed to generate enhancements");
     }
 
-    // Check if API key is missing (fallback prompts were used)
-    const hasApiKey = state.settings?.apiKey?.trim();
-    if (!hasApiKey && (response.optionA?.includes("Refined focus:") || response.optionB?.includes("Refined focus:"))) {
-      const notificationShown = sessionStorage.getItem("prompanion-api-key-notification");
-      if (!notificationShown) {
-        setTimeout(() => {
-          alert("Tip: Add your OpenAI API key in settings for AI-powered prompt enhancements. Currently using basic fallback enhancements.");
-          sessionStorage.setItem("prompanion-api-key-notification", "true");
-        }, 500);
-      }
+    // Check for authentication errors
+    if (response.error === "NO_AUTH_TOKEN" || response.error === "UNAUTHORIZED") {
+      alert("Please log in to your Prompanion account to use AI features. Click the account button in the header to log in.");
+      return state;
+    }
+
+    // Check for limit reached
+    if (response.error === "LIMIT_REACHED") {
+      alert("You have reached your enhancement limit. Please upgrade your plan to continue.");
+      return state;
     }
 
     // Update state with the enhanced prompts

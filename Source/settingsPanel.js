@@ -65,15 +65,11 @@ export function renderSettings(settings) {
   }
   
   const complexityField = document.getElementById("setting-complexity");
-  const apiKeyField = document.getElementById("setting-api-key");
   const modelButtons = document.querySelectorAll(".model-pill");
   const outputTabs = document.querySelectorAll(".form-tab[data-setting='output']");
 
   if (complexityField) {
     complexityField.value = settings.complexity;
-  }
-  if (apiKeyField) {
-    apiKeyField.value = settings.apiKey ?? "";
   }
 
   modelButtons.forEach((button) => {
@@ -120,7 +116,6 @@ export function registerSettingsHandlers(stateRef, dependencies = {}) {
     }
     stateRef.settings = {
       complexity: Number(document.getElementById("setting-complexity").value),
-      apiKey: document.getElementById("setting-api-key").value.trim(),
       model: stateRef.settings.model ?? "chatgpt",
       output: stateRef.settings.output ?? "text"
     };

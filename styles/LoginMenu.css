@@ -8,6 +8,23 @@
   fill: currentColor;
 }
 
+/* Account Dialog Views - Only one should be visible at a time */
+.account__login-view {
+  display: block;
+}
+
+.account__login-view[hidden] {
+  display: none !important;
+}
+
+.account__logged-in-view {
+  display: block;
+}
+
+.account__logged-in-view[hidden] {
+  display: none !important;
+}
+
 /* Account Dialog Body */
 .account__body {
   display: flex;
@@ -213,5 +230,116 @@
   font-size: 14px;
   color: var(--color-text);
   line-height: 1.5;
+}
+
+/* Logged In View */
+.account__logged-in-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.account__logged-in-body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 20px 0;
+}
+
+.account__user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account__logged-in-as {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+.account__logged-in-as span {
+  font-weight: 600;
+}
+
+.account__switch-link {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 120ms ease;
+  text-align: left;
+  width: fit-content;
+}
+
+.account__switch-link:hover {
+  color: var(--color-primary-strong);
+}
+
+.account__switch-link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.account__plan-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.account__plan-label {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text);
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.account__plan-label span {
+  font-weight: 700;
+}
+
+.account__plan-description {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+/* Upgrade Button */
+.btn--upgrade {
+  width: 100%;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease;
+  margin-top: 8px;
+}
+
+.btn--upgrade:hover {
+  background: var(--color-primary-strong);
+  transform: translateY(-1px);
+}
+
+.btn--upgrade:active {
+  transform: translateY(0);
+}
+
+.btn--upgrade:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 

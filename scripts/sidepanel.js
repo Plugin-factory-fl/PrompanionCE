@@ -77,6 +77,7 @@ import {
   registerLibraryHandlers
 } from "../Source/promptLibrary.js";
 import { registerAccountHandlers } from "../Source/LoginMenu.js";
+import { cleanupStorage, getStorageInfo } from "./storageCleanup.js";
 import {
   detailLevelLabels,
   renderSettings,
@@ -97,7 +98,6 @@ const defaultState = {
   library: createDefaultLibrary(),
   settings: {
     complexity: 2,
-    apiKey: "",
     model: "chatgpt",
     output: "text"
   },
@@ -457,12 +457,70 @@ async function loadState() {
   return mergedState;
 }
 
+// Flag to prevent save loops
+let isSaving = false;
+let lastSaveTime = 0;
+const SAVE_DEBOUNCE_MS = 100; // Minimum time between saves
+
 /**
  * Saves application state to storage
  * @param {Object} nextState - State object to save
  */
 async function saveState(nextState) {
-  await storage.set(STATE_KEY, nextState);
+  // Prevent rapid successive saves (rate limiting)
+  const now = Date.now();
+  if (isSaving) {
+    console.log("[Prompanion Sidepanel] Save already in progress, skipping...");
+    return;
+  }
+  if (now - lastSaveTime < SAVE_DEBOUNCE_MS) {
+    console.log("[Prompanion Sidepanel] Save debounced, too soon after last save");
+    return;
+  }
+  
+  isSaving = true;
+  try {
+    await storage.set(STATE_KEY, nextState);
+    lastSaveTime = Date.now();
+  } catch (error) {
+    // Handle extension context invalidated
+    if (error?.message?.includes("Extension context invalidated")) {
+      console.error("[Prompanion Sidepanel] Extension context invalidated during storage.set:", error);
+      showContextInvalidatedNotification();
+      isSaving = false;
+      return; // Silently fail - can't save if context is invalidated
+    }
+    
+    // Handle quota exceeded errors
+    if (error?.message?.includes("quota") || error?.message?.includes("QUOTA_BYTES")) {
+      console.warn("[Prompanion Sidepanel] Storage quota exceeded, running cleanup...");
+      try {
+        const cleanupResult = await cleanupStorage();
+        if (cleanupResult.cleaned) {
+          console.log("[Prompanion Sidepanel] Cleanup saved", cleanupResult.saved, "bytes, retrying save...");
+          // Retry saving after cleanup
+          try {
+            await storage.set(STATE_KEY, nextState);
+            lastSaveTime = Date.now();
+            console.log("[Prompanion Sidepanel] State saved after cleanup");
+          } catch (retryError) {
+            console.error("[Prompanion Sidepanel] Still can't save after cleanup:", retryError);
+            // Don't clear prompts - just fail silently to prevent data loss
+            console.warn("[Prompanion Sidepanel] Save failed, but preserving prompts in memory");
+          }
+        } else {
+          console.error("[Prompanion Sidepanel] Cleanup failed or didn't free enough space");
+        }
+      } catch (cleanupError) {
+        console.error("[Prompanion Sidepanel] Error during cleanup:", cleanupError);
+      }
+    } else {
+      // Re-throw other errors
+      throw error;
+    }
+  } finally {
+    isSaving = false;
+  }
 }
 
 /**
@@ -474,6 +532,126 @@ function renderStatus({ plan, enhancementsUsed, enhancementsLimit, activePlatfor
   document.getElementById("enhancements-count").textContent = enhancementsUsed;
   document.getElementById("enhancements-limit").textContent = enhancementsLimit;
   document.getElementById("active-platform").textContent = activePlatform;
+}
+
+/**
+ * Updates the user status display based on authentication state
+ */
+async function updateUserStatus() {
+  const userStatusEl = document.getElementById("user-status");
+  if (!userStatusEl) return;
+
+  try {
+    // Check if extension context is valid first
+    if (!isExtensionContextValid()) {
+      console.warn("[Prompanion Sidepanel] Extension context invalidated, retrying updateUserStatus in 1 second");
+      setTimeout(() => updateUserStatus(), 1000);
+      return;
+    }
+
+    // Check for auth token in chrome.storage.local with timeout and error handling
+    let result;
+    try {
+      result = await Promise.race([
+        new Promise((resolve, reject) => {
+          try {
+            if (!chrome?.storage?.local) {
+              reject(new Error("chrome.storage.local not available"));
+              return;
+            }
+            chrome.storage.local.get(["authToken"], (items) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else {
+                resolve(items || { authToken: null });
+              }
+            });
+          } catch (error) {
+            reject(error);
+          }
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Storage timeout")), 2000)
+        )
+      ]);
+    } catch (error) {
+      console.warn("[Prompanion Sidepanel] Storage access failed:", error.message);
+      // If context is invalidated, retry later
+      if (error.message?.includes("Extension context invalidated") || 
+          error.message?.includes("message port closed") ||
+          !isExtensionContextValid()) {
+        setTimeout(() => updateUserStatus(), 1000);
+        return;
+      }
+      result = { authToken: null };
+    }
+
+    if (!result.authToken) {
+      userStatusEl.textContent = "Not Logged In";
+      return;
+    }
+
+    // Fetch user profile from backend with timeout
+    const BACKEND_URL = "https://prompanionce.onrender.com";
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/user/profile`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${result.authToken}`,
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        // If token is invalid, clear it and show not logged in
+        if (response.status === 401) {
+          try {
+            chrome.storage.local.remove(["authToken"], () => {
+              console.log("[Prompanion Sidepanel] Auth token removed due to 401");
+            });
+          } catch (error) {
+            console.error("[Prompanion Sidepanel] Error removing auth token:", error);
+          }
+          userStatusEl.textContent = "Not Logged In";
+        } else {
+          console.warn("[Prompanion Sidepanel] Failed to fetch user profile:", response.status, response.statusText);
+          userStatusEl.textContent = "Not Logged In";
+        }
+        return;
+      }
+
+      const data = await response.json();
+      const user = data.user;
+
+      // Display name if available (check for null, undefined, or empty string), otherwise email
+      const userName = user.name?.trim();
+      
+      if (userName && userName.length > 0) {
+        userStatusEl.textContent = userName;
+      } else if (user.email) {
+        userStatusEl.textContent = user.email;
+      } else {
+        userStatusEl.textContent = "Not Logged In";
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.warn("[Prompanion Sidepanel] User profile fetch timed out");
+        userStatusEl.textContent = "Not Logged In";
+      } else {
+        throw fetchError;
+      }
+    }
+  } catch (error) {
+    console.error("[Prompanion Sidepanel] Error updating user status:", error);
+    userStatusEl.textContent = "Not Logged In";
+  }
 }
 
 /**
@@ -510,6 +688,29 @@ function registerSectionActionGuards() {
  * Initializes the side panel application
  */
 async function init() {
+  // SETUP ACCOUNT BUTTON IMMEDIATELY - before anything else
+  console.log("[Prompanion Sidepanel] ========== SETTING UP ACCOUNT BUTTON IMMEDIATELY ==========");
+  try {
+    const accountButton = document.getElementById("open-account");
+    const accountDialog = document.getElementById("account-dialog");
+    console.log("[Prompanion Sidepanel] Account elements check:", { 
+      hasButton: !!accountButton, 
+      hasDialog: !!accountDialog,
+      buttonId: accountButton?.id,
+      dialogId: accountDialog?.id
+    });
+    
+    if (accountButton && accountDialog) {
+      // DON'T add handlers here - LoginMenu.js will handle the account button click
+      // LoginMenu.js needs to check login status and show the correct view
+      console.log("[Prompanion Sidepanel] Account button found, LoginMenu.js will handle clicks");
+    } else {
+      console.error("[Prompanion Sidepanel] Account button or dialog missing! Button:", !!accountButton, "Dialog:", !!accountDialog);
+    }
+  } catch (error) {
+    console.error("[Prompanion Sidepanel] Error setting up account button:", error);
+  }
+  
   currentState = await loadState();
   
   // SIMPLIFIED: Read prompts directly from storage, bypass merge logic
@@ -611,8 +812,42 @@ async function init() {
   const activeConversation = getActiveConversation(currentState);
 
   renderStatus(currentState);
+  // Update user login status - try immediately and also after delays
+  updateUserStatus();
+  setTimeout(() => updateUserStatus(), 500);
+  setTimeout(() => updateUserStatus(), 2000);
   renderSettings(currentState.settings);
   renderLibrary(currentState.library);
+
+  // Check storage and cleanup if needed - run this more aggressively
+  try {
+    const storageInfo = await getStorageInfo();
+    if (storageInfo) {
+      console.log("[Prompanion Sidepanel] Storage info:", {
+        totalSize: storageInfo.totalSize,
+        stateSize: storageInfo.stateSize,
+        conversations: storageInfo.conversations,
+        libraryFolders: storageInfo.libraryFolders
+      });
+      
+      // Lower threshold - clean up at 70KB instead of 80KB
+      if (storageInfo.totalSize > 70000) {
+        console.warn("[Prompanion Sidepanel] Storage approaching limit (" + storageInfo.totalSize + " bytes), running cleanup...");
+        const cleanupResult = await cleanupStorage();
+        if (cleanupResult.cleaned) {
+          console.log("[Prompanion Sidepanel] Storage cleaned:", cleanupResult.saved, "bytes saved");
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[Prompanion Sidepanel] Error during storage cleanup:", error);
+    // Try cleanup anyway if we can't get info
+    try {
+      await cleanupStorage();
+    } catch (cleanupError) {
+      console.error("[Prompanion Sidepanel] Cleanup also failed:", cleanupError);
+    }
+  }
 
   registerCopyHandlers();
   registerLibraryHandlers(currentState, {
@@ -620,7 +855,49 @@ async function init() {
     LIBRARY_SCHEMA_VERSION
   });
   registerSettingsHandlers(currentState, { saveState });
-  registerAccountHandlers();
+  
+  // Setup account button handler - do this FIRST and independently
+  const setupAccountButtonDirectly = () => {
+    console.log("[Prompanion Sidepanel] ========== SETTING UP ACCOUNT BUTTON ==========");
+    const accountButton = document.getElementById("open-account");
+    const accountDialog = document.getElementById("account-dialog");
+    
+    console.log("[Prompanion Sidepanel] Elements found:", {
+      hasButton: !!accountButton,
+      hasDialog: !!accountDialog,
+      button: accountButton,
+      dialog: accountDialog
+    });
+    
+    if (!accountButton || !accountDialog) {
+      console.error("[Prompanion Sidepanel] Missing elements! Button:", !!accountButton, "Dialog:", !!accountDialog);
+      return false;
+    }
+    
+    // DON'T add handlers here - let LoginMenu.js handle it
+    // The LoginMenu.js handler will check login status and show the correct view
+    console.log("[Prompanion Sidepanel] Account button found, LoginMenu.js will handle clicks");
+    
+    console.log("[Prompanion Sidepanel] Account button handlers attached!");
+    return true;
+  };
+  
+  // Try immediately
+  if (!setupAccountButtonDirectly()) {
+    console.warn("[Prompanion Sidepanel] Initial setup failed, retrying...");
+    setTimeout(() => setupAccountButtonDirectly(), 100);
+    setTimeout(() => setupAccountButtonDirectly(), 500);
+    setTimeout(() => setupAccountButtonDirectly(), 1000);
+  }
+  
+  // Also try registerAccountHandlers (but don't depend on it)
+  try {
+    console.log("[Prompanion Sidepanel] Calling registerAccountHandlers...");
+    registerAccountHandlers();
+    console.log("[Prompanion Sidepanel] registerAccountHandlers completed");
+  } catch (error) {
+    console.error("[Prompanion Sidepanel] Error in registerAccountHandlers (non-fatal):", error);
+  }
   initTabs();
   registerSectionActionGuards();
   
@@ -712,6 +989,33 @@ async function init() {
   }
 }
 
+// Setup account button as early as possible
+function setupAccountButtonEarly() {
+  console.log("[Prompanion Sidepanel] ========== EARLY ACCOUNT BUTTON SETUP ==========");
+  const accountButton = document.getElementById("open-account");
+  const accountDialog = document.getElementById("account-dialog");
+  
+  if (accountButton && accountDialog) {
+    console.log("[Prompanion Sidepanel] Early setup: Found button and dialog");
+    // DON'T add handlers here - LoginMenu.js will handle the account button click
+    // LoginMenu.js needs to check login status and show the correct view
+    console.log("[Prompanion Sidepanel] Early setup complete, LoginMenu.js will handle clicks");
+  } else {
+    console.warn("[Prompanion Sidepanel] Early setup: Elements not found yet");
+  }
+}
+
+// Try immediately if DOM is ready
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", setupAccountButtonEarly);
+} else {
+  setupAccountButtonEarly();
+}
+
+// Also try after a short delay
+setTimeout(setupAccountButtonEarly, 100);
+setTimeout(setupAccountButtonEarly, 500);
+
 document.addEventListener("DOMContentLoaded", init);
 
 // Also listen for visibility changes to refresh prompts when side panel becomes visible
@@ -732,8 +1036,59 @@ document.addEventListener("visibilitychange", () => {
         console.log("[Prompanion Sidepanel] Visibility change - no prompts found in storage");
       }
     });
+    // Update user status when side panel becomes visible
+    updateUserStatus();
   }
 });
+
+// Expose cleanup function globally
+window.cleanupStorage = async function() {
+  console.log("[Prompanion Sidepanel] Manual storage cleanup triggered");
+  try {
+    const info = await getStorageInfo();
+    console.log("[Prompanion Sidepanel] Storage before cleanup:", info);
+    console.log("[Prompanion Sidepanel] Detailed breakdown:", JSON.stringify(info.breakdown, null, 2));
+    const result = await cleanupStorage();
+    console.log("[Prompanion Sidepanel] Cleanup result:", result);
+    const infoAfter = await getStorageInfo();
+    console.log("[Prompanion Sidepanel] Storage after cleanup:", infoAfter);
+    console.log("[Prompanion Sidepanel] Detailed breakdown after:", JSON.stringify(infoAfter.breakdown, null, 2));
+    alert(`Storage cleaned! Saved ${result.saved} bytes.\n\nBefore: ${info.totalSize} bytes\nAfter: ${infoAfter.totalSize} bytes`);
+  } catch (error) {
+    console.error("[Prompanion Sidepanel] Cleanup error:", error);
+    alert("Error during cleanup: " + error.message);
+  }
+};
+
+// Expose storage inspector
+window.inspectStorage = async function() {
+  try {
+    const info = await getStorageInfo();
+    console.log("[Prompanion Sidepanel] ========== STORAGE INSPECTION ==========");
+    console.log("[Prompanion Sidepanel] Total size:", info.totalSize, "bytes");
+    console.log("[Prompanion Sidepanel] State size:", info.stateSize, "bytes");
+    console.log("[Prompanion Sidepanel] Detailed breakdown:", JSON.stringify(info.breakdown, null, 2));
+    console.log("[Prompanion Sidepanel] Conversations:", info.conversations);
+    console.log("[Prompanion Sidepanel] Library folders:", info.libraryFolders);
+    
+    // Get the actual state to see what's in it
+    const result = await chrome.storage.sync.get(STATE_KEY);
+    const state = result[STATE_KEY];
+    if (state) {
+      console.log("[Prompanion Sidepanel] Full state object:", state);
+      console.log("[Prompanion Sidepanel] Conversations details:", state.conversations?.map(c => ({
+        id: c.id,
+        historyLength: c.history?.length || 0,
+        historySize: JSON.stringify(c.history || []).length
+      })));
+    }
+    
+    return info;
+  } catch (error) {
+    console.error("[Prompanion Sidepanel] Inspection error:", error);
+    return null;
+  }
+};
 
 // Expose manual functions for debugging
 window.refreshPrompts = async function() {
@@ -780,6 +1135,16 @@ window.testPrompts = function() {
   }
 };
 
+// Set up storage listener for auth token changes
+if (chrome?.storage?.local?.onChanged) {
+  chrome.storage.local.onChanged.addListener(async (changes, areaName) => {
+    if (areaName === "local" && changes.authToken) {
+      // Update user status when auth token changes
+      updateUserStatus();
+    }
+  });
+}
+
 // Set up storage listener BEFORE init() to catch all changes
 if (chrome?.storage?.onChanged) {
   chrome.storage.onChanged.addListener(async (changes, areaName) => {
@@ -817,7 +1182,8 @@ if (chrome?.storage?.onChanged) {
           console.log("[Prompanion Sidepanel] Calling renderPrompts after storage change");
           renderPrompts(currentState);
           renderStatus(currentState);
-          processPendingSideChat(currentState, { saveState });
+          // Don't call processPendingSideChat here - it can trigger saveState and create a loop
+          // processPendingSideChat(currentState, { saveState });
         } else {
           // Queue for processing after init() completes
           console.log("[Prompanion Sidepanel] Storage change queued for after init");

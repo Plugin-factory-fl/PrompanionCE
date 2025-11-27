@@ -5,6 +5,7 @@
 
 const STATE_KEY = "prompanion-sidepanel-state";
 const storageArea = chrome.storage?.sync;
+const BACKEND_URL = "https://prompanionce.onrender.com";
 
 /**
  * Gets the tab ID from sender or active tab
@@ -248,93 +249,70 @@ function buildSystemPrompt(model, outputType, levelOfDetail) {
 }
 
 /**
- * Generates two enhanced versions of a prompt using OpenAI API
- * @param {string} apiKey - OpenAI API key
+ * Gets the authentication token from storage
+ * @returns {Promise<string|null>} JWT token or null if not found
+ */
+async function getAuthToken() {
+  try {
+    const result = await chrome.storage.local.get("authToken");
+    return result.authToken || null;
+  } catch (error) {
+    console.error("Prompanion: failed to get auth token", error);
+    return null;
+  }
+}
+
+/**
+ * Generates two enhanced versions of a prompt using backend API
  * @param {string} promptText - Original prompt text
  * @param {Object} settings - User settings (model, output, complexity)
  * @returns {Promise<Object>} Object with optionA and optionB enhanced prompts
  */
-async function generateEnhancements(apiKey, promptText, settings = {}) {
+async function generateEnhancements(promptText, settings = {}) {
   const fallbackA = `${promptText}\n\nRefined focus: clarify intent and add a persuasive closing.`;
   const fallbackB = `${promptText}\n\nRefined focus: provide more context and outline clear next steps.`;
 
-  if (!apiKey) {
-    return { optionA: fallbackA, optionB: fallbackB, error: "NO_API_KEY" };
+  const token = await getAuthToken();
+  if (!token) {
+    return { optionA: fallbackA, optionB: fallbackB, error: "NO_AUTH_TOKEN" };
   }
 
-  // Extract settings with defaults
-  const model = settings.model || "chatgpt";
-  const outputType = settings.output || "text";
-  const levelOfDetail = settings.complexity || 2;
-
-  // Build adaptive system prompt based on settings
-  const systemPrompt = buildSystemPrompt(model, outputType, levelOfDetail);
-
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(`${BACKEND_URL}/api/enhance`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`
+        "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        temperature: 0.7,
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt
-          },
-          {
-            role: "user",
-            content: `Enhance this prompt:\n\n${promptText}`
-          }
-        ]
+        prompt: promptText,
+        model: settings.model || "chatgpt",
+        outputType: settings.output || "text",
+        levelOfDetail: settings.complexity || 2
       })
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        errorData = { error: { message: errorText } };
+      const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+      
+      if (response.status === 401) {
+        return { optionA: fallbackA, optionB: fallbackB, error: "UNAUTHORIZED" };
       }
       
-      // Check for quota/billing errors
-      if (errorData.error?.code === "insufficient_quota" || 
-          errorData.error?.type === "insufficient_quota" ||
-          errorText.includes("quota") ||
-          errorText.includes("billing")) {
-        throw new Error("API_QUOTA_EXCEEDED");
+      if (response.status === 403) {
+        return { optionA: fallbackA, optionB: fallbackB, error: "LIMIT_REACHED" };
       }
       
-      throw new Error(errorText);
+      throw new Error(errorData.error || "Failed to enhance prompt");
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content?.trim();
-    if (!content) {
-      return { optionA: fallbackA, optionB: fallbackB, error: "EMPTY_RESPONSE" };
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch (error) {
-      return { optionA: fallbackA, optionB: fallbackB, error: "PARSE_ERROR" };
-    }
-
-    const optionA = typeof parsed.optionA === "string" ? parsed.optionA.trim() : fallbackA;
-    const optionB = typeof parsed.optionB === "string" ? parsed.optionB.trim() : fallbackB;
+    const optionA = typeof data.optionA === "string" ? data.optionA.trim() : fallbackA;
+    const optionB = typeof data.optionB === "string" ? data.optionB.trim() : fallbackB;
     return { optionA, optionB };
   } catch (error) {
     console.error("Prompanion: enhancement generation failed", error);
     const errorMessage = error.message || String(error);
-    if (errorMessage === "API_QUOTA_EXCEEDED") {
-      return { optionA: promptText, optionB: promptText, error: "API_QUOTA_EXCEEDED" };
-    }
     return { optionA: promptText, optionB: promptText, error: "API_ERROR" };
   }
 }
@@ -378,60 +356,42 @@ function buildRegenerateSystemPrompt(model, outputType, levelOfDetail) {
 
 /**
  * Regenerates a single enhanced prompt option by re-wording it for better clarity
- * @param {string} apiKey - OpenAI API key
  * @param {string} currentPrompt - The current enhanced prompt to regenerate
+ * @param {string} option - The option to regenerate ("a" or "b")
  * @param {Object} settings - User settings (model, output, complexity)
  * @returns {Promise<string>} Regenerated prompt text
  */
-async function regenerateEnhancement(apiKey, currentPrompt, settings = {}) {
+async function regenerateEnhancement(currentPrompt, option, settings = {}) {
   const fallback = `${currentPrompt}\n\n(Re-worded for improved clarity and precision.)`;
 
-  if (!apiKey) {
+  const token = await getAuthToken();
+  if (!token) {
     return fallback;
   }
 
-  // Extract settings with defaults
-  const model = settings.model || "chatgpt";
-  const outputType = settings.output || "text";
-  const levelOfDetail = settings.complexity || 2;
-
-  // Build adaptive system prompt for regeneration
-  const systemPrompt = buildRegenerateSystemPrompt(model, outputType, levelOfDetail);
-
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(`${BACKEND_URL}/api/enhance`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`
+        "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        temperature: 0.8,
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt
-          },
-          {
-            role: "user",
-            content: `Re-word this prompt to be more clear and effective:\n\n${currentPrompt}`
-          }
-        ]
+        prompt: currentPrompt,
+        model: settings.model || "chatgpt",
+        outputType: settings.output || "text",
+        levelOfDetail: settings.complexity || 2
       })
     });
 
     if (!response.ok) {
-      throw new Error(await response.text());
+      throw new Error("Failed to regenerate enhancement");
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content?.trim();
-    if (!content) {
-      return fallback;
-    }
-
-    return content;
+    // Return the appropriate option (A or B)
+    const regenerated = option === "a" ? data.optionA : data.optionB;
+    return typeof regenerated === "string" ? regenerated.trim() : fallback;
   } catch (error) {
     console.error("Prompanion: regeneration failed", error);
     return fallback;
@@ -521,60 +481,69 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           typeof message.prompt === "string" ? message.prompt : "";
         console.log("[Prompanion Background] PROMPANION_PREPARE_ENHANCEMENT received, prompt:", promptText);
         const currentState = await readState();
-        const apiKey = currentState.settings?.apiKey;
         const settings = {
           model: currentState.settings?.model || "chatgpt",
           output: currentState.settings?.output || "text",
           complexity: currentState.settings?.complexity || 2
         };
         console.log("[Prompanion Background] Using settings:", settings);
-        const result = await generateEnhancements(apiKey, promptText, settings);
+        const result = await generateEnhancements(promptText, settings);
         const { optionA, optionB, error } = result;
         console.log("[Prompanion Background] Enhancement result - optionA:", optionA, "optionB:", optionB, "error:", error);
-        const nextState = {
-          ...currentState,
-          originalPrompt: promptText,
-          optionA,
-          optionB
-        };
-        console.log("[Prompanion Background] Next state prepared:", { 
-          originalPrompt: nextState.originalPrompt?.substring(0, 50), 
-          optionA: nextState.optionA?.substring(0, 50), 
-          optionB: nextState.optionB?.substring(0, 50) 
-        });
-        await writeState(nextState);
-        console.log("[Prompanion Background] ========== STATE SAVED TO STORAGE ==========");
-        console.log("[Prompanion Background] Verifying state was saved...");
-        const verifyState = await readState();
-        console.log("[Prompanion Background] Verified saved state:", {
-          hasOriginalPrompt: !!verifyState.originalPrompt,
-          hasOptionA: !!verifyState.optionA,
-          hasOptionB: !!verifyState.optionB,
-          originalPrompt: verifyState.originalPrompt?.substring(0, 50),
-          optionA: verifyState.optionA?.substring(0, 50),
-          optionB: verifyState.optionB?.substring(0, 50)
-        });
-        console.log("[Prompanion Background] State saved, sending PROMPANION_STATE_PUSH message");
         
-        // Send message to any listeners (including sidepanel if it's loaded)
-        chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState }, (response) => {
-          if (chrome.runtime.lastError) {
-            // This is normal if sidepanel isn't loaded yet - state is saved to storage
-            console.log("[Prompanion Background] STATE_PUSH message sent (sidepanel may not be loaded yet):", chrome.runtime.lastError.message);
-          } else {
-            console.log("[Prompanion Background] STATE_PUSH message sent successfully");
-          }
-        });
-        
-        if (message.openPanel !== false && !error) {
-          const tabId = await getTabId(sender);
-          if (tabId) {
-            await openPanel(tabId);
-          } else {
-            console.warn("Prompanion: could not toggle panel, no tabId resolved");
+        // Only update state and open panel if there's no error
+        if (!error) {
+          const nextState = {
+            ...currentState,
+            originalPrompt: promptText,
+            optionA,
+            optionB
+          };
+          console.log("[Prompanion Background] Next state prepared:", { 
+            originalPrompt: nextState.originalPrompt?.substring(0, 50), 
+            optionA: nextState.optionA?.substring(0, 50), 
+            optionB: nextState.optionB?.substring(0, 50) 
+          });
+          await writeState(nextState);
+          console.log("[Prompanion Background] ========== STATE SAVED TO STORAGE ==========");
+          console.log("[Prompanion Background] Verifying state was saved...");
+          const verifyState = await readState();
+          console.log("[Prompanion Background] Verified saved state:", {
+            hasOriginalPrompt: !!verifyState.originalPrompt,
+            hasOptionA: !!verifyState.optionA,
+            hasOptionB: !!verifyState.optionB,
+            originalPrompt: verifyState.originalPrompt?.substring(0, 50),
+            optionA: verifyState.optionA?.substring(0, 50),
+            optionB: verifyState.optionB?.substring(0, 50)
+          });
+          console.log("[Prompanion Background] State saved, sending PROMPANION_STATE_PUSH message");
+          
+          // Send message to any listeners (including sidepanel if it's loaded)
+          chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState }, (response) => {
+            if (chrome.runtime.lastError) {
+              // This is normal if sidepanel isn't loaded yet - state is saved to storage
+              console.log("[Prompanion Background] STATE_PUSH message sent (sidepanel may not be loaded yet):", chrome.runtime.lastError.message);
+            } else {
+              console.log("[Prompanion Background] STATE_PUSH message sent successfully");
+            }
+          });
+          
+          if (message.openPanel !== false) {
+            const tabId = await getTabId(sender);
+            if (tabId) {
+              await openPanel(tabId);
+            } else {
+              console.warn("Prompanion: could not toggle panel, no tabId resolved");
+            }
           }
         }
-        sendResponse?.({ ok: !error, optionA, optionB, error });
+        
+        sendResponse?.({ 
+          ok: !error, 
+          optionA, 
+          optionB, 
+          error 
+        });
       } catch (error) {
         console.error("Prompanion: failed to prepare enhancement", error);
         sendResponse?.({ ok: false, reason: error?.message ?? "UNKNOWN", error: "UNKNOWN" });
@@ -595,13 +564,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         const currentState = await readState();
-        const apiKey = currentState.settings?.apiKey;
         const settings = {
           model: currentState.settings?.model || "chatgpt",
           output: currentState.settings?.output || "text",
           complexity: currentState.settings?.complexity || 2
         };
-        const regenerated = await regenerateEnhancement(apiKey, currentPrompt, settings);
+        const option = message.option === "a" ? "a" : message.option === "b" ? "b" : "a";
+        const regenerated = await regenerateEnhancement(currentPrompt, option, settings);
         
         const optionKey = message.option === "a" ? "optionA" : message.option === "b" ? "optionB" : null;
         if (optionKey) {

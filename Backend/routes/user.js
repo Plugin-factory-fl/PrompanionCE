@@ -19,7 +19,7 @@ router.use(authenticate);
 router.get('/profile', async (req, res) => {
   try {
     const result = await query(
-      'SELECT id, email, subscription_status, enhancements_used, enhancements_limit, created_at FROM users WHERE id = $1',
+      'SELECT id, email, name, subscription_status, enhancements_used, enhancements_limit, created_at FROM users WHERE id = $1',
       [req.user.userId]
     );
 

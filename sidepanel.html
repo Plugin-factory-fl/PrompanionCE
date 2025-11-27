@@ -24,7 +24,7 @@
           </div>
         </div>
         <div class="panel__actions">
-          <button class="btn btn--ghost" id="open-account" aria-label="Account">
+          <button class="btn btn--ghost" id="open-account" aria-label="Account" type="button">
             <svg class="icon icon--account" viewBox="0 0 24 24" aria-hidden="true">
               <path
                 d="M12 12c2.761 0 5-2.462 5-5.5S14.761 1 12 1 7 3.462 7 6.5 9.239 12 12 12Zm0 2c-3.033 0-9 1.523-9 4.5V21a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2.5c0-2.977-5.967-4.5-9-4.5Z"
@@ -36,6 +36,8 @@
 
       <section class="panel__section panel__section--status">
         <div class="status-card">
+          <div class="status-card__label">User</div>
+          <div class="status-card__value" id="user-status">Not Logged In</div>
           <div class="status-card__label">Plan</div>
           <div class="status-card__value" id="user-plan">Freemium</div>
         </div>
@@ -242,7 +244,8 @@
     </dialog>
 
     <dialog id="account-dialog" class="modal modal--dark">
-      <form method="dialog" class="modal__content" id="account-form">
+      <!-- Login View (shown when not logged in) -->
+      <form class="modal__content account__login-view" id="account-form">
         <header class="modal__header">
           <h2>Log in to your Prompanion Account</h2>
           <button class="btn btn--ghost modal__close account__cancel" value="cancel" aria-label="Close account dialog">
@@ -271,29 +274,40 @@
           </div>
           <div class="account__footer-buttons">
             <button class="btn btn--ghost account__cancel" value="cancel">Cancel</button>
-            <button class="btn btn--primary account__submit" value="login">Log In</button>
+            <button type="submit" class="btn btn--primary account__submit" value="login">Log In</button>
           </div>
         </footer>
       </form>
+
+      <!-- Logged In View (shown when user is logged in) -->
+      <div class="modal__content account__logged-in-view" id="account-logged-in-view" hidden>
+        <header class="modal__header">
+          <h2>Account</h2>
+          <button class="btn btn--ghost modal__close account__cancel" value="cancel" aria-label="Close account dialog">
+            <svg class="icon icon--close" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7.05 6.34a1 1 0 0 1 1.41 0L12 9.88l3.54-3.54a1 1 0 1 1 1.41 1.41L13.41 11.3l3.54 3.54a1 1 0 0 1-1.41 1.41L12 12.7l-3.54 3.54a1 1 0 0 1-1.41-1.41l3.54-3.54-3.54-3.54a1 1 0 0 1 0-1.41Z" />
+            </svg>
+          </button>
+        </header>
+        <div class="modal__body account__logged-in-body">
+          <div class="account__user-info">
+            <p class="account__logged-in-as">Logged In As: <span id="account-user-name">Loading...</span></p>
+            <button type="button" class="account__switch-link" id="switch-account">Switch accounts?</button>
+          </div>
+          <div class="account__plan-info">
+            <p class="account__plan-label">Current Plan: <span id="account-plan-name">FREE</span></p>
+            <p class="account__plan-description">On the free plan, you can only enhance prompts 10 times and your conversations are limited with the Side Chat. Upgrade now for unlimited enhancements and side chat conversations.</p>
+          </div>
+          <button type="button" class="btn btn--primary btn--upgrade" id="upgrade-button">UPGRADE NOW</button>
+        </div>
+      </div>
     </dialog>
 
     <!-- Status Popup Dialog -->
     <dialog id="status-dialog" class="modal modal--dark status-dialog">
       <div class="modal__content status-dialog__content">
-        <div class="status-dialog__loading" id="status-loading">
+        <div class="status-dialog__loading" id="status-loading" hidden>
           <div class="status-dialog__spinner"></div>
-        </div>
-        <div class="status-dialog__success" id="status-success" hidden>
-          <svg class="status-dialog__icon status-dialog__icon--success" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-          </svg>
-          <p class="status-dialog__message">Account Created!</p>
-        </div>
-        <div class="status-dialog__error" id="status-error" hidden>
-          <svg class="status-dialog__icon status-dialog__icon--error" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-          </svg>
-          <p class="status-dialog__message" id="status-error-message">Account Creation Failed. Check your internet connection. If the issue persists, contact customer support or try again later.</p>
         </div>
       </div>
     </dialog>
