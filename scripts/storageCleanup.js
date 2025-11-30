@@ -91,6 +91,54 @@ export async function cleanupStorage() {
     // Remove unnecessary fields
     delete state.pendingSideChat; // This is temporary data
     delete state.lastEnhancementTime; // Not needed
+    
+    // More aggressive cleanup: truncate prompts if still too large
+    const currentSize = JSON.stringify(state).length;
+    if (currentSize > 7000) { // If still over 7KB, truncate more aggressively
+      console.log("[Prompanion Cleanup] Still too large after initial cleanup, truncating more aggressively...");
+      
+      // Truncate prompts more aggressively
+      if (state.originalPrompt && state.originalPrompt.length > 300) {
+        state.originalPrompt = state.originalPrompt.substring(0, 300);
+      }
+      if (state.optionA && state.optionA.length > 500) {
+        state.optionA = state.optionA.substring(0, 500);
+      }
+      if (state.optionB && state.optionB.length > 500) {
+        state.optionB = state.optionB.substring(0, 500);
+      }
+      
+      // Keep only the most recent 5 conversations
+      if (state.conversations && Array.isArray(state.conversations) && state.conversations.length > 5) {
+        state.conversations = state.conversations.slice(-5);
+      }
+      
+      // Keep only last 5 messages per conversation
+      if (state.conversations && Array.isArray(state.conversations)) {
+        state.conversations = state.conversations.map((conv) => {
+          if (conv.history && Array.isArray(conv.history) && conv.history.length > 5) {
+            conv.history = conv.history.slice(-5);
+          }
+          return conv;
+        });
+      }
+      
+      // Limit library prompts even more
+      if (state.library && Array.isArray(state.library)) {
+        state.library = state.library.map((folder) => {
+          if (folder.prompts && Array.isArray(folder.prompts)) {
+            folder.prompts = folder.prompts.slice(0, 20); // Reduced to 20
+            folder.prompts = folder.prompts.map((prompt) => {
+              if (prompt.text && prompt.text.length > 200) {
+                prompt.text = prompt.text.substring(0, 200);
+              }
+              return prompt;
+            });
+          }
+          return folder;
+        });
+      }
+    }
 
     const sizeAfter = JSON.stringify(state).length;
     console.log("[Prompanion Cleanup] Storage size after cleanup:", sizeAfter, "bytes");

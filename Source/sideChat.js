@@ -504,7 +504,7 @@ function createNewConversation() {
  * @param {Object} options - Options object with fromPending and startFresh flags
  * @param {Object} dependencies - Required dependencies (saveState)
  */
-export async function triggerAutoSideChat(stateRef, text, { fromPending = false, startFresh = false } = {}, dependencies = {}) {
+export async function triggerAutoSideChat(stateRef, text, { fromPending = false, startFresh = false, llmChatHistory = null } = {}, dependencies = {}) {
   // Safety check: Ensure we're in the correct context
   if (!isInSidepanelContext()) {
     console.error('[Prompanion] triggerAutoSideChat called outside of sidepanel context');
@@ -599,16 +599,19 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
     }
   }
 
-  // Extract chat history from pendingSideChat if available
-  const llmChatHistory = Array.isArray(stateRef.pendingSideChat?.chatHistory) 
-    ? stateRef.pendingSideChat.chatHistory 
-    : [];
+  // Use chat history from parameter (passed directly from message, not stored)
+  // Fallback to pendingSideChat for backwards compatibility, but prefer parameter
+  const chatHistoryToUse = Array.isArray(llmChatHistory) && llmChatHistory.length > 0
+    ? llmChatHistory 
+    : (Array.isArray(stateRef.pendingSideChat?.chatHistory) && stateRef.pendingSideChat.chatHistory.length > 0
+        ? stateRef.pendingSideChat.chatHistory 
+        : []);
 
   // Show toast notification if chat history was retrieved
   // Show it after the section is opened and conversation is created
   let toast = null;
-  if (llmChatHistory.length > 0) {
-    console.log("[Prompanion] Chat history retrieved:", llmChatHistory.length, "messages");
+  if (chatHistoryToUse.length > 0) {
+    console.log("[Prompanion] Chat history retrieved:", chatHistoryToUse.length, "messages");
     // Wait a bit for the section to be visible, then show toast
     setTimeout(() => {
       toast = showSideChatToast("Retrieving chat history...", "loading", 0); // Don't auto-remove
@@ -682,11 +685,11 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
       snippetLength: snippet.length,
       hasDependencies: !!dependencies,
       hasSaveState: typeof dependencies?.saveState === 'function',
-      llmChatHistoryLength: llmChatHistory.length
+      chatHistoryLength: chatHistoryToUse.length
     });
     
     try {
-      await sendSideChatMessage(stateRef, snippet, dependencies, llmChatHistory);
+      await sendSideChatMessage(stateRef, snippet, dependencies, chatHistoryToUse);
       console.log("[Prompanion] Message sent successfully");
     } catch (error) {
       console.error("[Prompanion] Error sending message:", error);

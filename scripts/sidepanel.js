@@ -1447,13 +1447,12 @@ if (chrome?.runtime?.onMessage) {
         return;
       }
       
-      // Update currentState with pendingSideChat data from the message
-      // This ensures the chat history is available when triggerAutoSideChat is called
+      // Store only the text snippet (not chat history) - chat history is passed directly in message
       if (message.text) {
         const chatHistoryArray = Array.isArray(message.chatHistory) ? message.chatHistory : [];
         currentState.pendingSideChat = {
           text: message.text,
-          chatHistory: chatHistoryArray,
+          // Don't store chatHistory - it's passed directly in the message
           timestamp: Date.now()
         };
         console.log("[Prompanion Sidepanel] Updated pendingSideChat from PROMPANION_SIDECHAT_DELIVER:", {
@@ -1462,7 +1461,8 @@ if (chrome?.runtime?.onMessage) {
           chatHistoryLength: chatHistoryArray.length,
           chatHistoryIsArray: Array.isArray(chatHistoryArray),
           firstMessageRole: chatHistoryArray[0]?.role,
-          firstMessagePreview: chatHistoryArray[0]?.content?.substring(0, 50)
+          firstMessagePreview: chatHistoryArray[0]?.content?.substring(0, 50),
+          note: "Chat history passed directly in message, not stored"
         });
       } else {
         console.error("[Prompanion Sidepanel] PROMPANION_SIDECHAT_DELIVER has no text!");
@@ -1472,8 +1472,9 @@ if (chrome?.runtime?.onMessage) {
       // Wait for sideChat module to load before using it
       sideChatLoadPromise.then(async () => {
         // CRITICAL: Use the text from currentState.pendingSideChat as the source of truth
-        // This ensures we have the latest data, even if message.text is stale
+        // Chat history comes directly from the message, not from storage
         const textToSend = currentState.pendingSideChat?.text || message.text;
+        const chatHistoryFromMessage = Array.isArray(message.chatHistory) ? message.chatHistory : [];
         
         if (!textToSend || !textToSend.trim()) {
           console.error("[Prompanion Sidepanel] PROMPANION_SIDECHAT_DELIVER: No valid text to send!", {
@@ -1523,10 +1524,11 @@ if (chrome?.runtime?.onMessage) {
           checkReady();
         });
         
-        // Now trigger the auto chat - everything should be ready
+        // Now trigger the auto chat - pass chat history directly from message (not from storage)
         triggerAutoSideChat(currentState, textToSend, {
           fromPending: Boolean(message.clearPending),
-          startFresh: true // Always start a fresh conversation when Elaborate button is pressed
+          startFresh: true, // Always start a fresh conversation when Elaborate button is pressed
+          llmChatHistory: chatHistoryFromMessage // Pass chat history directly from message
         }, { saveState });
       }).catch((error) => {
         console.error("[Prompanion Sidepanel] Failed to load sideChat for PROMPANION_SIDECHAT_DELIVER:", error);

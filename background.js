@@ -48,7 +48,38 @@ async function writeState(nextState) {
   if (!storageArea) {
     return;
   }
-  await storageArea.set({ [STATE_KEY]: nextState });
+  try {
+    await storageArea.set({ [STATE_KEY]: nextState });
+  } catch (error) {
+    // Don't throw - storage failures shouldn't break enhancements
+    // Log the error but continue execution
+    console.error("[Prompanion Background] Failed to save state to storage:", error);
+    
+    // If it's a quota error, try to clean up and retry once
+    if (error?.message?.includes("quota") || error?.message?.includes("QUOTA_BYTES")) {
+      console.warn("[Prompanion Background] Storage quota exceeded, attempting cleanup...");
+      try {
+        // Import cleanup function dynamically
+        const { cleanupStorage } = await import("./scripts/storageCleanup.js");
+        const cleanupResult = await cleanupStorage();
+        if (cleanupResult.cleaned) {
+          console.log("[Prompanion Background] Cleanup completed, retrying save...");
+          // Retry once after cleanup
+          try {
+            await storageArea.set({ [STATE_KEY]: nextState });
+            console.log("[Prompanion Background] State saved after cleanup");
+          } catch (retryError) {
+            console.error("[Prompanion Background] Still can't save after cleanup:", retryError);
+            // Don't throw - enhancement should still work
+          }
+        }
+      } catch (cleanupError) {
+        console.error("[Prompanion Background] Cleanup failed:", cleanupError);
+        // Don't throw - enhancement should still work
+      }
+    }
+    // Don't re-throw - allow enhancement to complete even if storage fails
+  }
 }
 
 chrome.action.onClicked.addListener(async (tab) => {
@@ -427,7 +458,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return;
         }
 
-        // Extract chat history from message (if provided)
+        // Extract chat history from message (if provided) - don't store it, just pass it through
         const chatHistory = Array.isArray(message.chatHistory) ? message.chatHistory : [];
         console.log("[Prompanion Background] Received chat history:", {
           isArray: Array.isArray(message.chatHistory),
@@ -439,17 +470,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           } : null
         });
 
-        const currentState = await readState();
-        const nextState = {
-          ...currentState,
-          pendingSideChat: {
-            text: snippet,
-            chatHistory: chatHistory, // Include chat history for context
-            timestamp: Date.now()
+        // Store only the text snippet, NOT the chat history (to save storage space)
+        let nextState = null;
+        try {
+          const currentState = await readState();
+          nextState = {
+            ...currentState,
+            pendingSideChat: {
+              text: snippet,
+              // Don't store chatHistory - it will be passed directly in the message
+              timestamp: Date.now()
+            }
+          };
+          console.log("[Prompanion Background] Storing pendingSideChat (text only, no chat history)");
+          await writeState(nextState);
+        } catch (error) {
+          // If storage fails (quota exceeded), continue anyway - we'll send the data directly
+          console.warn("[Prompanion Background] Failed to save state (storage may be full), continuing with direct message:", error.message);
+          // Try to get current state for STATE_PUSH, but don't fail if it doesn't work
+          try {
+            nextState = await readState();
+            nextState.pendingSideChat = {
+              text: snippet,
+              timestamp: Date.now()
+            };
+          } catch (readError) {
+            console.warn("[Prompanion Background] Could not read state either, will skip STATE_PUSH:", readError.message);
           }
-        };
-        console.log("[Prompanion Background] Storing pendingSideChat with chatHistory length:", chatHistory.length);
-        await writeState(nextState);
+        }
         
         const tabId = await getTabId(sender);
         if (tabId) {
@@ -460,12 +508,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           await new Promise(resolve => setTimeout(resolve, 200));
         }
         
-        // Send state push and sidechat deliver messages
-        chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState });
+        // Always send the messages directly with chat history - don't store it, just pass it through
+        // This ensures chat history is delivered without using storage space
+        if (nextState) {
+          chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState });
+        }
         chrome.runtime.sendMessage({
           type: "PROMPANION_SIDECHAT_DELIVER",
           text: snippet,
-          chatHistory: chatHistory, // Pass history to SideChat
+          chatHistory: chatHistory, // Pass history directly - not stored, just passed through
           clearPending: true
         });
         
@@ -521,18 +572,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             optionA: nextState.optionA?.substring(0, 50), 
             optionB: nextState.optionB?.substring(0, 50) 
           });
-          await writeState(nextState);
-          console.log("[Prompanion Background] ========== STATE SAVED TO STORAGE ==========");
-          console.log("[Prompanion Background] Verifying state was saved...");
-          const verifyState = await readState();
-          console.log("[Prompanion Background] Verified saved state:", {
-            hasOriginalPrompt: !!verifyState.originalPrompt,
-            hasOptionA: !!verifyState.optionA,
-            hasOptionB: !!verifyState.optionB,
-            originalPrompt: verifyState.originalPrompt?.substring(0, 50),
-            optionA: verifyState.optionA?.substring(0, 50),
-            optionB: verifyState.optionB?.substring(0, 50)
-          });
+          // Try to save state, but don't fail enhancement if storage fails
+          try {
+            await writeState(nextState);
+            console.log("[Prompanion Background] ========== STATE SAVED TO STORAGE ==========");
+          } catch (storageError) {
+            // Log but don't throw - enhancement should still work
+            console.error("[Prompanion Background] Failed to save state, but enhancement completed:", storageError);
+          }
           console.log("[Prompanion Background] State saved, sending PROMPANION_STATE_PUSH message");
           
           // Send message to any listeners (including sidepanel if it's loaded)
