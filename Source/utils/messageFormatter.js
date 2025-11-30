@@ -24,28 +24,27 @@ export function formatMessageContent(text) {
       // First, temporarily replace links with placeholders
       const linkPlaceholders = [];
       let placeholderIndex = 0;
-      const linkPattern = /<a\s+([^>]*)>(.*?)<\/a>/gi;
+      const linkPattern = /<a\s+[^>]*>.*?<\/a>/gi;
       let processedStr = str;
       let match;
       
+      // Find all links and replace with placeholders
       while ((match = linkPattern.exec(str)) !== null) {
         const placeholder = `__LINK_PLACEHOLDER_${placeholderIndex}__`;
         linkPlaceholders.push({
           placeholder,
-          fullMatch: match[0],
-          href: match[1],
-          text: match[2]
+          fullMatch: match[0]
         });
         processedStr = processedStr.replace(match[0], placeholder);
         placeholderIndex++;
       }
       
-      // Escape the processed string
+      // Escape the processed string (which now has placeholders instead of links)
       const div = document.createElement("div");
       div.textContent = processedStr;
       let escaped = div.innerHTML;
       
-      // Restore the link placeholders with their HTML
+      // Restore the link placeholders with their original HTML
       linkPlaceholders.forEach(({ placeholder, fullMatch }) => {
         escaped = escaped.replace(placeholder, fullMatch);
       });
