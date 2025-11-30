@@ -829,7 +829,17 @@ function handleRefineButtonClick(e) {
       if (!result || !result.ok) {
         enhanceActionInFlight = false;
         if (result?.reason === "EXTENSION_CONTEXT_INVALIDATED") {
-          console.error("[Prompanion ChatGPT] Cannot enhance prompt - extension context invalidated. Please reload the page.");
+        console.error("[Prompanion ChatGPT] Cannot enhance prompt - extension context invalidated. Please reload the page.");
+        enhanceTooltipDismissed = true;
+        hideEnhanceTooltip();
+        } else if (result?.error === "LIMIT_REACHED") {
+          // Show upgrade button in tooltip instead of hiding
+          console.log("[Prompanion] Limit reached, showing upgrade button");
+          showUpgradeButtonInTooltip();
+        } else {
+          // Other errors - hide tooltip normally
+          enhanceTooltipDismissed = true;
+          hideEnhanceTooltip();
         }
         return;
       }
