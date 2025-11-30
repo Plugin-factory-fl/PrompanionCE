@@ -144,8 +144,20 @@ router.post('/chat', async (req, res) => {
     }
 
     // Build messages array
+    // chatHistory already includes the system message with context (if provided)
+    // and any previous conversation messages
     const messages = Array.isArray(chatHistory) ? [...chatHistory] : [];
     messages.push({ role: 'user', content: message });
+
+    // Log for debugging
+    console.log(`[API Chat] Received request with ${messages.length} messages in history`);
+    const systemMsg = messages.find(msg => msg.role === 'system');
+    if (systemMsg) {
+      console.log(`[API Chat] System message present (${systemMsg.content.length} chars)`);
+      console.log(`[API Chat] System message preview: ${systemMsg.content.substring(0, 200)}...`);
+    } else {
+      console.log(`[API Chat] No system message found in chatHistory`);
+    }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',

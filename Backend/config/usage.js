@@ -34,6 +34,35 @@ export async function resetDailyUsageIfNeeded(userId) {
     }
 
     const user = checkResult.rows[0];
+    
+    // Get the user's limit to check for data corruption
+    const limitResult = await query(
+      'SELECT enhancements_limit FROM users WHERE id = $1',
+      [userId]
+    );
+    const enhancementsLimit = limitResult.rows[0]?.enhancements_limit || 10;
+    
+    console.log(`[Usage] Reset check for user ${userId}:`, {
+      last_reset_date: user.last_reset_date,
+      enhancements_used: user.enhancements_used,
+      enhancements_limit: enhancementsLimit,
+      needs_reset: user.needs_reset,
+      current_date: new Date().toISOString().split('T')[0]
+    });
+
+    // Safety check: If enhancements_used exceeds limit and last_reset_date is today,
+    // this indicates corrupted data - force a reset
+    const isToday = user.last_reset_date && 
+      new Date(user.last_reset_date).toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+    
+    if (isToday && user.enhancements_used > enhancementsLimit) {
+      console.log(`[Usage] Data corruption detected for user ${userId}: count ${user.enhancements_used} exceeds limit ${enhancementsLimit} but last_reset_date is today. Forcing reset.`);
+      await query(
+        'UPDATE users SET enhancements_used = 0, last_reset_date = CURRENT_DATE WHERE id = $1',
+        [userId]
+      );
+      return true;
+    }
 
     // If reset is needed, update the usage
     if (user.needs_reset) {
@@ -41,9 +70,11 @@ export async function resetDailyUsageIfNeeded(userId) {
         'UPDATE users SET enhancements_used = 0, last_reset_date = CURRENT_DATE WHERE id = $1',
         [userId]
       );
-      console.log(`Daily usage reset for user ${userId} (was ${user.enhancements_used}, now 0)`);
+      console.log(`[Usage] Daily usage reset for user ${userId} (was ${user.enhancements_used}, now 0)`);
       return true; // Reset occurred
     }
+    
+    console.log(`[Usage] No reset needed for user ${userId} - already reset today (count: ${user.enhancements_used})`);
 
     return false; // Already reset today
   } catch (error) {
@@ -59,10 +90,10 @@ export async function resetDailyUsageIfNeeded(userId) {
  */
 export async function getUserUsage(userId) {
   // Reset if needed before fetching
-  await resetDailyUsageIfNeeded(userId);
+  const resetOccurred = await resetDailyUsageIfNeeded(userId);
   
   const result = await query(
-    'SELECT enhancements_used, enhancements_limit, subscription_status FROM users WHERE id = $1',
+    'SELECT enhancements_used, enhancements_limit, subscription_status, last_reset_date FROM users WHERE id = $1',
     [userId]
   );
 
@@ -71,6 +102,13 @@ export async function getUserUsage(userId) {
   }
 
   const user = result.rows[0];
+  console.log(`[Usage] getUserUsage for user ${userId}:`, {
+    enhancementsUsed: user.enhancements_used,
+    enhancementsLimit: user.enhancements_limit,
+    last_reset_date: user.last_reset_date,
+    resetOccurred
+  });
+  
   return {
     enhancementsUsed: user.enhancements_used,
     enhancementsLimit: user.enhancements_limit,

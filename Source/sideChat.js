@@ -196,9 +196,7 @@ function buildChatApiMessages(history, llmChatHistory = []) {
     // Get the user's question (the highlighted text they want to elaborate on)
     const userQuestion = history.find(msg => msg.role === "user")?.content || "";
     
-    messages.push({
-      role: "system",
-      content: `You are helping the user elaborate on a specific part of a conversation they had with an AI assistant. 
+    const systemMessageContent = `You are helping the user elaborate on a specific part of a conversation they had with an AI assistant. 
 
 CRITICAL REQUIREMENTS - YOU MUST FOLLOW THESE:
 1. The user has highlighted text from the conversation below and wants you to elaborate on it
@@ -222,10 +220,22 @@ Your response MUST:
 - Mention specific details, companies, products, or topics from the conversation when relevant
 - ALWAYS conclude by connecting your explanation back to the original context using the format: "In terms of [topic/company/product from context], [your explanation]"
 
-Example: If the conversation mentioned "Samsung" and "200MP camera", and the user highlights "200MP camera", you MUST mention Samsung and conclude with something like "In terms of Samsung's 200MP cameras, they are a unique innovation and Samsung achieved this by..."`
+Example: If the conversation mentioned "Samsung" and "200MP camera", and the user highlights "200MP camera", you MUST mention Samsung and conclude with something like "In terms of Samsung's 200MP cameras, they are a unique innovation and Samsung achieved this by..."`;
+    
+    messages.push({
+      role: "system",
+      content: systemMessageContent
     });
     
     console.log("[Prompanion] Added chat history context to API call:", llmChatHistory.length, "messages");
+    console.log("[Prompanion] System message created with context:", {
+      contextTextLength: contextText.length,
+      contextPreview: contextText.substring(0, 200) + "...",
+      userQuestion: userQuestion.substring(0, 100),
+      systemMessageLength: systemMessageContent.length
+    });
+  } else {
+    console.log("[Prompanion] No LLM chat history provided, skipping context system message");
   }
   
   // Add the SideChat conversation history

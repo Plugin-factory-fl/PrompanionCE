@@ -21,8 +21,8 @@ async function getAuthToken() {
 
 /**
  * Calls the backend chat API
- * @param {Array} messages - Array of message objects with role and content
- * @param {Array} chatHistory - Optional LLM chat history for context
+ * @param {Array} messages - Array of message objects with role and content (already includes system message with context if applicable)
+ * @param {Array} chatHistory - Optional LLM chat history for context (deprecated - messages already includes context)
  * @returns {Promise<string>} The assistant's reply content
  * @throws {Error} If the API call fails
  */
@@ -32,9 +32,19 @@ export async function callOpenAI(messages, chatHistory = []) {
     throw new Error("No authentication token. Please log in.");
   }
 
-  // Combine chat history with current messages
-  const allMessages = [...chatHistory, ...messages];
-  const lastMessage = allMessages[allMessages.length - 1];
+  // messages array already includes the system message with chat history context from buildChatApiMessages
+  // We should use it directly, not mix it with raw chatHistory
+  // The last message is the user's current message
+  const lastMessage = messages[messages.length - 1];
+  
+  // Log for debugging
+  console.log("[Prompanion OpenAI Client] Sending messages to API:", {
+    totalMessages: messages.length,
+    hasSystemMessage: messages.some(msg => msg.role === "system"),
+    systemMessagePreview: messages.find(msg => msg.role === "system")?.content?.substring(0, 100),
+    lastMessageRole: lastMessage?.role,
+    lastMessagePreview: lastMessage?.content?.substring(0, 50)
+  });
 
   const response = await fetch(`${BACKEND_URL}/api/chat`, {
     method: "POST",
@@ -44,7 +54,7 @@ export async function callOpenAI(messages, chatHistory = []) {
     },
     body: JSON.stringify({
       message: lastMessage.content,
-      chatHistory: allMessages.slice(0, -1) // All messages except the last one
+      chatHistory: messages.slice(0, -1) // All messages except the last one (includes system message)
     })
   });
 
