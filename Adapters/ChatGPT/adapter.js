@@ -823,7 +823,7 @@ function handleRefineButtonClick(e) {
   }
   enhanceActionInFlight = true;
   enhanceTooltipDismissed = true;
-  hideEnhanceTooltip();
+  // Don't hide tooltip yet - wait to see if there's a limit error
   console.log("[Prompanion] Requesting prompt enhancement...");
   requestPromptEnhancement(promptText)
     .then((result) => {
@@ -834,6 +834,9 @@ function handleRefineButtonClick(e) {
         }
         return;
       }
+      // Success - hide tooltip and set text
+      enhanceTooltipDismissed = true;
+      hideEnhanceTooltip();
       const refinedText = result.optionA && typeof result.optionA === "string" && result.optionA.trim()
         ? result.optionA.trim() 
         : promptText;
@@ -843,6 +846,8 @@ function handleRefineButtonClick(e) {
     .catch((error) => {
       console.error("Prompanion: refine request threw", error);
       enhanceActionInFlight = false;
+      enhanceTooltipDismissed = true;
+      hideEnhanceTooltip();
     });
 }
 
