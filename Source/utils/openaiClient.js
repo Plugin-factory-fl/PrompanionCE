@@ -73,7 +73,12 @@ export async function callOpenAI(messages, chatHistory = []) {
     throw new Error("Empty reply from API");
   }
   
-  return reply;
+  // Return both the reply and usage data if available
+  return {
+    reply,
+    enhancementsUsed: data.enhancementsUsed,
+    enhancementsLimit: data.enhancementsLimit
+  };
 }
 
 /**
@@ -100,7 +105,8 @@ export async function generateConversationTitle(contextualMessages, fallback = "
       }
     ];
 
-    const summary = await callOpenAI(messages);
+    const result = await callOpenAI(messages);
+    const summary = typeof result === 'string' ? result : result.reply;
     return summary ? summary.slice(0, 60) : fallback.slice(0, 60);
   } catch (error) {
     console.error("Failed to summarize conversation", error);

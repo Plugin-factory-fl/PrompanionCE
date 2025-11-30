@@ -666,6 +666,9 @@ function renderStatus({ plan, enhancementsUsed, enhancementsLimit, activePlatfor
   document.getElementById("active-platform").textContent = activePlatform;
 }
 
+// Expose renderStatus globally so Side Chat can use it
+window.renderStatus = renderStatus;
+
 /**
  * Updates the user status display based on authentication state
  */

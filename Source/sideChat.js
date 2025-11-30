@@ -348,9 +348,9 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
       console.log("[Prompanion] Chat history context included:", llmChatHistory.length, "messages from LLM conversation");
     }
     
-    let reply;
+    let apiResult;
     try {
-      reply = await callOpenAI(apiMessages, llmChatHistory);
+      apiResult = await callOpenAI(apiMessages, llmChatHistory);
     } catch (error) {
       console.error("[Prompanion] Side chat API call failed:", error);
       const errorMessage = error.message || "Failed to get response";
@@ -367,6 +367,53 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
       renderChat(currentActiveConversation.history);
       await saveState(stateRef);
       return stateRef;
+    }
+
+    // Handle both old format (string) and new format (object with reply and usage data)
+    const reply = typeof apiResult === 'string' ? apiResult : apiResult.reply;
+    const enhancementsUsed = typeof apiResult === 'object' ? apiResult.enhancementsUsed : undefined;
+    const enhancementsLimit = typeof apiResult === 'object' ? apiResult.enhancementsLimit : undefined;
+
+    // Update enhancement count if usage data is available
+    if (enhancementsUsed !== undefined && enhancementsLimit !== undefined) {
+      console.log("[Prompanion] Side Chat usage data received:", { enhancementsUsed, enhancementsLimit });
+      // Update state
+      if (stateRef) {
+        stateRef.enhancementsUsed = enhancementsUsed;
+        stateRef.enhancementsLimit = enhancementsLimit;
+      }
+      // Update UI directly
+      const countEl = document.getElementById("enhancements-count");
+      const limitEl = document.getElementById("enhancements-limit");
+      if (countEl) {
+        countEl.textContent = enhancementsUsed;
+        console.log("[Prompanion] Updated enhancements count from Side Chat:", enhancementsUsed);
+      }
+      if (limitEl) {
+        limitEl.textContent = enhancementsLimit;
+      }
+      // Also update via renderStatus if available
+      if (typeof window.renderStatus === 'function') {
+        window.renderStatus({
+          ...stateRef,
+          enhancementsUsed,
+          enhancementsLimit
+        });
+      }
+      // Send message to background script to notify other parts of the extension
+      try {
+        chrome.runtime.sendMessage({ 
+          type: "PROMPANION_USAGE_UPDATE", 
+          enhancementsUsed,
+          enhancementsLimit 
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.log("[Prompanion] Usage update message sent (background may not be listening)");
+          }
+        });
+      } catch (error) {
+        console.warn("[Prompanion] Failed to send usage update message:", error);
+      }
     }
 
     // Re-get the active conversation to ensure we have the latest reference

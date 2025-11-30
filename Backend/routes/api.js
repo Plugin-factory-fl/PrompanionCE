@@ -138,6 +138,34 @@ router.post('/chat', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
+    // Reset daily usage if needed (lazy reset)
+    const resetOccurred = await resetDailyUsageIfNeeded(req.user.userId);
+    if (resetOccurred) {
+      console.log(`[API Chat] Daily reset occurred for user ${req.user.userId} before chat check`);
+    }
+
+    // Check user's subscription status and current usage
+    const userResult = await query(
+      'SELECT subscription_status, enhancements_used, enhancements_limit, last_reset_date FROM users WHERE id = $1',
+      [req.user.userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userResult.rows[0];
+    console.log(`[API Chat] User ${req.user.userId} usage check: ${user.enhancements_used}/${user.enhancements_limit}, last_reset: ${user.last_reset_date}`);
+
+    // Check if user has reached their daily limit
+    if (user.enhancements_used >= user.enhancements_limit) {
+      return res.status(403).json({ 
+        error: 'Daily enhancement limit reached. Your limit will reset tomorrow.',
+        enhancementsUsed: user.enhancements_used,
+        enhancementsLimit: user.enhancements_limit
+      });
+    }
+
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     if (!OPENAI_API_KEY) {
       return res.status(500).json({ error: 'OpenAI API key not configured' });
@@ -183,8 +211,19 @@ router.post('/chat', async (req, res) => {
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content?.trim();
 
+    // Increment user's enhancement count (Side Chat counts as an enhancement)
+    const incrementResult = await query(
+      'UPDATE users SET enhancements_used = enhancements_used + 1 WHERE id = $1 RETURNING enhancements_used',
+      [req.user.userId]
+    );
+    
+    const newCount = incrementResult.rows[0]?.enhancements_used || user.enhancements_used + 1;
+    console.log(`[API Chat] Incremented enhancement count for user ${req.user.userId}: ${user.enhancements_used} -> ${newCount}`);
+
     res.json({
-      message: content || 'No response generated'
+      message: content || 'No response generated',
+      enhancementsUsed: newCount, // Include updated count in response
+      enhancementsLimit: user.enhancements_limit
     });
   } catch (error) {
     console.error('Chat error:', error);
