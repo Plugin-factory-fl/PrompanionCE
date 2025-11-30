@@ -928,8 +928,61 @@ function showEnhanceTooltip() {
 
 function hideEnhanceTooltip() {
   if (!enhanceTooltipElement) return;
+  // Don't hide if it's showing upgrade button
+  if (enhanceTooltipElement.classList.contains("show-upgrade")) {
+    return;
+  }
   enhanceTooltipElement.classList.remove("is-visible");
   detachTooltipResizeHandler();
+}
+
+function showUpgradeButtonInTooltip() {
+  // Ensure tooltip element exists and is visible
+  if (!enhanceTooltipElement) {
+    ensureEnhanceTooltipElement();
+  }
+  if (!enhanceTooltipElement) {
+    console.error("[Prompanion] Cannot show upgrade button - tooltip element not found");
+    return;
+  }
+  
+  // Make sure tooltip is visible first
+  if (!enhanceTooltipElement.classList.contains("is-visible")) {
+    enhanceTooltipElement.classList.add("is-visible");
+    positionEnhanceTooltip();
+    attachTooltipResizeHandler();
+  }
+  
+  // Remove dismiss button if it exists
+  const dismiss = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__dismiss");
+  if (dismiss) {
+    dismiss.remove();
+  }
+  
+  // Change action button to upgrade button
+  const action = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
+  if (action) {
+    // Remove old click handlers by cloning
+    const newAction = action.cloneNode(true);
+    action.replaceWith(newAction);
+    
+    // Update the new button
+    newAction.className = "prompanion-enhance-tooltip__action prompanion-enhance-tooltip__upgrade";
+    AdapterBase.setButtonTextContent(newAction, "Upgrade for more uses!");
+    
+    // Add upgrade click handler
+    newAction.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("[Prompanion] Upgrade button clicked - placeholder for Stripe integration");
+      // TODO: Navigate to Stripe upgrade page
+      // window.open("https://stripe.com/upgrade", "_blank");
+    });
+  }
+  
+  // Add class to prevent auto-hide
+  enhanceTooltipElement.classList.add("show-upgrade");
+  enhanceTooltipDismissed = false; // Reset dismissed flag so tooltip stays visible
 }
 
 function positionEnhanceTooltip() {
