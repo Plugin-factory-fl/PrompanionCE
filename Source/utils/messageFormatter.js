@@ -15,8 +15,45 @@ export function formatMessageContent(text) {
     return "";
   }
 
-  // Escape HTML to prevent XSS
+  // Escape HTML to prevent XSS, but preserve allowed HTML tags (like links)
   const escapeHtml = (str) => {
+    // Check if content already contains HTML tags (like <a> for links)
+    // If so, we'll preserve those tags while escaping the rest
+    if (/<a\s+[^>]*>.*?<\/a>/i.test(str)) {
+      // Content has HTML links - escape everything except the link tags
+      // First, temporarily replace links with placeholders
+      const linkPlaceholders = [];
+      let placeholderIndex = 0;
+      const linkPattern = /<a\s+([^>]*)>(.*?)<\/a>/gi;
+      let processedStr = str;
+      let match;
+      
+      while ((match = linkPattern.exec(str)) !== null) {
+        const placeholder = `__LINK_PLACEHOLDER_${placeholderIndex}__`;
+        linkPlaceholders.push({
+          placeholder,
+          fullMatch: match[0],
+          href: match[1],
+          text: match[2]
+        });
+        processedStr = processedStr.replace(match[0], placeholder);
+        placeholderIndex++;
+      }
+      
+      // Escape the processed string
+      const div = document.createElement("div");
+      div.textContent = processedStr;
+      let escaped = div.innerHTML;
+      
+      // Restore the link placeholders with their HTML
+      linkPlaceholders.forEach(({ placeholder, fullMatch }) => {
+        escaped = escaped.replace(placeholder, fullMatch);
+      });
+      
+      return escaped;
+    }
+    
+    // No HTML tags - escape normally
     const div = document.createElement("div");
     div.textContent = str;
     return div.innerHTML;
