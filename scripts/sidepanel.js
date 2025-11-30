@@ -201,8 +201,8 @@ const storage = {
         showContextInvalidatedNotification();
         return undefined; // Return undefined to allow fallback to defaults
       }
-      const result = await chrome.storage.sync.get(key);
-      return result[key];
+    const result = await chrome.storage.sync.get(key);
+    return result[key];
     } catch (error) {
       // Handle extension context invalidated errors gracefully
       if (error?.message?.includes("Extension context invalidated") || 
@@ -223,7 +223,7 @@ const storage = {
         showContextInvalidatedNotification();
         return; // Silently fail - can't save if context is invalidated
       }
-      await chrome.storage.sync.set({ [key]: value });
+    await chrome.storage.sync.set({ [key]: value });
     } catch (error) {
       // Handle extension context invalidated errors gracefully
       if (error?.message?.includes("Extension context invalidated") || 
@@ -480,7 +480,7 @@ async function saveState(nextState) {
   
   isSaving = true;
   try {
-    await storage.set(STATE_KEY, nextState);
+  await storage.set(STATE_KEY, nextState);
     lastSaveTime = Date.now();
   } catch (error) {
     // Handle extension context invalidated
@@ -527,11 +527,19 @@ async function saveState(nextState) {
  * Fetches user usage data from the backend API
  * @returns {Promise<Object|null>} Usage object with enhancementsUsed and enhancementsLimit, or null if not logged in
  */
-async function fetchUserUsage() {
+async function fetchUserUsage(retryCount = 0) {
+  const MAX_RETRIES = 2;
   try {
     if (!isExtensionContextValid()) {
-      console.warn("[Prompanion Sidepanel] Extension context invalidated, cannot fetch usage");
-      return null;
+      if (retryCount < MAX_RETRIES) {
+        console.warn(`[Prompanion Sidepanel] Extension context invalidated, retrying fetch (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+        // Retry after a delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return fetchUserUsage(retryCount + 1);
+      } else {
+        console.warn("[Prompanion Sidepanel] Extension context invalidated after max retries, returning defaults");
+        return { enhancementsUsed: 0, enhancementsLimit: 10 }; // Return defaults
+      }
     }
 
     // Get auth token
@@ -884,7 +892,7 @@ async function init() {
     
     // Also render multiple times to ensure it sticks
     [100, 500, 1000].forEach(delay => {
-      setTimeout(() => {
+    setTimeout(() => {
         renderPrompts({
           originalPrompt: currentState.originalPrompt,
           optionA: currentState.optionA,
@@ -937,7 +945,7 @@ async function init() {
 
   // Fetch and display real usage data from server
   await updateEnhancementsDisplay();
-  
+
   renderStatus(currentState);
   // Update user login status - try immediately and also after delays
   updateUserStatus();
@@ -1023,7 +1031,7 @@ async function init() {
   // Also try registerAccountHandlers (but don't depend on it)
   try {
     console.log("[Prompanion Sidepanel] Calling registerAccountHandlers...");
-    registerAccountHandlers();
+  registerAccountHandlers();
     console.log("[Prompanion Sidepanel] registerAccountHandlers completed");
   } catch (error) {
     console.error("[Prompanion Sidepanel] Error in registerAccountHandlers (non-fatal):", error);
@@ -1037,17 +1045,17 @@ async function init() {
     const activeConv = getActiveConversation(currentState);
     renderChat(activeConv?.history ?? []);
     renderChatTabs(currentState.conversations, currentState.activeConversationId);
-    registerChatHandlers(currentState, {
-      renderStatus,
-      saveState
-    });
-    
-    // Check if there's a pending side chat message and open section if needed
-    if (currentState.pendingSideChat?.text) {
-      openSideChatSection();
-    }
-    
-    processPendingSideChat(currentState, { saveState });
+  registerChatHandlers(currentState, {
+    renderStatus,
+    saveState
+  });
+  
+  // Check if there's a pending side chat message and open section if needed
+  if (currentState.pendingSideChat?.text) {
+    openSideChatSection();
+  }
+  
+  processPendingSideChat(currentState, { saveState });
     console.log("[Prompanion Sidepanel] Side chat initialized");
   };
   
@@ -1353,6 +1361,41 @@ if (chrome?.runtime?.onMessage) {
     if (!message || typeof message !== "object") {
       return;
     }
+    
+    // Handle usage updates from enhancements (e.g., Refine button)
+    if (message.type === "PROMPANION_USAGE_UPDATE") {
+      console.log("[Prompanion Sidepanel] ========== USAGE UPDATE RECEIVED ==========");
+      console.log("[Prompanion Sidepanel] Usage data:", {
+        enhancementsUsed: message.enhancementsUsed,
+        enhancementsLimit: message.enhancementsLimit
+      });
+      
+      if (message.enhancementsUsed !== undefined && message.enhancementsLimit !== undefined) {
+        // Update state
+        if (currentState) {
+          currentState.enhancementsUsed = message.enhancementsUsed;
+          currentState.enhancementsLimit = message.enhancementsLimit;
+        }
+        // Update UI directly
+        const countEl = document.getElementById("enhancements-count");
+        const limitEl = document.getElementById("enhancements-limit");
+        if (countEl) {
+          countEl.textContent = message.enhancementsUsed;
+          console.log("[Prompanion Sidepanel] Updated enhancements count from message:", message.enhancementsUsed);
+        }
+        if (limitEl) {
+          limitEl.textContent = message.enhancementsLimit;
+        }
+        // Also update via renderStatus
+        renderStatus({
+          ...currentState,
+          enhancementsUsed: message.enhancementsUsed,
+          enhancementsLimit: message.enhancementsLimit
+        });
+      }
+      return;
+    }
+    
     if (message.type === "PROMPANION_STATE_PUSH") {
       if (!currentState) {
         pendingMessages.push(message);
@@ -1383,7 +1426,16 @@ if (chrome?.runtime?.onMessage) {
         textLength: message.text?.length,
         textPreview: message.text?.substring(0, 50),
         hasChatHistory: !!message.chatHistory,
+        chatHistoryIsArray: Array.isArray(message.chatHistory),
         chatHistoryLength: message.chatHistory?.length || 0,
+        chatHistoryType: typeof message.chatHistory,
+        chatHistoryPreview: Array.isArray(message.chatHistory) && message.chatHistory.length > 0 ? {
+          firstMessage: {
+            role: message.chatHistory[0].role,
+            contentPreview: message.chatHistory[0].content?.substring(0, 50)
+          },
+          totalMessages: message.chatHistory.length
+        } : null,
         clearPending: message.clearPending
       });
       
@@ -1395,15 +1447,19 @@ if (chrome?.runtime?.onMessage) {
       // Update currentState with pendingSideChat data from the message
       // This ensures the chat history is available when triggerAutoSideChat is called
       if (message.text) {
+        const chatHistoryArray = Array.isArray(message.chatHistory) ? message.chatHistory : [];
         currentState.pendingSideChat = {
           text: message.text,
-          chatHistory: Array.isArray(message.chatHistory) ? message.chatHistory : [],
+          chatHistory: chatHistoryArray,
           timestamp: Date.now()
         };
         console.log("[Prompanion Sidepanel] Updated pendingSideChat from PROMPANION_SIDECHAT_DELIVER:", {
           hasText: !!message.text,
           textLength: message.text?.length,
-          chatHistoryLength: message.chatHistory?.length || 0
+          chatHistoryLength: chatHistoryArray.length,
+          chatHistoryIsArray: Array.isArray(chatHistoryArray),
+          firstMessageRole: chatHistoryArray[0]?.role,
+          firstMessagePreview: chatHistoryArray[0]?.content?.substring(0, 50)
         });
       } else {
         console.error("[Prompanion Sidepanel] PROMPANION_SIDECHAT_DELIVER has no text!");
@@ -1432,7 +1488,7 @@ if (chrome?.runtime?.onMessage) {
         });
         
         // IMPORTANT: Open the Side Chat section FIRST and wait for it to be ready
-        // This ensures the user can see the interaction happening
+      // This ensures the user can see the interaction happening
         const sectionOpened = await openSideChatSection();
         
         if (!sectionOpened) {

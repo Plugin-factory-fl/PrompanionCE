@@ -419,6 +419,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Return true to keep the message channel open for async response
     (async () => {
       try {
+        console.log("[Prompanion Background] ========== PROMPANION_SIDECHAT_REQUEST RECEIVED ==========");
         const snippet =
           typeof message.text === "string" ? message.text.trim() : "";
         if (!snippet) {
@@ -428,6 +429,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         // Extract chat history from message (if provided)
         const chatHistory = Array.isArray(message.chatHistory) ? message.chatHistory : [];
+        console.log("[Prompanion Background] Received chat history:", {
+          isArray: Array.isArray(message.chatHistory),
+          length: chatHistory.length,
+          hasChatHistory: chatHistory.length > 0,
+          firstMessage: chatHistory[0] ? {
+            role: chatHistory[0].role,
+            contentPreview: chatHistory[0].content?.substring(0, 50)
+          } : null
+        });
 
         const currentState = await readState();
         const nextState = {
@@ -438,6 +448,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             timestamp: Date.now()
           }
         };
+        console.log("[Prompanion Background] Storing pendingSideChat with chatHistory length:", chatHistory.length);
         await writeState(nextState);
         
         const tabId = await getTabId(sender);
@@ -534,6 +545,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
           });
           
+          // If we have usage data from the enhancement, send it to update the sidepanel count
+          if (enhancementsUsed !== undefined && enhancementsLimit !== undefined) {
+            chrome.runtime.sendMessage({ 
+              type: "PROMPANION_USAGE_UPDATE", 
+              enhancementsUsed,
+              enhancementsLimit 
+            }, (response) => {
+              if (chrome.runtime.lastError) {
+                // Sidepanel might not be open, that's okay
+                console.log("[Prompanion Background] Usage update message sent (sidepanel may not be open)");
+              } else {
+                console.log("[Prompanion Background] Usage update message sent successfully");
+              }
+            });
+          }
+          
           if (message.openPanel !== false) {
             const tabId = await getTabId(sender);
             if (tabId) {
@@ -552,6 +579,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           enhancementsUsed, // Pass through usage data
           enhancementsLimit
         });
+        
+        // If enhancement was successful, send a message to update the sidepanel count
+        // This ensures the count updates even if the sidepanel is open
+        if (!error && enhancementsUsed !== undefined) {
+          chrome.runtime.sendMessage({ 
+            type: "PROMPANION_USAGE_UPDATE", 
+            enhancementsUsed,
+            enhancementsLimit 
+          }, (response) => {
+            if (chrome.runtime.lastError) {
+              // Sidepanel might not be open, that's okay
+              console.log("[Prompanion Background] Usage update message sent (sidepanel may not be open)");
+            } else {
+              console.log("[Prompanion Background] Usage update message sent successfully");
+            }
+          });
+        }
       } catch (error) {
         console.error("Prompanion: failed to prepare enhancement", error);
         sendResponse?.({ ok: false, reason: error?.message ?? "UNKNOWN", error: "UNKNOWN" });
