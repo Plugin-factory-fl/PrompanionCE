@@ -953,11 +953,25 @@ function showUpgradeButtonInTooltip() {
     attachTooltipResizeHandler();
   }
   
-  // Remove dismiss button if it exists
-  const dismiss = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__dismiss");
-  if (dismiss) {
-    dismiss.remove();
+  // Remove existing dismiss button if it exists (we'll add a new one)
+  const oldDismiss = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__dismiss");
+  if (oldDismiss) {
+    oldDismiss.remove();
   }
+  
+  // Add dismiss button (X) for closing the upgrade tooltip
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "prompanion-enhance-tooltip__dismiss";
+  dismiss.textContent = "×";
+  dismiss.setAttribute("aria-label", "Dismiss upgrade prompt");
+  dismiss.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    enhanceTooltipDismissed = true;
+    enhanceTooltipElement.classList.remove("show-upgrade");
+    hideEnhanceTooltip();
+  });
   
   // Change action button to upgrade button
   const action = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
