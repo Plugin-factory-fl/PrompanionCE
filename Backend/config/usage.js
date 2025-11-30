@@ -13,26 +13,30 @@ import { query } from './database.js';
  */
 export async function resetDailyUsageIfNeeded(userId) {
   try {
-    // Get current UTC date (YYYY-MM-DD format)
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Get user's current reset date
-    const userResult = await query(
-      'SELECT last_reset_date, enhancements_used FROM users WHERE id = $1',
+    // Use PostgreSQL's CURRENT_DATE for consistency (avoids timezone issues)
+    // Check if last_reset_date is not today using SQL comparison
+    const checkResult = await query(
+      `SELECT 
+        last_reset_date, 
+        enhancements_used,
+        CASE 
+          WHEN last_reset_date IS NULL THEN true
+          WHEN last_reset_date < CURRENT_DATE THEN true
+          ELSE false
+        END as needs_reset
+      FROM users 
+      WHERE id = $1`,
       [userId]
     );
 
-    if (userResult.rows.length === 0) {
+    if (checkResult.rows.length === 0) {
       throw new Error('User not found');
     }
 
-    const user = userResult.rows[0];
-    const lastResetDate = user.last_reset_date 
-      ? new Date(user.last_reset_date).toISOString().split('T')[0]
-      : null;
+    const user = checkResult.rows[0];
 
-    // If last reset date is not today, reset the usage
-    if (lastResetDate !== today) {
+    // If reset is needed, update the usage
+    if (user.needs_reset) {
       await query(
         'UPDATE users SET enhancements_used = 0, last_reset_date = CURRENT_DATE WHERE id = $1',
         [userId]

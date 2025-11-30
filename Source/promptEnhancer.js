@@ -305,7 +305,9 @@ export async function handleEnhance(state, dependencies = {}) {
     }
 
     // Update enhancements display from server after successful enhancement
+    // Add a small delay to ensure database update has completed
     if (dependencies.updateEnhancementsDisplay) {
+      await new Promise(resolve => setTimeout(resolve, 200)); // Wait 200ms for DB update
       await dependencies.updateEnhancementsDisplay();
     }
 
@@ -632,10 +634,27 @@ export function registerEnhanceButton(stateRef, dependencies) {
     return;
   }
 
+  let isProcessing = false; // Prevent multiple simultaneous enhancements
+
   enhanceButton.addEventListener("click", async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    await handleEnhance(stateRef, dependencies);
+    
+    // Prevent multiple clicks while processing
+    if (isProcessing) {
+      console.log("[Prompanion] Enhancement already in progress, ignoring click");
+      return;
+    }
+    
+    isProcessing = true;
+    try {
+      await handleEnhance(stateRef, dependencies);
+    } finally {
+      // Reset flag after a short delay to prevent rapid clicks
+      setTimeout(() => {
+        isProcessing = false;
+      }, 1000);
+    }
   });
 }
 

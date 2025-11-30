@@ -585,6 +585,7 @@ async function fetchUserUsage() {
       }
 
       const data = await response.json();
+      console.log("[Prompanion Sidepanel] Fetched usage data from API:", data);
       return {
         enhancementsUsed: data.enhancementsUsed || 0,
         enhancementsLimit: data.enhancementsLimit || 10
@@ -604,26 +605,41 @@ async function fetchUserUsage() {
   }
 }
 
+// Prevent multiple simultaneous calls to updateEnhancementsDisplay
+let isUpdatingEnhancements = false;
+
 /**
  * Updates the enhancements count display with real data from the server
  */
 async function updateEnhancementsDisplay() {
-  const usage = await fetchUserUsage();
-  if (usage) {
-    // Update currentState
-    if (currentState) {
-      currentState.enhancementsUsed = usage.enhancementsUsed;
-      currentState.enhancementsLimit = usage.enhancementsLimit;
+  // Prevent multiple simultaneous calls
+  if (isUpdatingEnhancements) {
+    console.log("[Prompanion Sidepanel] Enhancement display update already in progress, skipping");
+    return;
+  }
+  
+  isUpdatingEnhancements = true;
+  try {
+    const usage = await fetchUserUsage();
+    if (usage) {
+      // Update currentState
+      if (currentState) {
+        currentState.enhancementsUsed = usage.enhancementsUsed;
+        currentState.enhancementsLimit = usage.enhancementsLimit;
+      }
+      // Update UI
+      const countEl = document.getElementById("enhancements-count");
+      const limitEl = document.getElementById("enhancements-limit");
+      if (countEl) {
+        countEl.textContent = usage.enhancementsUsed;
+        console.log("[Prompanion Sidepanel] Updated enhancements count display:", usage.enhancementsUsed);
+      }
+      if (limitEl) {
+        limitEl.textContent = usage.enhancementsLimit;
+      }
     }
-    // Update UI
-    const countEl = document.getElementById("enhancements-count");
-    const limitEl = document.getElementById("enhancements-limit");
-    if (countEl) {
-      countEl.textContent = usage.enhancementsUsed;
-    }
-    if (limitEl) {
-      limitEl.textContent = usage.enhancementsLimit;
-    }
+  } finally {
+    isUpdatingEnhancements = false;
   }
 }
 
