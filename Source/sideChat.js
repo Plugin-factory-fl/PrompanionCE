@@ -368,16 +368,16 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
           content: 'You used all 10 of your free uses! You\'ll get 10 more tomorrow. If <a href="#" style="text-decoration: underline; color: inherit;" onclick="event.preventDefault(); console.log(\'Upgrade clicked - placeholder for Stripe integration\'); return false;">upgrade now</a> you can get unlimited uses.',
           timestamp: Date.now()
         };
-        currentActiveConversation.history.push(limitMessage);
-        renderChat(currentActiveConversation.history);
+        activeConversation.history.push(limitMessage);
+        renderChat(activeConversation.history);
         await saveState(stateRef);
         return stateRef;
       }
       
       // Show error message to user for other errors
       const errorMsg = { role: "agent", content: `Error: ${errorMessage}`, timestamp: Date.now() };
-      currentActiveConversation.history.push(errorMsg);
-      renderChat(currentActiveConversation.history);
+      activeConversation.history.push(errorMsg);
+      renderChat(activeConversation.history);
       await saveState(stateRef);
       return stateRef;
     }
