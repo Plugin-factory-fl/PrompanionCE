@@ -822,7 +822,6 @@ function handleRefineButtonClick(e) {
     return;
   }
   enhanceActionInFlight = true;
-  enhanceTooltipDismissed = true;
   // Don't hide tooltip yet - wait to see if there's a limit error
   console.log("[Prompanion] Requesting prompt enhancement...");
   requestPromptEnhancement(promptText)
