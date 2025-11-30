@@ -15,6 +15,26 @@ export function formatMessageContent(text) {
     return "";
   }
 
+  // If content contains HTML links, preserve them and return early with minimal processing
+  if (/<a\s+[^>]*>.*?<\/a>/i.test(text)) {
+    // Use a simpler approach: split by link pattern, escape text parts, keep HTML links
+    const linkPattern = /(<a\s+[^>]*>.*?<\/a>)/gi;
+    const parts = text.split(linkPattern);
+    const escapedParts = parts.map(part => {
+      // If this part is a link (matches the pattern), keep it as-is
+      if (/^<a\s+[^>]*>.*?<\/a>$/i.test(part)) {
+        return part;
+      }
+      // Otherwise, escape it
+      const div = document.createElement("div");
+      div.textContent = part;
+      return div.innerHTML;
+    });
+    
+    // Return as a simple paragraph to avoid further processing
+    return `<p class="chat-message__paragraph">${escapedParts.join('')}</p>`;
+  }
+
   // Escape HTML to prevent XSS, but preserve allowed HTML tags (like links)
   const escapeHtml = (str) => {
     // Check if content already contains HTML tags (like <a> for links)

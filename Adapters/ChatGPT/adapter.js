@@ -410,8 +410,20 @@ async function submitSelectionToSideChat(text) {
   selectionAskInFlight = true;
   
   try {
-    // Chat history capture DISABLED - always send empty array to avoid issues
-    const chatHistory = [];
+    // Capture chat history from ChatGPT conversation for context
+    let chatHistory = [];
+    console.log("%c[Prompanion ChatGPT] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
+    try {
+      chatHistory = captureGPTChatHistory(20);
+      console.log(`%c[Prompanion ChatGPT] ✓ Captured ${chatHistory.length} messages`, 
+        chatHistory.length > 0 ? "color: green; font-size: 14px; font-weight: bold;" : "color: red; font-size: 14px; font-weight: bold;");
+      if (chatHistory.length === 0) {
+        console.warn("[Prompanion ChatGPT] ⚠️ No messages found in DOM");
+      }
+    } catch (error) {
+      console.error("[Prompanion ChatGPT] ✗ Failed to capture chat history:", error);
+      chatHistory = [];
+    };
 
     AdapterBase.sendMessage({ 
       type: "PROMPANION_SIDECHAT_REQUEST", 

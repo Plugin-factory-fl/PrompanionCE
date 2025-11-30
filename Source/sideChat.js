@@ -446,7 +446,6 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
     console.log("[Prompanion] Added agent response, final history length:", currentActiveConversation.history.length);
     
     // Auto-generate title if conversation doesn't have one yet or is still "New chat"
-    // Generate after we have at least 1 user message + 1 agent response (2 messages total, excluding welcome)
     const nonWelcomeMessages = currentActiveConversation.history.filter(
       (msg) => !(msg.role === "agent" && msg.content && msg.content.includes("Welcome to the Side Chat"))
     );
@@ -455,19 +454,29 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
       currentActiveConversation.title === "New chat" ||
       currentActiveConversation.title === "Conversation";
     
-    if (needsTitle && nonWelcomeMessages.length >= 2) {
+    // Generate title if we have at least 1 user message and 1 agent response (excluding welcome)
+    const userMessages = nonWelcomeMessages.filter(msg => msg.role === "user");
+    const agentMessages = nonWelcomeMessages.filter(msg => msg.role === "agent");
+    
+    if (needsTitle && userMessages.length >= 1 && agentMessages.length >= 1) {
+      console.log("[Prompanion] Generating title for conversation:", currentActiveConversation.id);
       // Generate title asynchronously (don't wait for it to complete)
       generateConversationTitle(stateRef, currentActiveConversation).then((title) => {
-        if (title && title !== currentActiveConversation.title) {
+        console.log("[Prompanion] Generated title:", title, "for conversation:", currentActiveConversation.id);
+        if (title && title !== currentActiveConversation.title && title !== "Conversation") {
           currentActiveConversation.title = title;
           renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
           saveState(stateRef).catch((error) => {
             console.warn("Failed to save state after title generation:", error);
           });
+        } else {
+          console.log("[Prompanion] Title not updated - title:", title, "current:", currentActiveConversation.title);
         }
       }).catch((error) => {
         console.warn("Failed to generate conversation title:", error);
       });
+    } else {
+      console.log("[Prompanion] Title generation skipped - needsTitle:", needsTitle, "userMessages:", userMessages.length, "agentMessages:", agentMessages.length);
     }
     
     renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
@@ -519,6 +528,44 @@ function createNewConversation() {
       }
     ]
   };
+}
+
+/**
+ * Limits conversations to a maximum of 7, deleting the oldest ones
+ * @param {Object} stateRef - Reference to application state
+ * @returns {boolean} True if conversations were deleted
+ */
+function limitConversationsToMax(stateRef) {
+  const MAX_CONVERSATIONS = 7;
+  if (!stateRef.conversations || stateRef.conversations.length <= MAX_CONVERSATIONS) {
+    return false;
+  }
+  
+  // Sort conversations by timestamp (oldest first)
+  // Extract timestamp from conversation ID (format: "conv-{timestamp}")
+  const sortedConversations = [...stateRef.conversations].sort((a, b) => {
+    const timestampA = Number.parseInt(a.id.match(/^conv-(\d+)$/)?.[1] || "0", 10);
+    const timestampB = Number.parseInt(b.id.match(/^conv-(\d+)$/)?.[1] || "0", 10);
+    return timestampA - timestampB;
+  });
+  
+  // Keep only the most recent MAX_CONVERSATIONS
+  const conversationsToKeep = sortedConversations.slice(-MAX_CONVERSATIONS);
+  const deletedCount = stateRef.conversations.length - conversationsToKeep.length;
+  
+  // Update conversations array
+  stateRef.conversations = conversationsToKeep;
+  
+  // If the active conversation was deleted, switch to the most recent one
+  if (!stateRef.conversations.find(c => c.id === stateRef.activeConversationId)) {
+    stateRef.activeConversationId = stateRef.conversations[stateRef.conversations.length - 1]?.id || null;
+  }
+  
+  if (deletedCount > 0) {
+    console.log(`[Prompanion] Deleted ${deletedCount} oldest conversation(s) to maintain limit of ${MAX_CONVERSATIONS}`);
+  }
+  
+  return deletedCount > 0;
 }
 
 /**
@@ -579,6 +626,8 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
     // Create a completely new conversation with welcome message
     const newConversation = createNewConversation();
     stateRef.conversations.push(newConversation);
+    // Limit conversations to 7, deleting oldest if needed
+    limitConversationsToMax(stateRef);
     stateRef.activeConversationId = newConversation.id;
     
     // Verify we got the correct conversation
@@ -920,6 +969,8 @@ export function registerChatHandlers(stateRef, dependencies = {}) {
       ]
     };
     stateRef.conversations.push(newConversation);
+    // Limit conversations to 7, deleting oldest if needed
+    limitConversationsToMax(stateRef);
     stateRef.activeConversationId = newConversation.id;
     renderChat(newConversation.history);
     renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
@@ -964,6 +1015,8 @@ export function registerChatHandlers(stateRef, dependencies = {}) {
               ]
             };
             stateRef.conversations.push(fresh);
+            // Limit conversations to 7, deleting oldest if needed
+            limitConversationsToMax(stateRef);
             stateRef.activeConversationId = fresh.id;
           }
         }

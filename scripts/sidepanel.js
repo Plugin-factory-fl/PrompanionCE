@@ -927,6 +927,21 @@ async function init() {
     // Create a new conversation only if no fresh one exists
     const newConversation = createNewConversation();
     currentState.conversations.push(newConversation);
+    // Limit conversations to 7, deleting oldest if needed
+    const MAX_CONVERSATIONS = 7;
+    if (currentState.conversations.length > MAX_CONVERSATIONS) {
+      // Sort by timestamp (oldest first) and keep only the most recent 7
+      const sorted = [...currentState.conversations].sort((a, b) => {
+        const timestampA = Number.parseInt(a.id.match(/^conv-(\d+)$/)?.[1] || "0", 10);
+        const timestampB = Number.parseInt(b.id.match(/^conv-(\d+)$/)?.[1] || "0", 10);
+        return timestampA - timestampB;
+      });
+      currentState.conversations = sorted.slice(-MAX_CONVERSATIONS);
+      // If active conversation was deleted, switch to most recent
+      if (!currentState.conversations.find(c => c.id === currentState.activeConversationId)) {
+        currentState.activeConversationId = currentState.conversations[currentState.conversations.length - 1]?.id || null;
+      }
+    }
     currentState.activeConversationId = newConversation.id;
   }
   

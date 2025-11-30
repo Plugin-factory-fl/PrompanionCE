@@ -93,26 +93,33 @@ export async function callOpenAI(messages, chatHistory = []) {
 export async function generateConversationTitle(contextualMessages, fallback = "Conversation") {
   const token = await getAuthToken();
   if (!token) {
+    console.log("[Prompanion] No auth token for title generation, using fallback");
     return fallback.slice(0, 40);
   }
 
   try {
+    // Only use the first few messages to generate title (to avoid token limits)
+    const messagesForTitle = contextualMessages.slice(0, 6);
+    
     const messages = [
       {
         role: "system",
-        content: "You summarize chat conversations in 3-5 words for tabs."
+        content: "Generate a short 3-5 word title for this conversation. Return only the title, nothing else."
       },
       {
         role: "user",
-        content: contextualMessages.map((msg) => `${msg.role}: ${msg.content}`).join("\n")
+        content: messagesForTitle.map((msg) => `${msg.role}: ${msg.content}`).join("\n")
       }
     ];
 
+    console.log("[Prompanion] Calling OpenAI for title generation with", messagesForTitle.length, "messages");
     const result = await callOpenAI(messages);
     const summary = typeof result === 'string' ? result : result.reply;
-    return summary ? summary.slice(0, 60) : fallback.slice(0, 60);
+    const title = summary ? summary.trim().slice(0, 60) : fallback.slice(0, 60);
+    console.log("[Prompanion] Title generation result:", title);
+    return title;
   } catch (error) {
-    console.error("Failed to summarize conversation", error);
+    console.error("[Prompanion] Failed to summarize conversation:", error);
     return fallback.slice(0, 60);
   }
 }
