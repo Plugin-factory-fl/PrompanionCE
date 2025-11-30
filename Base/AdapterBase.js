@@ -816,6 +816,237 @@ class AdapterBase {
     }
     return false;
   }
+  
+  // ============================================================================
+  // Generic Style Loading
+  // ============================================================================
+  
+  /**
+   * Ensures adapter styles are loaded from external CSS file
+   * @param {string} styleId - Optional style element ID (defaults to "prompanion-adapter-styles")
+   * @param {string} cssPath - Optional path to CSS file (defaults to "/styles/AdapterStyles.css")
+   */
+  static ensureStyle(styleId = "prompanion-adapter-styles", cssPath = "/styles/AdapterStyles.css") {
+    let styleElement = document.getElementById(styleId);
+    
+    if (!styleElement) {
+      // Load CSS file from extension
+      if (typeof chrome === "undefined" || !chrome.runtime) {
+        console.error("[AdapterBase] Cannot load styles - chrome.runtime not available");
+        return;
+      }
+      
+      const cssUrl = chrome.runtime.getURL(cssPath);
+      const link = document.createElement("link");
+      link.id = styleId;
+      link.rel = "stylesheet";
+      link.type = "text/css";
+      link.href = cssUrl;
+      document.head.appendChild(link);
+    }
+  }
+  
+  // ============================================================================
+  // Generic Selection Toolbar System
+  // ============================================================================
+  // Provides a reusable selection toolbar that appears when text is selected.
+  // Adapters provide condition functions and action handlers.
+  // ============================================================================
+  
+  static _selectionToolbarElement = null;
+  static _selectionToolbarButton = null;
+  static _selectionToolbarText = "";
+  static _selectionUpdateRaf = null;
+  static _selectionToolbarConfig = null;
+  
+  /**
+   * Initializes the selection toolbar system
+   * @param {Object} config - Configuration object
+   * @param {Function} config.shouldShowToolbar - Function(selection) => boolean - determines if toolbar should show
+   * @param {Function} config.onAction - Function(text) => void - called when toolbar button is clicked
+   * @param {string} config.buttonText - Text for the toolbar button (default: "Elaborate")
+   * @param {string} config.toolbarId - ID for the toolbar element (default: this.SELECTION_TOOLBAR_ID)
+   * @param {string} config.visibleClass - Class for visible state (default: this.SELECTION_TOOLBAR_VISIBLE_CLASS)
+   */
+  static initSelectionToolbar(config) {
+    if (!config || typeof config.shouldShowToolbar !== 'function' || typeof config.onAction !== 'function') {
+      console.error("[AdapterBase] Invalid selection toolbar config - must provide shouldShowToolbar and onAction functions");
+      return;
+    }
+    
+    this._selectionToolbarConfig = {
+      buttonText: config.buttonText || "Elaborate",
+      toolbarId: config.toolbarId || this.SELECTION_TOOLBAR_ID,
+      visibleClass: config.visibleClass || this.SELECTION_TOOLBAR_VISIBLE_CLASS,
+      shouldShowToolbar: config.shouldShowToolbar,
+      onAction: config.onAction
+    };
+    
+    // Set up selection change listener
+    document.addEventListener("selectionchange", () => {
+      this._handleSelectionChange();
+    });
+  }
+  
+  /**
+   * Ensures the selection toolbar element exists
+   * @private
+   */
+  static _ensureSelectionToolbar() {
+    if (this._selectionToolbarElement) return this._selectionToolbarElement;
+    
+    if (!this._selectionToolbarConfig) {
+      console.error("[AdapterBase] Selection toolbar not initialized - call initSelectionToolbar() first");
+      return null;
+    }
+    
+    this.ensureStyle();
+    
+    const toolbar = document.createElement("div");
+    toolbar.id = this._selectionToolbarConfig.toolbarId;
+    
+    const dismiss = document.createElement("button");
+    dismiss.type = "button";
+    dismiss.className = "prompanion-selection-toolbar__dismiss";
+    dismiss.textContent = "×";
+    dismiss.setAttribute("aria-label", "Dismiss");
+    dismiss.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this._hideSelectionToolbar();
+    });
+    
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "prompanion-selection-toolbar__button";
+    button.textContent = this._selectionToolbarConfig.buttonText;
+    button.addEventListener("pointerdown", (e) => e.preventDefault());
+    button.addEventListener("mousedown", (e) => e.stopPropagation());
+    button.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const text = this._selectionToolbarText;
+      this._hideSelectionToolbar();
+      this._selectionToolbarConfig.onAction(text);
+    });
+    
+    toolbar.append(dismiss, button);
+    
+    if (!document.body) {
+      console.error("[AdapterBase] Cannot create selection toolbar: document.body not available");
+      return null;
+    }
+    
+    document.body.append(toolbar);
+    this._selectionToolbarElement = toolbar;
+    this._selectionToolbarButton = button;
+    return toolbar;
+  }
+  
+  /**
+   * Hides the selection toolbar
+   * @private
+   */
+  static _hideSelectionToolbar() {
+    if (this._selectionToolbarElement) {
+      this._selectionToolbarElement.classList.remove(this._selectionToolbarConfig.visibleClass);
+      this._selectionToolbarElement.style.opacity = "";
+      this._selectionToolbarElement.style.pointerEvents = "";
+    }
+    this._selectionToolbarText = "";
+  }
+  
+  /**
+   * Handles selection change events
+   * @private
+   */
+  static _handleSelectionChange() {
+    if (this._selectionUpdateRaf !== null) {
+      return;
+    }
+    this._selectionUpdateRaf = window.requestAnimationFrame(() => {
+      this._selectionUpdateRaf = null;
+      this._updateSelectionToolbar();
+    });
+  }
+  
+  /**
+   * Updates the selection toolbar visibility and position
+   * @private
+   */
+  static _updateSelectionToolbar() {
+    if (!this._selectionToolbarConfig) return;
+    
+    const selection = window.getSelection();
+    const text = selection?.toString().trim();
+    
+    // Use adapter's condition function to determine if toolbar should show
+    if (!selection || selection.isCollapsed || !text || !this._selectionToolbarConfig.shouldShowToolbar(selection)) {
+      this._hideSelectionToolbar();
+      return;
+    }
+    
+    const rangeRect = this.getSelectionRect(selection);
+    if (!rangeRect) {
+      this._hideSelectionToolbar();
+      return;
+    }
+    
+    const toolbar = this._ensureSelectionToolbar();
+    if (!toolbar) {
+      console.error("[AdapterBase] Failed to create selection toolbar");
+      return;
+    }
+    this._selectionToolbarText = text;
+    
+    // Position toolbar BELOW the selection
+    toolbar.classList.remove(this._selectionToolbarConfig.visibleClass);
+    toolbar.style.position = "fixed";
+    toolbar.style.left = "-9999px";
+    toolbar.style.top = "0";
+    toolbar.style.transform = "translate(-50%, 0)";
+    toolbar.style.opacity = "0";
+    toolbar.style.pointerEvents = "none";
+    toolbar.style.display = "flex";
+    
+    // Force reflows for accurate measurement
+    void toolbar.offsetWidth;
+    void toolbar.offsetHeight;
+    
+    let w = toolbar.offsetWidth;
+    let h = toolbar.offsetHeight;
+    
+    if (!w || !h) {
+      void toolbar.offsetWidth;
+      w = toolbar.offsetWidth;
+      h = toolbar.offsetHeight;
+      if (!w || !h) {
+        console.error("[AdapterBase] Toolbar dimensions invalid, cannot position");
+        return;
+      }
+    }
+    
+    const { clientWidth: vw, clientHeight: vh } = document.documentElement;
+    const selectionCenterX = rangeRect.left + rangeRect.width / 2;
+    const selectionBottom = rangeRect.bottom;
+    
+    let left = Math.max(w / 2 + 8, Math.min(vw - w / 2 - 8, selectionCenterX));
+    let top = selectionBottom + 8;
+    
+    const maxTop = vh - h - 8;
+    if (top > maxTop) {
+      top = Math.max(8, rangeRect.top - h - 8);
+      toolbar.style.transform = "translate(-50%, -100%)";
+    } else {
+      toolbar.style.transform = "translate(-50%, 0)";
+    }
+    
+    toolbar.style.left = `${Math.round(left)}px`;
+    toolbar.style.top = `${Math.round(top)}px`;
+    toolbar.style.opacity = "";
+    toolbar.style.pointerEvents = "";
+    toolbar.classList.add(this._selectionToolbarConfig.visibleClass);
+  }
 }
 
 // Export for use in adapters

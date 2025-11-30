@@ -5,9 +5,9 @@
 // This eliminates duplicate listener registrations and provides unified message handling.
 // ============================================================================
 
-console.log("[Prompanion] ========== CLAUDE ADAPTER LOADING ==========");
-console.log("[Prompanion] Timestamp:", new Date().toISOString());
-console.log("[Prompanion] Location:", window.location.href);
+console.log("[Prompanion Deepseek] ========== BOLT ADAPTER LOADING ==========");
+console.log("[Prompanion Deepseek] Timestamp:", new Date().toISOString());
+console.log("[Prompanion Deepseek] Location:", window.location.href);
 
 // Import constants from AdapterBase
 if (typeof AdapterBase === "undefined") {
@@ -15,15 +15,11 @@ if (typeof AdapterBase === "undefined") {
   throw new Error("AdapterBase must be loaded before adapter.js");
 }
 
-const BUTTON_ID = "prompanion-claude-trigger";
-const BUTTON_CLASS = "prompanion-claude-trigger";
+const BUTTON_ID = AdapterBase.BUTTON_ID;
+const BUTTON_CLASS = AdapterBase.BUTTON_CLASS;
 const SELECTION_TOOLBAR_ID = AdapterBase.SELECTION_TOOLBAR_ID;
 const SELECTION_TOOLBAR_VISIBLE_CLASS = AdapterBase.SELECTION_TOOLBAR_VISIBLE_CLASS;
-const HIGHLIGHT_BUTTON_SELECTORS = [
-  // Claude-specific selectors for highlight/select buttons (if they exist)
-  "button[aria-label*='Ask']",
-  "button[aria-label*='ask']"
-];
+const HIGHLIGHT_BUTTON_SELECTORS = AdapterBase.HIGHLIGHT_BUTTON_SELECTORS;
 const BUTTON_SIZE = AdapterBase.BUTTON_SIZE;
 
 console.log("[Prompanion] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
@@ -86,15 +82,14 @@ function getHighlightButton() {
 function nodeInAssistantMessage(node) {
   const element = AdapterBase.getElementFromNode(node);
   if (!element) return false;
-  // Claude uses different structure - look for assistant message containers
-  // Common patterns: data-role, role attributes, or specific class patterns
+  // Deepseek-specific selectors - adjust based on actual DOM structure
   return !!(
     element.closest("[data-role='assistant']") ||
-    element.closest("[role='article']")?.querySelector("[data-role='assistant']") ||
-    element.closest("article")?.querySelector("[data-role='assistant']") ||
-    element.closest("div[data-testid*='message']")?.querySelector("[data-role='assistant']") ||
-    // Fallback: check if parent has assistant-related attributes
-    element.closest("div")?.getAttribute("data-role") === "assistant"
+    element.closest("[class*='assistant']") ||
+    element.closest("[class*='bot']") ||
+    element.closest("[class*='ai-message']") ||
+    element.closest("article[class*='assistant']") ||
+    element.closest("div[class*='message'][class*='assistant']")
   );
 }
 
@@ -122,11 +117,15 @@ function ensureHighlightObserver() {
 function nodeInComposer(node) {
   const element = AdapterBase.getElementFromNode(node);
   if (!element) return false;
+  // Deepseek-specific composer selectors - adjust based on actual DOM structure
   return !!(
-    element.closest("[data-testid='chat-input']") ||
-    element.closest(".tiptap.ProseMirror[contenteditable='true']") ||
-    element.closest("fieldset")?.querySelector("[data-testid='chat-input']") ||
-    element.closest("div[role='textbox'][contenteditable='true']")
+    element.closest("textarea[placeholder*='message']") ||
+    element.closest("textarea[placeholder*='Message']") ||
+    element.closest("input[type='text'][placeholder*='message']") ||
+    element.closest("[contenteditable='true'][role='textbox']") ||
+    element.closest("form[class*='composer']") ||
+    element.closest("div[class*='input']") ||
+    element.closest("div[class*='composer']")
   );
 }
 
@@ -232,7 +231,7 @@ function updateSelectionToolbar() {
   }
   selectionToolbarText = text;
   
-  // Position tooltip BELOW the selection to avoid conflict with Claude's native UI
+  // Position tooltip BELOW the selection to avoid conflict with Deepseek's native button above
   // Measure toolbar dimensions by temporarily positioning offscreen (but keep opacity 0 via class)
   toolbar.classList.remove(SELECTION_TOOLBAR_VISIBLE_CLASS);
   toolbar.style.position = "fixed";
@@ -293,60 +292,18 @@ function updateSelectionToolbar() {
   toolbar.classList.add(SELECTION_TOOLBAR_VISIBLE_CLASS);
 }
 
-function captureClaudeChatHistory(maxMessages = 20) {
-  console.log("%c[Prompanion Claude] ========== captureClaudeChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("[Prompanion Claude] Current URL:", window.location.href);
-  
+function captureDeepseekChatHistory(maxMessages = 20) {
   const messages = [];
   
   try {
-    // Claude-specific selectors
-    const assistantSelectors = [
-      "[data-role='assistant']",
-      "[role='article'][data-role='assistant']",
-      "div[data-role='assistant']",
-      "article[data-role='assistant']",
-      "[class*='assistant'][class*='message']"
-    ];
+    // Deepseek-specific selectors - adjust based on actual DOM structure
+    const assistantSelector = "[data-role='assistant'], [class*='assistant'], [class*='bot'], [class*='ai-message'], article[class*='assistant']";
+    const userSelector = "[data-role='user'], [class*='user'], [class*='human'], article[class*='user']";
     
-    const userSelectors = [
-      "[data-role='user']",
-      "[role='article'][data-role='user']",
-      "div[data-role='user']",
-      "article[data-role='user']",
-      "[class*='user'][class*='message']"
-    ];
+    const assistantElements = Array.from(document.querySelectorAll(assistantSelector));
+    const userElements = Array.from(document.querySelectorAll(userSelector));
     
-    let assistantElements = [];
-    let userElements = [];
-    
-    for (const selector of assistantSelectors) {
-      try {
-        const found = Array.from(document.querySelectorAll(selector));
-        if (found.length > 0) {
-          console.log(`[Prompanion Claude] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
-          assistantElements = found;
-          break;
-        }
-      } catch (e) {
-        console.warn(`[Prompanion Claude] Selector failed: ${selector}`, e);
-      }
-    }
-    
-    for (const selector of userSelectors) {
-      try {
-        const found = Array.from(document.querySelectorAll(selector));
-        if (found.length > 0) {
-          console.log(`[Prompanion Claude] ✓ Found ${found.length} user messages with selector: ${selector}`);
-          userElements = found;
-          break;
-        }
-      } catch (e) {
-        console.warn(`[Prompanion Claude] Selector failed: ${selector}`, e);
-      }
-    }
-    
-    // Combine and sort by DOM position
+    // Combine and sort by DOM position (maintain conversation order)
     const allElements = [];
     assistantElements.forEach(el => {
       if (el && el.isConnected) {
@@ -359,25 +316,89 @@ function captureClaudeChatHistory(maxMessages = 20) {
       }
     });
     
+    // Sort by position in document (top to bottom)
     allElements.sort((a, b) => a.position - b.position);
     
     for (const { el, role } of allElements) {
       if (messages.length >= maxMessages) break;
       
-      const content = (el.innerText || el.textContent || "").trim();
-      if (content && content.length > 3) {
-        messages.push({
-          role: role === 'assistant' ? 'assistant' : 'user',
-          content: content.replace(/\s+/g, " ").trim(),
-          timestamp: Date.now()
-        });
+      // Extract content using multiple strategies
+      const contentSelectors = [
+        "[data-message-content]",
+        ".markdown",
+        ".prose",
+        "[class*='markdown']",
+        "div[class*='text']"
+      ];
+      
+      let content = null;
+      for (const selector of contentSelectors) {
+        const contentEl = el.querySelector(selector);
+        if (contentEl) {
+          content = (contentEl.innerText || contentEl.textContent)?.trim();
+          if (content && content.length > 0) break;
+        }
+      }
+      
+      // Fallback: get text from element itself, but filter out UI elements
+      if (!content) {
+        const textNodes = [];
+        const walker = document.createTreeWalker(
+          el,
+          NodeFilter.SHOW_TEXT,
+          {
+            acceptNode: (node) => {
+              const parent = node.parentElement;
+              if (parent && (
+                parent.tagName === "BUTTON" ||
+                parent.tagName === "INPUT" ||
+                parent.closest("button") ||
+                parent.closest("input")
+              )) {
+                return NodeFilter.FILTER_REJECT;
+              }
+              return NodeFilter.FILTER_ACCEPT;
+            }
+          }
+        );
+        
+        let node;
+        while ((node = walker.nextNode())) {
+          const text = node.textContent?.trim();
+          if (text && text.length > 0) {
+            textNodes.push(text);
+          }
+        }
+        
+        if (textNodes.length > 0) {
+          content = textNodes.join(" ").trim();
+        }
+      }
+      
+      // Final fallback
+      if (!content) {
+        content = (el.innerText || el.textContent)?.trim();
+      }
+      
+      // Clean and validate content
+      if (content) {
+        content = content.replace(/\s+/g, " ").trim();
+        
+        // Filter out very short or UI-only content
+        if (content.length > 3 && !/^(copy|regenerate|thumbs up|thumbs down|share)$/i.test(content)) {
+          messages.push({
+            role: role === 'assistant' ? 'assistant' : 'user',
+            content: content,
+            timestamp: Date.now()
+          });
+        }
       }
     }
     
-    console.log(`[Prompanion Claude] ✓ Captured ${messages.length} messages from Claude conversation`);
+    console.log(`[Prompanion] Captured ${messages.length} messages from Deepseek conversation`);
     return messages;
   } catch (error) {
-    console.error("[Prompanion Claude] ✗ Error capturing Claude chat history:", error);
+    console.error("[Prompanion] Error capturing GPT chat history:", error);
     return [];
   }
 }
@@ -392,39 +413,26 @@ function getElementPosition(element) {
   return position;
 }
 
-function submitSelectionToSideChat(text) {
-  console.log("%c[Prompanion Claude] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
-  
+async function submitSelectionToSideChat(text) {
   const snippet = typeof text === "string" ? text.trim() : "";
-  console.log("[Prompanion Claude] Snippet:", snippet?.substring(0, 50));
-  
-  if (!snippet || selectionAskInFlight) {
-    console.log("[Prompanion Claude] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
-    return;
-  }
+  if (!snippet || selectionAskInFlight) return;
   selectionAskInFlight = true;
   
   try {
-    // Capture chat history from Claude conversation for context
+    // Capture chat history from Deepseek conversation for context
     let chatHistory = [];
-    console.log("%c[Prompanion Claude] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
+    console.log("%c[Prompanion Deepseek] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
     try {
-      chatHistory = captureClaudeChatHistory(20);
-      console.log(`%c[Prompanion Claude] ✓ Captured ${chatHistory.length} messages`, 
+      chatHistory = captureDeepseekChatHistory(20);
+      console.log(`%c[Prompanion Deepseek] ✓ Captured ${chatHistory.length} messages`, 
         chatHistory.length > 0 ? "color: green; font-size: 14px; font-weight: bold;" : "color: red; font-size: 14px; font-weight: bold;");
       if (chatHistory.length === 0) {
-        console.warn("[Prompanion Claude] ⚠️ No messages found in DOM");
+        console.warn("[Prompanion Deepseek] ⚠️ No messages found in DOM");
       }
     } catch (error) {
-      console.error("[Prompanion Claude] ✗ Failed to capture chat history:", error);
+      console.error("[Prompanion Deepseek] ✗ Failed to capture chat history:", error);
       chatHistory = [];
-    }
-    
-    console.log("%c[Prompanion Claude] Sending PROMPANION_SIDECHAT_REQUEST", "color: purple; font-size: 14px; font-weight: bold;");
-    console.log("[Prompanion Claude] Request details:", {
-      textLength: snippet.length,
-      chatHistoryLength: chatHistory.length
-    });
+    };
 
     AdapterBase.sendMessage({ 
       type: "PROMPANION_SIDECHAT_REQUEST", 
@@ -473,8 +481,14 @@ function createIcon() {
 function requestPromptEnhancement(promptText) {
   return AdapterBase.sendMessage({ type: "PROMPANION_PREPARE_ENHANCEMENT", prompt: promptText, openPanel: false })
     .catch((error) => {
-      console.warn("Prompanion: enhancement request failed", error);
-      return { ok: false };
+      const errorMessage = error?.message || "";
+      if (errorMessage.includes("Extension context invalidated")) {
+        console.error("[Prompanion Deepseek] Extension context invalidated - user should reload page");
+        // The notification is already shown by AdapterBase._showContextInvalidatedNotification()
+      } else {
+        console.warn("[Prompanion Deepseek] Enhancement request failed:", error);
+      }
+      return { ok: false, reason: errorMessage || "UNKNOWN_ERROR" };
     });
 }
 
@@ -495,14 +509,11 @@ function findComposerNode() {
     return composer.input;
   }
 
-  // Last resort: query for common selectors (prioritize Claude-specific)
+  // Last resort: query for common selectors
   const selectors = [
-    "[data-testid='chat-input'][contenteditable='true']",
-    ".tiptap.ProseMirror[contenteditable='true']",
-    "div[contenteditable='true'][role='textbox'][aria-label*='Claude']",
-    "[contenteditable='true'][role='textbox']",
+    "[data-testid='textbox'][contenteditable='true']",
     "div[contenteditable='true']",
-    "textarea:not([readonly])"
+    "[data-testid='conversation-turn-textbox'] textarea:not([readonly])"
   ];
 
   for (const selector of selectors) {
@@ -516,7 +527,7 @@ function findComposerNode() {
 }
 
 // Generic text insertion moved to AdapterBase.setEditableElementText()
-// This wrapper maintains Claude-specific logging
+// This wrapper maintains Deepseek-specific logging
 function setComposerText(node, text) {
   return AdapterBase.setEditableElementText(node, text, { verbose: true });
 }
@@ -531,7 +542,7 @@ function buildButton() {
   // Use AdapterBase for generic hover tooltip
   AdapterBase.attachTooltip(button, "Open Prompanion to enhance your prompts for the best response.", BUTTON_ID);
   button.addEventListener("click", () => AdapterBase.togglePanel()
-    .catch((e) => console.error("Prompanion: failed to open sidebar from Claude adapter", e)));
+    .catch((e) => console.error("Prompanion: failed to open sidebar from Deepseek adapter", e)));
   button.addEventListener("mouseenter", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("focus", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("mouseleave", () => AdapterBase.hideTooltip(button));
@@ -607,48 +618,29 @@ function ensureDomObserver() {
 }
 
 function locateComposer() {
-  // Claude-specific selectors for composer based on actual DOM structure
-  // Primary selector: [data-testid="chat-input"] which is the contenteditable div
-  let input = document.querySelector("[data-testid='chat-input'][contenteditable='true']") ??
-              document.querySelector(".tiptap.ProseMirror[contenteditable='true']") ??
-              document.querySelector("div[contenteditable='true'][role='textbox'][aria-label*='Claude']");
-  
-  // If not found, try finding via fieldset wrapper
-  if (!input) {
-    const fieldset = document.querySelector("fieldset.flex.w-full");
-    if (fieldset) {
-      input = fieldset.querySelector("[data-testid='chat-input']") ??
-              fieldset.querySelector(".tiptap.ProseMirror[contenteditable='true']") ??
-              fieldset.querySelector("div[contenteditable='true'][role='textbox']");
-    }
+  // Deepseek-specific composer selectors - adjust based on actual DOM structure
+  const wrappers = [
+    "textarea[placeholder*='message']",
+    "textarea[placeholder*='Message']", 
+    "form[class*='composer']",
+    "div[class*='input']",
+    "div[class*='composer']",
+    "main form"
+  ].map(sel => document.querySelector(sel)).filter(Boolean);
+  let input = null;
+  for (const wrapper of wrappers) {
+    const editable = wrapper.querySelector("textarea, input[type='text'], [contenteditable='true'][role='textbox']") ??
+                     wrapper.querySelector("div[contenteditable='true']");
+    if (editable instanceof HTMLElement) { input = editable; break; }
   }
-  
-  // Fallback: try direct queries
   if (!input) {
-    const directSelectors = [
-      "[data-testid='chat-input']",
-      ".tiptap.ProseMirror[contenteditable='true']",
-      "div[contenteditable='true'][role='textbox']"
-    ];
-    for (const selector of directSelectors) {
-      const element = document.querySelector(selector);
-      if (element instanceof HTMLElement) {
-        input = element;
-        break;
-      }
-    }
+    const textarea = document.querySelector("[data-testid='conversation-turn-textbox'] textarea:not([readonly])");
+    if (textarea instanceof HTMLTextAreaElement && !textarea.className.includes("_fallbackTextarea")) input = textarea;
   }
-  
   if (!input) return null;
-  
-  // Find the container - prefer fieldset, then the box-content div, then parent
-  const container = input.closest("fieldset") ??
-                    input.closest("div.box-content") ??
-                    input.closest("div.mx-auto") ??
-                    input.parentElement ?? 
-                    document.body;
-  
-  return { input, container };
+  return { input, container: input.closest("[data-testid='composer-footer']") ??
+                             input.closest("[data-testid='composer-container']") ??
+                             input.parentElement ?? document.body };
 }
 
 function init() {
@@ -662,6 +654,40 @@ function init() {
   }
   ensureDomObserver();
   return false;
+}
+
+/**
+ * Finds the active composer input node
+ * @returns {HTMLElement|null} The composer input node or null if not found
+ */
+function findComposerNode() {
+  // Try tracked nodes first
+  let composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
+  if (composerNode) {
+    return composerNode;
+  }
+
+  // Fallback: locate composer using locateComposer
+  const composer = locateComposer();
+  if (composer?.input) {
+    return composer.input;
+  }
+
+  // Last resort: query for common selectors
+  const selectors = [
+    "[data-testid='textbox'][contenteditable='true']",
+    "div[contenteditable='true']",
+    "[data-testid='conversation-turn-textbox'] textarea:not([readonly])"
+  ];
+
+  for (const selector of selectors) {
+    const element = document.querySelector(selector);
+    if (element instanceof HTMLElement) {
+      return element;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -824,15 +850,30 @@ function handleRefineButtonClick(e) {
     return;
   }
   enhanceActionInFlight = true;
-  enhanceTooltipDismissed = true;
-  hideEnhanceTooltip();
+  // Don't hide tooltip yet - wait to see if there's a limit error
   console.log("[Prompanion] Requesting prompt enhancement...");
   requestPromptEnhancement(promptText)
     .then((result) => {
       if (!result || !result.ok) {
         enhanceActionInFlight = false;
+        if (result?.reason === "EXTENSION_CONTEXT_INVALIDATED") {
+        console.error("[Prompanion Deepseek] Cannot enhance prompt - extension context invalidated. Please reload the page.");
+        enhanceTooltipDismissed = true;
+        hideEnhanceTooltip();
+        } else if (result?.error === "LIMIT_REACHED") {
+          // Show upgrade button in tooltip instead of hiding
+          console.log("[Prompanion] Limit reached, showing upgrade button");
+          showUpgradeButtonInTooltip();
+        } else {
+          // Other errors - hide tooltip normally
+          enhanceTooltipDismissed = true;
+          hideEnhanceTooltip();
+        }
         return;
       }
+      // Success - hide tooltip and set text
+      enhanceTooltipDismissed = true;
+      hideEnhanceTooltip();
       const refinedText = result.optionA && typeof result.optionA === "string" && result.optionA.trim()
         ? result.optionA.trim() 
         : promptText;
@@ -842,6 +883,8 @@ function handleRefineButtonClick(e) {
     .catch((error) => {
       console.error("Prompanion: refine request threw", error);
       enhanceActionInFlight = false;
+      enhanceTooltipDismissed = true;
+      hideEnhanceTooltip();
     });
 }
 
@@ -867,7 +910,7 @@ function extractInputText() {
 function handleInputChange() {
   if (!enhanceTooltipActiveTextarea) return;
   const rawText = extractInputText();
-  const text = rawText.trim();
+  const text = (rawText.startsWith("window.__oai") || rawText.includes("__oai_logHTML") ? "" : rawText).trim();
   const wordCount = text.split(/\s+/).filter(Boolean).length;
   if (wordCount < 3) {
     hideEnhanceTooltip();
@@ -913,8 +956,78 @@ function showEnhanceTooltip() {
 
 function hideEnhanceTooltip() {
   if (!enhanceTooltipElement) return;
+  // Don't hide if it's showing upgrade button
+  if (enhanceTooltipElement.classList.contains("show-upgrade")) {
+    return;
+  }
   enhanceTooltipElement.classList.remove("is-visible");
   detachTooltipResizeHandler();
+}
+
+function showUpgradeButtonInTooltip() {
+  // Ensure tooltip element exists and is visible
+  if (!enhanceTooltipElement) {
+    ensureEnhanceTooltipElement();
+  }
+  if (!enhanceTooltipElement) {
+    console.error("[Prompanion] Cannot show upgrade button - tooltip element not found");
+    return;
+  }
+  
+  // Make sure tooltip is visible first
+  if (!enhanceTooltipElement.classList.contains("is-visible")) {
+    enhanceTooltipElement.classList.add("is-visible");
+    positionEnhanceTooltip();
+    attachTooltipResizeHandler();
+  }
+  
+  // Remove existing dismiss button if it exists (we'll add a new one)
+  const oldDismiss = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__dismiss");
+  if (oldDismiss) {
+    oldDismiss.remove();
+  }
+  
+  // Add dismiss button (X) for closing the upgrade tooltip
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "prompanion-enhance-tooltip__dismiss";
+  dismiss.textContent = "×";
+  dismiss.setAttribute("aria-label", "Dismiss upgrade prompt");
+  dismiss.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    enhanceTooltipDismissed = true;
+    enhanceTooltipElement.classList.remove("show-upgrade");
+    hideEnhanceTooltip();
+  });
+  
+  // Change action button to upgrade button
+  const action = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
+  if (action) {
+    // Remove old click handlers by cloning
+    const newAction = action.cloneNode(true);
+    action.replaceWith(newAction);
+    
+    // Update the new button
+    newAction.className = "prompanion-enhance-tooltip__action prompanion-enhance-tooltip__upgrade";
+    AdapterBase.setButtonTextContent(newAction, "Upgrade for more uses!");
+    
+    // Add upgrade click handler
+    newAction.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("[Prompanion] Upgrade button clicked - placeholder for Stripe integration");
+      // TODO: Navigate to Stripe upgrade page
+      // window.open("https://stripe.com/upgrade", "_blank");
+    });
+    
+    // Insert dismiss button before the upgrade button
+    newAction.parentNode.insertBefore(dismiss, newAction);
+  }
+  
+  // Add class to prevent auto-hide
+  enhanceTooltipElement.classList.add("show-upgrade");
+  enhanceTooltipDismissed = false; // Reset dismissed flag so tooltip stays visible
 }
 
 function positionEnhanceTooltip() {
@@ -1033,4 +1146,3 @@ document.addEventListener("mousedown", (e) => {
     }
   }
 }, true);
-

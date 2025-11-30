@@ -292,12 +292,144 @@ function updateSelectionToolbar() {
   toolbar.classList.add(SELECTION_TOOLBAR_VISIBLE_CLASS);
 }
 
-function submitSelectionToSideChat(text) {
-  const snippet = typeof text === "string" ? text.trim() : "";
-  if (!snippet || selectionAskInFlight) return;
-  selectionAskInFlight = true;
+function captureGeminiChatHistory(maxMessages = 20) {
+  console.log("%c[Prompanion Gemini] ========== captureGeminiChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("[Prompanion Gemini] Current URL:", window.location.href);
+  
+  const messages = [];
+  
   try {
-    AdapterBase.sendMessage({ type: "PROMPANION_SIDECHAT_REQUEST", text: snippet }, (response) => {
+    // Gemini-specific selectors
+    const assistantSelectors = [
+      "[data-model-turn='model']",
+      "[data-model-role='model']",
+      "[data-message-type='model']",
+      ".response-container",
+      ".model-response"
+    ];
+    
+    const userSelectors = [
+      "[data-model-turn='user']",
+      "[data-model-role='user']",
+      "[data-message-type='user']",
+      ".user-message",
+      "[data-user-turn]"
+    ];
+    
+    let assistantElements = [];
+    let userElements = [];
+    
+    for (const selector of assistantSelectors) {
+      try {
+        const found = Array.from(document.querySelectorAll(selector));
+        if (found.length > 0) {
+          console.log(`[Prompanion Gemini] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
+          assistantElements = found;
+          break;
+        }
+      } catch (e) {
+        console.warn(`[Prompanion Gemini] Selector failed: ${selector}`, e);
+      }
+    }
+    
+    for (const selector of userSelectors) {
+      try {
+        const found = Array.from(document.querySelectorAll(selector));
+        if (found.length > 0) {
+          console.log(`[Prompanion Gemini] ✓ Found ${found.length} user messages with selector: ${selector}`);
+          userElements = found;
+          break;
+        }
+      } catch (e) {
+        console.warn(`[Prompanion Gemini] Selector failed: ${selector}`, e);
+      }
+    }
+    
+    // Combine and sort by DOM position
+    const allElements = [];
+    assistantElements.forEach(el => {
+      if (el && el.isConnected) {
+        allElements.push({ el, role: 'assistant', position: getElementPosition(el) });
+      }
+    });
+    userElements.forEach(el => {
+      if (el && el.isConnected) {
+        allElements.push({ el, role: 'user', position: getElementPosition(el) });
+      }
+    });
+    
+    allElements.sort((a, b) => a.position - b.position);
+    
+    for (const { el, role } of allElements) {
+      if (messages.length >= maxMessages) break;
+      
+      const content = (el.innerText || el.textContent || "").trim();
+      if (content && content.length > 3) {
+        messages.push({
+          role: role === 'assistant' ? 'assistant' : 'user',
+          content: content.replace(/\s+/g, " ").trim(),
+          timestamp: Date.now()
+        });
+      }
+    }
+    
+    console.log(`[Prompanion Gemini] ✓ Captured ${messages.length} messages from Gemini conversation`);
+    return messages;
+  } catch (error) {
+    console.error("[Prompanion Gemini] ✗ Error capturing Gemini chat history:", error);
+    return [];
+  }
+}
+
+function getElementPosition(element) {
+  let position = 0;
+  let node = element;
+  while (node) {
+    position += node.offsetTop || 0;
+    node = node.offsetParent;
+  }
+  return position;
+}
+
+function submitSelectionToSideChat(text) {
+  console.log("%c[Prompanion Gemini] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  
+  const snippet = typeof text === "string" ? text.trim() : "";
+  console.log("[Prompanion Gemini] Snippet:", snippet?.substring(0, 50));
+  
+  if (!snippet || selectionAskInFlight) {
+    console.log("[Prompanion Gemini] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
+    return;
+  }
+  selectionAskInFlight = true;
+  
+  try {
+    // Capture chat history from Gemini conversation for context
+    let chatHistory = [];
+    console.log("%c[Prompanion Gemini] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
+    try {
+      chatHistory = captureGeminiChatHistory(20);
+      console.log(`%c[Prompanion Gemini] ✓ Captured ${chatHistory.length} messages`, 
+        chatHistory.length > 0 ? "color: green; font-size: 14px; font-weight: bold;" : "color: red; font-size: 14px; font-weight: bold;");
+      if (chatHistory.length === 0) {
+        console.warn("[Prompanion Gemini] ⚠️ No messages found in DOM");
+      }
+    } catch (error) {
+      console.error("[Prompanion Gemini] ✗ Failed to capture chat history:", error);
+      chatHistory = [];
+    }
+    
+    console.log("%c[Prompanion Gemini] Sending PROMPANION_SIDECHAT_REQUEST", "color: purple; font-size: 14px; font-weight: bold;");
+    console.log("[Prompanion Gemini] Request details:", {
+      textLength: snippet.length,
+      chatHistoryLength: chatHistory.length
+    });
+
+    AdapterBase.sendMessage({ 
+      type: "PROMPANION_SIDECHAT_REQUEST", 
+      text: snippet,
+      chatHistory: chatHistory 
+    }, (response) => {
       if (!response?.ok) {
         console.warn("Prompanion: sidechat request rejected", response?.reason);
       }

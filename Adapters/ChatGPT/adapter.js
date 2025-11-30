@@ -45,27 +45,11 @@ let selectionUpdateRaf = null;
 let highlightObserver = null;
 
 // Generic styles moved to styles/AdapterStyles.css
-// Styles are loaded via ensureStyle() function
+// Styles are loaded via AdapterBase.ensureStyle() function
 
 // Generic DOM utilities have been moved to AdapterBase
 // Use AdapterBase.injectStyle(), AdapterBase.getElementFromNode(), etc.
 
-function ensureStyle() {
-  // Load generic adapter styles from external CSS file
-  const styleId = "prompanion-adapter-styles";
-  let styleElement = document.getElementById(styleId);
-  
-  if (!styleElement) {
-    // Load CSS file from extension
-    const cssUrl = chrome.runtime.getURL("/styles/AdapterStyles.css");
-    const link = document.createElement("link");
-    link.id = styleId;
-    link.rel = "stylesheet";
-    link.type = "text/css";
-    link.href = cssUrl;
-    document.head.appendChild(link);
-  }
-}
 
 // Generic DOM utilities removed - use AdapterBase.getElementFromNode(), etc.
 
@@ -105,7 +89,7 @@ function selectionTargetsAssistant(selection) {
 function ensureHighlightObserver() {
   if (highlightObserver || !document.body) return;
   highlightObserver = new MutationObserver(() => {
-    if (getHighlightButton()) requestSelectionToolbarUpdate();
+    if (getHighlightButton()) 
   });
   highlightObserver.observe(document.body, { childList: true, subtree: true });
 }
@@ -124,164 +108,11 @@ function selectionWithinComposer(selection) {
   return selection && (nodeInComposer(selection.anchorNode) || nodeInComposer(selection.focusNode));
 }
 
-function ensureSelectionToolbar() {
-  if (selectionToolbarElement) return selectionToolbarElement;
-  
-  // CRITICAL: Ensure styles are injected before creating the toolbar element
-  ensureStyle();
-  
-  const toolbar = document.createElement("div");
-  toolbar.id = SELECTION_TOOLBAR_ID;
-  
-  const dismiss = document.createElement("button");
-  dismiss.type = "button";
-  dismiss.className = "prompanion-selection-toolbar__dismiss";
-  dismiss.textContent = "×";
-  dismiss.setAttribute("aria-label", "Dismiss");
-  dismiss.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    hideSelectionToolbar();
-  });
-  
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "prompanion-selection-toolbar__button";
-  button.textContent = "Elaborate";
-  button.addEventListener("pointerdown", (e) => e.preventDefault());
-  button.addEventListener("mousedown", (e) => e.stopPropagation());
-  button.addEventListener("click", handleSelectionToolbarAction);
-  
-  toolbar.append(dismiss, button);
-  
-  // Verify document.body exists before appending
-  if (!document.body) {
-    console.error("[Prompanion] Cannot create selection toolbar: document.body not available");
-    return null;
-  }
-  
-  document.body.append(toolbar);
-  selectionToolbarElement = toolbar;
-  selectionToolbarButton = button;
-  return toolbar;
-}
 
-function hideSelectionToolbar() {
-  if (selectionToolbarElement) {
-    selectionToolbarElement.classList.remove(SELECTION_TOOLBAR_VISIBLE_CLASS);
-    // Clear inline styles that might interfere
-    selectionToolbarElement.style.opacity = "";
-    selectionToolbarElement.style.pointerEvents = "";
-  }
-  selectionToolbarText = "";
-}
 
 // Generic getSelectionRect removed - use AdapterBase.getSelectionRect()
 
-function requestSelectionToolbarUpdate() {
-  if (selectionUpdateRaf !== null) {
-    return;
-  }
-  selectionUpdateRaf = window.requestAnimationFrame(() => {
-    selectionUpdateRaf = null;
-    updateSelectionToolbar();
-  });
-}
 
-function updateSelectionToolbar() {
-  const selection = window.getSelection();
-  const text = selection?.toString().trim();
-  
-  console.log("[Prompanion] updateSelectionToolbar called", {
-    hasSelection: !!selection,
-    isCollapsed: selection?.isCollapsed,
-    textLength: text?.length,
-    textPreview: text?.substring(0, 30),
-    inComposer: selection ? selectionWithinComposer(selection) : false,
-    targetsAssistant: selection ? selectionTargetsAssistant(selection) : false
-  });
-  
-  if (!selection || selection.isCollapsed || !text || selectionWithinComposer(selection) || 
-      !selectionTargetsAssistant(selection)) {
-    console.log("[Prompanion] Hiding toolbar - conditions not met");
-    hideSelectionToolbar();
-    return;
-  }
-  
-  console.log("[Prompanion] Showing toolbar - all conditions met");
-  const rangeRect = AdapterBase.getSelectionRect(selection);
-  if (!rangeRect) {
-    hideSelectionToolbar();
-    return;
-  }
-
-  const toolbar = ensureSelectionToolbar();
-  if (!toolbar) {
-    console.error("[Prompanion] Failed to create selection toolbar");
-    return;
-  }
-  selectionToolbarText = text;
-  
-  // Position tooltip BELOW the selection to avoid conflict with ChatGPT's native button above
-  // Measure toolbar dimensions by temporarily positioning offscreen (but keep opacity 0 via class)
-  toolbar.classList.remove(SELECTION_TOOLBAR_VISIBLE_CLASS);
-  toolbar.style.position = "fixed";
-  toolbar.style.left = "-9999px";
-  toolbar.style.top = "0";
-  toolbar.style.transform = "translate(-50%, 0)";
-  toolbar.style.opacity = "0";
-  toolbar.style.pointerEvents = "none";
-  toolbar.style.display = "flex"; // Ensure display is set for accurate measurement
-  
-  // Force multiple reflows to ensure styles are fully applied before measuring
-  void toolbar.offsetWidth; // Force layout recalculation
-  void toolbar.offsetHeight; // Force another reflow to ensure styles applied
-  
-  let w = toolbar.offsetWidth;
-  let h = toolbar.offsetHeight;
-  
-  // Verify we got valid dimensions
-  if (!w || !h) {
-    console.warn("[Prompanion] Toolbar has invalid dimensions:", { w, h }, "retrying...");
-    // Force another reflow and remeasure
-    void toolbar.offsetWidth;
-    w = toolbar.offsetWidth;
-    h = toolbar.offsetHeight;
-    if (!w || !h) {
-      console.error("[Prompanion] Toolbar dimensions still invalid, cannot position tooltip");
-      return;
-    }
-  }
-  
-  const { clientWidth: vw, clientHeight: vh } = document.documentElement;
-  const selectionCenterX = rangeRect.left + rangeRect.width / 2;
-  const selectionBottom = rangeRect.bottom;
-  
-  // Calculate horizontal position (centered on selection, constrained to viewport)
-  let left = Math.max(w / 2 + 8, Math.min(vw - w / 2 - 8, selectionCenterX));
-  
-  // Calculate vertical position (BELOW selection with 8px gap)
-  let top = selectionBottom + 8;
-  
-  // Ensure tooltip doesn't go below viewport (with 8px margin)
-  const maxTop = vh - h - 8;
-  if (top > maxTop) {
-    // If it would go below viewport, position it above instead (but this should be rare)
-    top = Math.max(8, rangeRect.top - h - 8);
-    toolbar.style.transform = "translate(-50%, -100%)";
-  } else {
-    toolbar.style.transform = "translate(-50%, 0)";
-  }
-  
-  // Apply final positioning
-  toolbar.style.left = `${Math.round(left)}px`;
-  toolbar.style.top = `${Math.round(top)}px`;
-  
-  // Show the tooltip with opacity transition
-  toolbar.style.opacity = "";
-  toolbar.style.pointerEvents = "";
-  toolbar.classList.add(SELECTION_TOOLBAR_VISIBLE_CLASS);
-}
 
 function captureGPTChatHistory(maxMessages = 20) {
   const messages = [];
@@ -337,6 +168,164 @@ function captureGPTChatHistory(maxMessages = 20) {
         const walker = document.createTreeWalker(
           el,
           NodeFilter.SHOW_TEXT,
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "prompanion-enhance-tooltip__dismiss";
+  dismiss.textContent = "×";
+  dismiss.setAttribute("aria-label", "Dismiss upgrade prompt");
+  dismiss.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    enhanceTooltipDismissed = true;
+    enhanceTooltipElement.classList.remove("show-upgrade");
+    hideEnhanceTooltip();
+  });
+  
+  // Change action button to upgrade button
+  const action = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
+  if (action) {
+    // Remove old click handlers by cloning
+    const newAction = action.cloneNode(true);
+    action.replaceWith(newAction);
+    
+    // Update the new button
+    newAction.className = "prompanion-enhance-tooltip__action prompanion-enhance-tooltip__upgrade";
+    AdapterBase.setButtonTextContent(newAction, "Upgrade for more uses!");
+    
+    // Add upgrade click handler
+    newAction.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("[Prompanion] Upgrade button clicked - placeholder for Stripe integration");
+      // TODO: Navigate to Stripe upgrade page
+      // window.open("https://stripe.com/upgrade", "_blank");
+    });
+    
+    // Insert dismiss button before the upgrade button
+    newAction.parentNode.insertBefore(dismiss, newAction);
+  }
+  
+  // Add class to prevent auto-hide
+  enhanceTooltipElement.classList.add("show-upgrade");
+  enhanceTooltipDismissed = false; // Reset dismissed flag so tooltip stays visible
+}
+
+function positionEnhanceTooltip() {
+  if (!enhanceTooltipElement || !enhanceTooltipActiveTextarea) return;
+  const rect = enhanceTooltipActiveTextarea.getBoundingClientRect();
+  enhanceTooltipElement.style.top = `${rect.top - 8}px`;
+  enhanceTooltipElement.style.left = `${rect.left + rect.width * 0.5}px`;
+  enhanceTooltipElement.style.transform = "translate(-50%, -100%)";
+}
+
+function attachTooltipResizeHandler() {
+  if (enhanceTooltipResizeHandler) return;
+  enhanceTooltipResizeHandler = () => positionEnhanceTooltip();
+  window.addEventListener("resize", enhanceTooltipResizeHandler);
+  window.addEventListener("scroll", enhanceTooltipResizeHandler, true);
+}
+
+function detachTooltipResizeHandler() {
+  if (!enhanceTooltipResizeHandler) return;
+  window.removeEventListener("resize", enhanceTooltipResizeHandler);
+  window.removeEventListener("scroll", enhanceTooltipResizeHandler, true);
+  enhanceTooltipResizeHandler = null;
+}
+
+// Backup message listener registration (IIFE to ensure it runs immediately)
+(function registerInsertTextListener() {
+  console.log("[Prompanion] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
+  console.log("[Prompanion] Current time:", new Date().toISOString());
+  
+  if (typeof chrome === "undefined") {
+    console.error("[Prompanion] chrome is undefined in backup registration");
+    return;
+  }
+  
+  if (!chrome.runtime || !chrome.runtime.onMessage) {
+    console.error("[Prompanion] chrome.runtime.onMessage not available in backup registration");
+    return;
+  }
+  
+  try {
+    chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+      if (message && message.type === "PROMPANION_INSERT_TEXT") {
+        console.log("[Prompanion] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
+        if (typeof handleInsertTextMessage === "function") {
+          handleInsertTextMessage(message, sender, sendResponse);
+        } else {
+          console.error("[Prompanion] handleInsertTextMessage is not a function!");
+          sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
+        }
+        return true;
+      }
+      return false;
+    });
+    console.log("[Prompanion] ✓ Backup listener registered successfully");
+  } catch (error) {
+    console.error("[Prompanion] ✗ Backup listener registration failed:", error);
+  }
+})();
+
+const readyState = document.readyState;
+if (readyState === "complete" || readyState === "interactive") {
+  bootstrap();
+} else {
+  document.addEventListener("DOMContentLoaded", bootstrap);
+}
+
+console.log("[Prompanion] Registering selection change event listeners");
+document.addEventListener("selectionchange", handleSelectionChange);
+window.addEventListener("scroll", handleSelectionChange, true);
+window.addEventListener("resize", handleSelectionChange);
+console.log("[Prompanion] Selection change event listeners registered");
+
+// Verify message listener is registered
+console.log("[Prompanion] ========== VERIFYING MESSAGE LISTENER ==========");
+if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
+  console.log("[Prompanion] chrome.runtime.onMessage is available");
+  console.log("[Prompanion] chrome.runtime.id:", chrome.runtime.id);
+  console.log("[Prompanion] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
+} else {
+  console.error("[Prompanion] chrome.runtime.onMessage is NOT available at this point!");
+}
+
+window.addEventListener("prompanion-panel-resize", () => {
+  refreshFloatingButtonPosition();
+});
+
+document.addEventListener("mousedown", (e) => {
+  if (enhanceTooltipElement?.classList.contains("is-visible")) {
+    const button = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
+    const clickedButton = e.target.closest(".prompanion-enhance-tooltip__action");
+    if (clickedButton || button === e.target) {
+      console.log("[Prompanion] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
+      console.log("[Prompanion] Setting tooltipClickInProgress flag");
+      tooltipClickInProgress = true;
+      const buttonRef = button;
+      const mousedownTime = Date.now();
+      
+      const clickHandler = (clickEvent) => {
+        const timeSinceMousedown = Date.now() - mousedownTime;
+        console.log("[Prompanion] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
+        console.log("[Prompanion] Time since mousedown:", timeSinceMousedown, "ms");
+        console.log("[Prompanion] Click target:", clickEvent.target);
+        if (typeof handleRefineButtonClick === "function") {
+          handleRefineButtonClick(clickEvent);
+        }
+        document.removeEventListener("click", clickHandler, true);
+      };
+      
+      document.addEventListener("click", clickHandler, true);
+      
+      setTimeout(() => {
+        tooltipClickInProgress = false;
+        console.log("[Prompanion] tooltipClickInProgress flag cleared");
+        document.removeEventListener("click", clickHandler, true);
+      }, 300);
+    }
+  }
+}, true);
           {
             acceptNode: (node) => {
               const parent = node.parentElement;
@@ -444,18 +433,7 @@ async function submitSelectionToSideChat(text) {
   }
 }
 
-function handleSelectionToolbarAction(event) {
-  event.preventDefault();
-  event.stopPropagation();
-  const text = selectionToolbarText;
-  hideSelectionToolbar();
-  submitSelectionToSideChat(text);
-}
 
-function handleSelectionChange() {
-  console.log("[Prompanion] handleSelectionChange fired");
-  requestSelectionToolbarUpdate();
-}
 
 // Generic setButtonTextContent removed - use AdapterBase.setButtonTextContent()
 
@@ -524,7 +502,7 @@ function setComposerText(node, text) {
 }
 
 function buildButton() {
-  ensureStyle();
+  AdapterBase.ensureStyle();
   const button = document.createElement("button");
   button.id = BUTTON_ID;
   button.type = "button";
@@ -547,7 +525,7 @@ function ensureFloatingButton() {
     floatingButtonElement.style.width = floatingButtonElement.style.height = BUTTON_SIZE.element;
     return;
   }
-  ensureStyle();
+  AdapterBase.ensureStyle();
   floatingButtonWrapper = document.getElementById(`${BUTTON_ID}-wrapper`);
   if (!floatingButtonWrapper) {
     floatingButtonWrapper = document.createElement("div");
@@ -565,28 +543,10 @@ function ensureFloatingButton() {
   if (!floatingButtonElement.isConnected) floatingButtonWrapper.append(floatingButtonElement);
 }
 
-function placeButton(targetContainer, inputNode) {
-  if (!inputNode) return;
-  ensureFloatingButton();
-  floatingButtonTargetContainer = targetContainer ?? inputNode;
-  floatingButtonTargetInput = inputNode;
-  positionFloatingButton(inputNode, floatingButtonTargetContainer);
-}
+// OLD placeButton function removed - using new version at line ~1010 with XPath-based positioning
 
-function positionFloatingButton(inputNode, containerNode = floatingButtonTargetContainer) {
-  if (!floatingButtonWrapper) return;
-  const target = containerNode ?? inputNode;
-  if (!target) return;
-  if (getComputedStyle(target).position === "static") {
-    target.style.position = "relative";
-  }
-  if (floatingButtonWrapper.parentElement !== target) {
-    target.append(floatingButtonWrapper);
-  }
-  floatingButtonWrapper.style.top = "50%";
-  floatingButtonWrapper.style.right = "12px";
-  floatingButtonWrapper.style.transform = "translateY(-50%)";
-}
+// OLD positionFloatingButton function removed - using new XPath-based positioning (see line ~1109)
+// The old function was causing the button to appear in the input bar with relative positioning
 
 function refreshFloatingButtonPosition() {
   if (floatingButtonTargetInput) {
@@ -597,7 +557,7 @@ function refreshFloatingButtonPosition() {
 function ensureDomObserver() {
   if (domObserverStarted) return;
   const observer = new MutationObserver(() => {
-    requestSelectionToolbarUpdate();
+    
     const composer = locateComposer();
     if (composer) {
       placeButton(composer.container, composer.input);
@@ -627,9 +587,49 @@ function locateComposer() {
                              input.parentElement ?? document.body };
 }
 
+
+function placeButton(targetContainer, inputNode) {
+  console.log("[Prompanion ChatGPT] placeButton called", { 
+    hasTargetContainer: !!targetContainer, 
+    hasInputNode: !!inputNode 
+  });
+  if (!inputNode) {
+    console.warn("[Prompanion ChatGPT] placeButton: no inputNode provided");
+    return;
+  }
+  ensureFloatingButton();
+  floatingButtonTargetContainer = targetContainer ?? inputNode;
+  floatingButtonTargetInput = inputNode;
+  
+  console.log("[Prompanion ChatGPT] Calling positionFloatingButton");
+  if (typeof positionFloatingButton === 'function') {
+    positionFloatingButton(inputNode, floatingButtonTargetContainer);
+  } else {
+    console.error('[Prompanion ChatGPT] ERROR: positionFloatingButton is not defined!');
+    console.error('[Prompanion ChatGPT] This should not happen - function declarations are hoisted.');
+    // The function should be available, but if it's not, we'll retry
+    setTimeout(() => {
+      if (typeof positionFloatingButton === 'function') {
+        console.log('[Prompanion ChatGPT] positionFloatingButton now available');
+        positionFloatingButton(inputNode, floatingButtonTargetContainer);
+      }
+    }, 50);
+  }
+  
+  const xpathElement = findXPathTargetElement();
+  if (!xpathElement) {
+    console.log("[Prompanion ChatGPT] XPath element not found, setting up observer to retry...");
+    observeForXPathElement();
+  } else {
+    console.log("[Prompanion ChatGPT] XPath element found immediately");
+  }
+  
+  setupFloatingButtonPositionHandlers();
+}
+
 function init() {
   const composer = locateComposer();
-  requestSelectionToolbarUpdate();
+  
   if (composer) {
     placeButton(composer.container, composer.input);
     setupEnhanceTooltip(composer.input, composer.container);
@@ -744,6 +744,7 @@ AdapterBase.registerMessageHandler("PROMPANION_INSERT_TEXT", handleInsertTextMes
 
 function bootstrap() {
   ensureHighlightObserver();
+  initSelectionToolbar(); // Initialize selection toolbar system (one-time setup)
   if (!init()) {
     const observer = new MutationObserver(() => {
       if (init()) {
@@ -972,161 +973,3 @@ function showUpgradeButtonInTooltip() {
   }
   
   // Add dismiss button (X) for closing the upgrade tooltip
-  const dismiss = document.createElement("button");
-  dismiss.type = "button";
-  dismiss.className = "prompanion-enhance-tooltip__dismiss";
-  dismiss.textContent = "×";
-  dismiss.setAttribute("aria-label", "Dismiss upgrade prompt");
-  dismiss.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    enhanceTooltipDismissed = true;
-    enhanceTooltipElement.classList.remove("show-upgrade");
-    hideEnhanceTooltip();
-  });
-  
-  // Change action button to upgrade button
-  const action = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
-  if (action) {
-    // Remove old click handlers by cloning
-    const newAction = action.cloneNode(true);
-    action.replaceWith(newAction);
-    
-    // Update the new button
-    newAction.className = "prompanion-enhance-tooltip__action prompanion-enhance-tooltip__upgrade";
-    AdapterBase.setButtonTextContent(newAction, "Upgrade for more uses!");
-    
-    // Add upgrade click handler
-    newAction.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log("[Prompanion] Upgrade button clicked - placeholder for Stripe integration");
-      // TODO: Navigate to Stripe upgrade page
-      // window.open("https://stripe.com/upgrade", "_blank");
-    });
-    
-    // Insert dismiss button before the upgrade button
-    newAction.parentNode.insertBefore(dismiss, newAction);
-  }
-  
-  // Add class to prevent auto-hide
-  enhanceTooltipElement.classList.add("show-upgrade");
-  enhanceTooltipDismissed = false; // Reset dismissed flag so tooltip stays visible
-}
-
-function positionEnhanceTooltip() {
-  if (!enhanceTooltipElement || !enhanceTooltipActiveTextarea) return;
-  const rect = enhanceTooltipActiveTextarea.getBoundingClientRect();
-  enhanceTooltipElement.style.top = `${rect.top - 8}px`;
-  enhanceTooltipElement.style.left = `${rect.left + rect.width * 0.5}px`;
-  enhanceTooltipElement.style.transform = "translate(-50%, -100%)";
-}
-
-function attachTooltipResizeHandler() {
-  if (enhanceTooltipResizeHandler) return;
-  enhanceTooltipResizeHandler = () => positionEnhanceTooltip();
-  window.addEventListener("resize", enhanceTooltipResizeHandler);
-  window.addEventListener("scroll", enhanceTooltipResizeHandler, true);
-}
-
-function detachTooltipResizeHandler() {
-  if (!enhanceTooltipResizeHandler) return;
-  window.removeEventListener("resize", enhanceTooltipResizeHandler);
-  window.removeEventListener("scroll", enhanceTooltipResizeHandler, true);
-  enhanceTooltipResizeHandler = null;
-}
-
-// Backup message listener registration (IIFE to ensure it runs immediately)
-(function registerInsertTextListener() {
-  console.log("[Prompanion] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
-  console.log("[Prompanion] Current time:", new Date().toISOString());
-  
-  if (typeof chrome === "undefined") {
-    console.error("[Prompanion] chrome is undefined in backup registration");
-    return;
-  }
-  
-  if (!chrome.runtime || !chrome.runtime.onMessage) {
-    console.error("[Prompanion] chrome.runtime.onMessage not available in backup registration");
-    return;
-  }
-  
-  try {
-    chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
-      if (message && message.type === "PROMPANION_INSERT_TEXT") {
-        console.log("[Prompanion] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
-        if (typeof handleInsertTextMessage === "function") {
-          handleInsertTextMessage(message, sender, sendResponse);
-        } else {
-          console.error("[Prompanion] handleInsertTextMessage is not a function!");
-          sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
-        }
-        return true;
-      }
-      return false;
-    });
-    console.log("[Prompanion] ✓ Backup listener registered successfully");
-  } catch (error) {
-    console.error("[Prompanion] ✗ Backup listener registration failed:", error);
-  }
-})();
-
-const readyState = document.readyState;
-if (readyState === "complete" || readyState === "interactive") {
-  bootstrap();
-} else {
-  document.addEventListener("DOMContentLoaded", bootstrap);
-}
-
-console.log("[Prompanion] Registering selection change event listeners");
-document.addEventListener("selectionchange", handleSelectionChange);
-window.addEventListener("scroll", handleSelectionChange, true);
-window.addEventListener("resize", handleSelectionChange);
-console.log("[Prompanion] Selection change event listeners registered");
-
-// Verify message listener is registered
-console.log("[Prompanion] ========== VERIFYING MESSAGE LISTENER ==========");
-if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
-  console.log("[Prompanion] chrome.runtime.onMessage is available");
-  console.log("[Prompanion] chrome.runtime.id:", chrome.runtime.id);
-  console.log("[Prompanion] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
-} else {
-  console.error("[Prompanion] chrome.runtime.onMessage is NOT available at this point!");
-}
-
-window.addEventListener("prompanion-panel-resize", () => {
-  refreshFloatingButtonPosition();
-});
-
-document.addEventListener("mousedown", (e) => {
-  if (enhanceTooltipElement?.classList.contains("is-visible")) {
-    const button = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
-    const clickedButton = e.target.closest(".prompanion-enhance-tooltip__action");
-    if (clickedButton || button === e.target) {
-      console.log("[Prompanion] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
-      console.log("[Prompanion] Setting tooltipClickInProgress flag");
-      tooltipClickInProgress = true;
-      const buttonRef = button;
-      const mousedownTime = Date.now();
-      
-      const clickHandler = (clickEvent) => {
-        const timeSinceMousedown = Date.now() - mousedownTime;
-        console.log("[Prompanion] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
-        console.log("[Prompanion] Time since mousedown:", timeSinceMousedown, "ms");
-        console.log("[Prompanion] Click target:", clickEvent.target);
-        if (typeof handleRefineButtonClick === "function") {
-          handleRefineButtonClick(clickEvent);
-        }
-        document.removeEventListener("click", clickHandler, true);
-      };
-      
-      document.addEventListener("click", clickHandler, true);
-      
-      setTimeout(() => {
-        tooltipClickInProgress = false;
-        console.log("[Prompanion] tooltipClickInProgress flag cleared");
-        document.removeEventListener("click", clickHandler, true);
-      }, 300);
-    }
-  }
-}, true);

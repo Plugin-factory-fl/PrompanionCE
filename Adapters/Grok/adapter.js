@@ -289,12 +289,144 @@ function updateSelectionToolbar() {
   toolbar.classList.add(SELECTION_TOOLBAR_VISIBLE_CLASS);
 }
 
-function submitSelectionToSideChat(text) {
-  const snippet = typeof text === "string" ? text.trim() : "";
-  if (!snippet || selectionAskInFlight) return;
-  selectionAskInFlight = true;
+function captureGrokChatHistory(maxMessages = 20) {
+  console.log("%c[Prompanion Grok] ========== captureGrokChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("[Prompanion Grok] Current URL:", window.location.href);
+  
+  const messages = [];
+  
   try {
-    AdapterBase.sendMessage({ type: "PROMPANION_SIDECHAT_REQUEST", text: snippet }, (response) => {
+    // Grok-specific selectors
+    const assistantSelectors = [
+      "[data-role='assistant']",
+      "[data-author='assistant']",
+      "[class*='assistant'][class*='message']",
+      "div[data-role='assistant']",
+      "article[data-role='assistant']"
+    ];
+    
+    const userSelectors = [
+      "[data-role='user']",
+      "[data-author='user']",
+      "[class*='user'][class*='message']",
+      "div[data-role='user']",
+      "article[data-role='user']"
+    ];
+    
+    let assistantElements = [];
+    let userElements = [];
+    
+    for (const selector of assistantSelectors) {
+      try {
+        const found = Array.from(document.querySelectorAll(selector));
+        if (found.length > 0) {
+          console.log(`[Prompanion Grok] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
+          assistantElements = found;
+          break;
+        }
+      } catch (e) {
+        console.warn(`[Prompanion Grok] Selector failed: ${selector}`, e);
+      }
+    }
+    
+    for (const selector of userSelectors) {
+      try {
+        const found = Array.from(document.querySelectorAll(selector));
+        if (found.length > 0) {
+          console.log(`[Prompanion Grok] ✓ Found ${found.length} user messages with selector: ${selector}`);
+          userElements = found;
+          break;
+        }
+      } catch (e) {
+        console.warn(`[Prompanion Grok] Selector failed: ${selector}`, e);
+      }
+    }
+    
+    // Combine and sort by DOM position
+    const allElements = [];
+    assistantElements.forEach(el => {
+      if (el && el.isConnected) {
+        allElements.push({ el, role: 'assistant', position: getElementPosition(el) });
+      }
+    });
+    userElements.forEach(el => {
+      if (el && el.isConnected) {
+        allElements.push({ el, role: 'user', position: getElementPosition(el) });
+      }
+    });
+    
+    allElements.sort((a, b) => a.position - b.position);
+    
+    for (const { el, role } of allElements) {
+      if (messages.length >= maxMessages) break;
+      
+      const content = (el.innerText || el.textContent || "").trim();
+      if (content && content.length > 3) {
+        messages.push({
+          role: role === 'assistant' ? 'assistant' : 'user',
+          content: content.replace(/\s+/g, " ").trim(),
+          timestamp: Date.now()
+        });
+      }
+    }
+    
+    console.log(`[Prompanion Grok] ✓ Captured ${messages.length} messages from Grok conversation`);
+    return messages;
+  } catch (error) {
+    console.error("[Prompanion Grok] ✗ Error capturing Grok chat history:", error);
+    return [];
+  }
+}
+
+function getElementPosition(element) {
+  let position = 0;
+  let node = element;
+  while (node) {
+    position += node.offsetTop || 0;
+    node = node.offsetParent;
+  }
+  return position;
+}
+
+function submitSelectionToSideChat(text) {
+  console.log("%c[Prompanion Grok] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  
+  const snippet = typeof text === "string" ? text.trim() : "";
+  console.log("[Prompanion Grok] Snippet:", snippet?.substring(0, 50));
+  
+  if (!snippet || selectionAskInFlight) {
+    console.log("[Prompanion Grok] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
+    return;
+  }
+  selectionAskInFlight = true;
+  
+  try {
+    // Capture chat history from Grok conversation for context
+    let chatHistory = [];
+    console.log("%c[Prompanion Grok] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
+    try {
+      chatHistory = captureGrokChatHistory(20);
+      console.log(`%c[Prompanion Grok] ✓ Captured ${chatHistory.length} messages`, 
+        chatHistory.length > 0 ? "color: green; font-size: 14px; font-weight: bold;" : "color: red; font-size: 14px; font-weight: bold;");
+      if (chatHistory.length === 0) {
+        console.warn("[Prompanion Grok] ⚠️ No messages found in DOM");
+      }
+    } catch (error) {
+      console.error("[Prompanion Grok] ✗ Failed to capture chat history:", error);
+      chatHistory = [];
+    }
+    
+    console.log("%c[Prompanion Grok] Sending PROMPANION_SIDECHAT_REQUEST", "color: purple; font-size: 14px; font-weight: bold;");
+    console.log("[Prompanion Grok] Request details:", {
+      textLength: snippet.length,
+      chatHistoryLength: chatHistory.length
+    });
+
+    AdapterBase.sendMessage({ 
+      type: "PROMPANION_SIDECHAT_REQUEST", 
+      text: snippet,
+      chatHistory: chatHistory 
+    }, (response) => {
       if (!response?.ok) {
         console.warn("Prompanion Grok: sidechat request rejected", response?.reason);
       }
