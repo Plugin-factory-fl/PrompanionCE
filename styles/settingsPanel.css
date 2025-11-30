@@ -95,7 +95,8 @@
 
 /* Form Tabs */
 .form-tabs {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   background: var(--settings-bg-tabs);
   border-radius: 9999px;
   border: 1px solid var(--settings-border-soft);
@@ -112,6 +113,7 @@
 
 .form-tab {
   position: relative;
+  flex: 1;
   border: none;
   border-radius: 9999px;
   padding: 8px 16px;

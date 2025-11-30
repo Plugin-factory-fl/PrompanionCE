@@ -92,7 +92,7 @@ export function renderPrompts({ originalPrompt, optionA, optionB }) {
   
   if (optionAField) {
     const valueToSet = optionA || "";
-    optionAField.readOnly = true;
+    optionAField.readOnly = false;
     optionAField.value = valueToSet;
     // Force multiple updates
     optionAField.setAttribute("value", valueToSet);
@@ -111,7 +111,7 @@ export function renderPrompts({ originalPrompt, optionA, optionB }) {
   
   if (optionBField) {
     const valueToSet = optionB || "";
-    optionBField.readOnly = true;
+    optionBField.readOnly = false;
     optionBField.value = valueToSet;
     // Force multiple updates
     optionBField.setAttribute("value", valueToSet);
@@ -264,7 +264,7 @@ export async function handleEnhance(state, dependencies = {}) {
     state.originalPrompt = basePrompt;
     state.optionA = response.optionA || basePrompt;
     state.optionB = response.optionB || basePrompt;
-    state.enhancementsUsed = enhancementsUsed + 1;
+    // Don't increment locally - fetch from server to get accurate count after backend increment
 
     console.log("[Prompanion] handleEnhance updating state:", {
       originalPrompt: state.originalPrompt?.substring(0, 50),
@@ -302,6 +302,11 @@ export async function handleEnhance(state, dependencies = {}) {
     
     if (saveState) {
       await saveState(state);
+    }
+
+    // Update enhancements display from server after successful enhancement
+    if (dependencies.updateEnhancementsDisplay) {
+      await dependencies.updateEnhancementsDisplay();
     }
 
     return state;

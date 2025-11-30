@@ -6,6 +6,7 @@
 import express from 'express';
 import { authenticate } from '../config/auth.js';
 import { query } from '../config/database.js';
+import { resetDailyUsageIfNeeded } from '../config/usage.js';
 
 const router = express.Router();
 
@@ -24,7 +25,10 @@ router.post('/enhance', async (req, res) => {
       return res.status(400).json({ error: 'Prompt is required' });
     }
 
-    // Check user's subscription status
+    // Reset daily usage if needed (lazy reset)
+    await resetDailyUsageIfNeeded(req.user.userId);
+
+    // Check user's subscription status and current usage
     const userResult = await query(
       'SELECT subscription_status, enhancements_used, enhancements_limit FROM users WHERE id = $1',
       [req.user.userId]
@@ -36,10 +40,10 @@ router.post('/enhance', async (req, res) => {
 
     const user = userResult.rows[0];
 
-    // Check if user has reached their limit
+    // Check if user has reached their daily limit
     if (user.enhancements_used >= user.enhancements_limit) {
       return res.status(403).json({ 
-        error: 'Enhancement limit reached',
+        error: 'Daily enhancement limit reached. Your limit will reset tomorrow.',
         enhancementsUsed: user.enhancements_used,
         enhancementsLimit: user.enhancements_limit
       });

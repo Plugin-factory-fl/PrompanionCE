@@ -9,7 +9,8 @@
     "build": "echo 'No build step required'",
     "dev": "node --watch server.js",
     "migrate": "node scripts/migrate.js",
-    "migrate:add-name": "node scripts/add-name-column.js"
+    "migrate:add-name": "node scripts/add-name-column.js",
+    "migrate:add-last-reset-date": "node scripts/add-last-reset-date.js"
   },
   "keywords": [],
   "author": "",

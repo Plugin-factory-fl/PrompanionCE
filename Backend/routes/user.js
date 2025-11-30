@@ -6,6 +6,7 @@
 import express from 'express';
 import { authenticate } from '../config/auth.js';
 import { query } from '../config/database.js';
+import { getUserUsage } from '../config/usage.js';
 
 const router = express.Router();
 
@@ -18,30 +19,12 @@ router.use(authenticate);
  */
 router.get('/profile', async (req, res) => {
   try {
+    // Get usage with daily reset applied
+    const usage = await getUserUsage(req.user.userId);
+    
+    // Get full user profile
     const result = await query(
-      'SELECT id, email, name, subscription_status, enhancements_used, enhancements_limit, created_at FROM users WHERE id = $1',
-      [req.user.userId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    res.json({ user: result.rows[0] });
-  } catch (error) {
-    console.error('Profile error:', error);
-    res.status(500).json({ error: 'Failed to fetch profile' });
-  }
-});
-
-/**
- * GET /api/user/usage
- * Get user's usage statistics
- */
-router.get('/usage', async (req, res) => {
-  try {
-    const result = await query(
-      'SELECT enhancements_used, enhancements_limit, subscription_status FROM users WHERE id = $1',
+      'SELECT id, email, name, subscription_status, created_at FROM users WHERE id = $1',
       [req.user.userId]
     );
 
@@ -50,11 +33,34 @@ router.get('/usage', async (req, res) => {
     }
 
     const user = result.rows[0];
+    // Include current usage data (with daily reset applied)
+    res.json({ 
+      user: {
+        ...user,
+        enhancements_used: usage.enhancementsUsed,
+        enhancements_limit: usage.enhancementsLimit
+      }
+    });
+  } catch (error) {
+    console.error('Profile error:', error);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+/**
+ * GET /api/user/usage
+ * Get user's usage statistics (with daily reset applied)
+ */
+router.get('/usage', async (req, res) => {
+  try {
+    // Get usage with daily reset applied
+    const usage = await getUserUsage(req.user.userId);
+    
     res.json({
-      enhancementsUsed: user.enhancements_used,
-      enhancementsLimit: user.enhancements_limit,
-      subscriptionStatus: user.subscription_status,
-      remaining: Math.max(0, user.enhancements_limit - user.enhancements_used)
+      enhancementsUsed: usage.enhancementsUsed,
+      enhancementsLimit: usage.enhancementsLimit,
+      subscriptionStatus: usage.subscriptionStatus,
+      remaining: Math.max(0, usage.enhancementsLimit - usage.enhancementsUsed)
     });
   } catch (error) {
     console.error('Usage error:', error);

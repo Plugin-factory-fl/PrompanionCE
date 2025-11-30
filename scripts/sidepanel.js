@@ -89,8 +89,8 @@ import {
  */
 const defaultState = {
   plan: "Freemium",
-  enhancementsUsed: 3,
-  enhancementsLimit: 10,
+  enhancementsUsed: 0, // Will be updated from server
+  enhancementsLimit: 10, // Will be updated from server
   activePlatform: "ChatGPT",
   originalPrompt: "",
   optionA: "",
@@ -524,6 +524,110 @@ async function saveState(nextState) {
 }
 
 /**
+ * Fetches user usage data from the backend API
+ * @returns {Promise<Object|null>} Usage object with enhancementsUsed and enhancementsLimit, or null if not logged in
+ */
+async function fetchUserUsage() {
+  try {
+    if (!isExtensionContextValid()) {
+      console.warn("[Prompanion Sidepanel] Extension context invalidated, cannot fetch usage");
+      return null;
+    }
+
+    // Get auth token
+    const result = await new Promise((resolve, reject) => {
+      try {
+        if (!chrome?.storage?.local) {
+          reject(new Error("chrome.storage.local not available"));
+          return;
+        }
+        chrome.storage.local.get(["authToken"], (items) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve(items || { authToken: null });
+          }
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    if (!result.authToken) {
+      // Not logged in - return default values
+      return { enhancementsUsed: 0, enhancementsLimit: 10 };
+    }
+
+    // Fetch usage from API
+    const BACKEND_URL = "https://prompanionce.onrender.com";
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/user/usage`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${result.authToken}`,
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token invalid, return defaults
+          return { enhancementsUsed: 0, enhancementsLimit: 10 };
+        }
+        console.warn("[Prompanion Sidepanel] Failed to fetch usage:", response.status, response.statusText);
+        return null;
+      }
+
+      const data = await response.json();
+      return {
+        enhancementsUsed: data.enhancementsUsed || 0,
+        enhancementsLimit: data.enhancementsLimit || 10
+      };
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.warn("[Prompanion Sidepanel] Usage fetch timed out");
+        return null;
+      } else {
+        throw fetchError;
+      }
+    }
+  } catch (error) {
+    console.error("[Prompanion Sidepanel] Error fetching user usage:", error);
+    return null;
+  }
+}
+
+/**
+ * Updates the enhancements count display with real data from the server
+ */
+async function updateEnhancementsDisplay() {
+  const usage = await fetchUserUsage();
+  if (usage) {
+    // Update currentState
+    if (currentState) {
+      currentState.enhancementsUsed = usage.enhancementsUsed;
+      currentState.enhancementsLimit = usage.enhancementsLimit;
+    }
+    // Update UI
+    const countEl = document.getElementById("enhancements-count");
+    const limitEl = document.getElementById("enhancements-limit");
+    if (countEl) {
+      countEl.textContent = usage.enhancementsUsed;
+    }
+    if (limitEl) {
+      limitEl.textContent = usage.enhancementsLimit;
+    }
+  }
+}
+
+/**
  * Renders status information in the UI
  * @param {Object} status - Status object with plan, enhancementsUsed, enhancementsLimit, activePlatform
  */
@@ -811,11 +915,17 @@ async function init() {
 
   const activeConversation = getActiveConversation(currentState);
 
+  // Fetch and display real usage data from server
+  await updateEnhancementsDisplay();
+  
   renderStatus(currentState);
   // Update user login status - try immediately and also after delays
   updateUserStatus();
   setTimeout(() => updateUserStatus(), 500);
   setTimeout(() => updateUserStatus(), 2000);
+  // Also update enhancements display after delays to ensure it's current
+  setTimeout(() => updateEnhancementsDisplay(), 500);
+  setTimeout(() => updateEnhancementsDisplay(), 2000);
   renderSettings(currentState.settings);
   renderLibrary(currentState.library);
 
@@ -930,7 +1040,8 @@ async function init() {
 
   registerEnhanceButton(currentState, {
     renderStatus,
-    saveState
+    saveState,
+    updateEnhancementsDisplay // Pass function to update usage after enhancement
   });
 
   // Process any pending messages that arrived before initialization
@@ -1038,6 +1149,8 @@ document.addEventListener("visibilitychange", () => {
     });
     // Update user status when side panel becomes visible
     updateUserStatus();
+    // Also update enhancements display when side panel becomes visible
+    updateEnhancementsDisplay();
   }
 });
 
@@ -1141,6 +1254,8 @@ if (chrome?.storage?.local?.onChanged) {
     if (areaName === "local" && changes.authToken) {
       // Update user status when auth token changes
       updateUserStatus();
+      // Also update enhancements display when login status changes
+      updateEnhancementsDisplay();
     }
   });
 }
