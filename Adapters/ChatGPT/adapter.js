@@ -992,6 +992,9 @@ function showUpgradeButtonInTooltip() {
       // TODO: Navigate to Stripe upgrade page
       // window.open("https://stripe.com/upgrade", "_blank");
     });
+    
+    // Insert dismiss button before the upgrade button
+    newAction.parentNode.insertBefore(dismiss, newAction);
   }
   
   // Add class to prevent auto-hide
