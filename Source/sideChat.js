@@ -361,7 +361,20 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
         return stateRef;
       }
       
-      // Show error message to user
+      // Check for limit reached error
+      if (errorMessage === "LIMIT_REACHED") {
+        const limitMessage = {
+          role: "agent",
+          content: 'You used all 10 of your free uses! You\'ll get 10 more tomorrow. If <a href="#" style="text-decoration: underline; color: inherit;" onclick="event.preventDefault(); console.log(\'Upgrade clicked - placeholder for Stripe integration\'); return false;">upgrade now</a> you can get unlimited uses.',
+          timestamp: Date.now()
+        };
+        currentActiveConversation.history.push(limitMessage);
+        renderChat(currentActiveConversation.history);
+        await saveState(stateRef);
+        return stateRef;
+      }
+      
+      // Show error message to user for other errors
       const errorMsg = { role: "agent", content: `Error: ${errorMessage}`, timestamp: Date.now() };
       currentActiveConversation.history.push(errorMsg);
       renderChat(currentActiveConversation.history);
@@ -461,15 +474,26 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
     await saveState(stateRef);
   } catch (error) {
     console.error("Side chat failed", error);
+    const errorMessage = error?.message || "Failed to get response";
+    
     // Re-get active conversation for error handling
     const currentActiveConversation = getActiveConversation(stateRef);
     if (currentActiveConversation) {
-      currentActiveConversation.history.push({
-        role: "agent",
-        content:
-          "I couldn't reach the model. Check your API key in settings and try again.",
-        timestamp: Date.now()
-      });
+      // Check for limit reached error
+      if (errorMessage === "LIMIT_REACHED") {
+        currentActiveConversation.history.push({
+          role: "agent",
+          content: 'You used all 10 of your free uses! You\'ll get 10 more tomorrow. If <a href="#" style="text-decoration: underline; color: inherit;" onclick="event.preventDefault(); console.log(\'Upgrade clicked - placeholder for Stripe integration\'); return false;">upgrade now</a> you can get unlimited uses.',
+          timestamp: Date.now()
+        });
+      } else {
+        // Other errors - show generic message
+        currentActiveConversation.history.push({
+          role: "agent",
+          content: "I couldn't reach the model. Check your API key in settings and try again.",
+          timestamp: Date.now()
+        });
+      }
       renderChat(currentActiveConversation.history);
       renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
       await saveState(stateRef);

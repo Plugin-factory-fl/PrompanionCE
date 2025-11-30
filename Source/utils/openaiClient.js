@@ -63,6 +63,9 @@ export async function callOpenAI(messages, chatHistory = []) {
     if (response.status === 401) {
       throw new Error("Authentication failed. Please log in again.");
     }
+    if (response.status === 403) {
+      throw new Error("LIMIT_REACHED");
+    }
     throw new Error(errorData.error || "Failed to get chat response");
   }
 
