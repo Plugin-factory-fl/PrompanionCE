@@ -101,6 +101,21 @@
   background: #2957c7;
 }
 
+.prompanion-enhance-tooltip__upgrade {
+  background: #10b981 !important;
+  box-shadow: 0 10px 26px rgba(16, 185, 129, 0.35) !important;
+}
+
+.prompanion-enhance-tooltip__upgrade:hover {
+  background: #059669 !important;
+}
+
+.prompanion-enhance-tooltip.show-upgrade {
+  /* Keep tooltip visible when showing upgrade button */
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
 /* Selection Toolbar Styles */
 #prompanion-selection-toolbar {
   position: fixed;
