@@ -585,10 +585,14 @@ async function fetchUserUsage() {
       }
 
       const data = await response.json();
-      console.log("[Prompanion Sidepanel] Fetched usage data from API:", data);
+      console.log("[Prompanion Sidepanel] Fetched usage data from API:", {
+        enhancementsUsed: data.enhancementsUsed,
+        enhancementsLimit: data.enhancementsLimit,
+        fullResponse: data
+      });
       return {
-        enhancementsUsed: data.enhancementsUsed || 0,
-        enhancementsLimit: data.enhancementsLimit || 10
+        enhancementsUsed: data.enhancementsUsed ?? 0,
+        enhancementsLimit: data.enhancementsLimit ?? 10
       };
     } catch (fetchError) {
       clearTimeout(timeoutId);

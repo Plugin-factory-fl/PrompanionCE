@@ -26,11 +26,15 @@ router.post('/enhance', async (req, res) => {
     }
 
     // Reset daily usage if needed (lazy reset)
-    await resetDailyUsageIfNeeded(req.user.userId);
+    const resetOccurred = await resetDailyUsageIfNeeded(req.user.userId);
+    if (resetOccurred) {
+      console.log(`[API] Daily reset occurred for user ${req.user.userId} before enhancement check`);
+    }
 
     // Check user's subscription status and current usage
+    // Use a fresh query after reset to ensure we get the latest data
     const userResult = await query(
-      'SELECT subscription_status, enhancements_used, enhancements_limit FROM users WHERE id = $1',
+      'SELECT subscription_status, enhancements_used, enhancements_limit, last_reset_date FROM users WHERE id = $1',
       [req.user.userId]
     );
 
@@ -39,6 +43,7 @@ router.post('/enhance', async (req, res) => {
     }
 
     const user = userResult.rows[0];
+    console.log(`[API] User ${req.user.userId} usage check: ${user.enhancements_used}/${user.enhancements_limit}, last_reset: ${user.last_reset_date}`);
 
     // Check if user has reached their daily limit
     if (user.enhancements_used >= user.enhancements_limit) {
@@ -101,14 +106,19 @@ router.post('/enhance', async (req, res) => {
     }
 
     // Increment user's enhancement count
-    await query(
-      'UPDATE users SET enhancements_used = enhancements_used + 1 WHERE id = $1',
+    const incrementResult = await query(
+      'UPDATE users SET enhancements_used = enhancements_used + 1 WHERE id = $1 RETURNING enhancements_used',
       [req.user.userId]
     );
+    
+    const newCount = incrementResult.rows[0]?.enhancements_used || user.enhancements_used + 1;
+    console.log(`[API] Incremented enhancement count for user ${req.user.userId}: ${user.enhancements_used} -> ${newCount}`);
 
     res.json({
       optionA: parsed.optionA || prompt,
-      optionB: parsed.optionB || prompt
+      optionB: parsed.optionB || prompt,
+      enhancementsUsed: newCount, // Include updated count in response
+      enhancementsLimit: user.enhancements_limit
     });
   } catch (error) {
     console.error('Enhancement error:', error);

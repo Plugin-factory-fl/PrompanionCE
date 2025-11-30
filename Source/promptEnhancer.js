@@ -305,10 +305,42 @@ export async function handleEnhance(state, dependencies = {}) {
     }
 
     // Update enhancements display from server after successful enhancement
-    // Add a small delay to ensure database update has completed
+    // Use count from response if available, otherwise fetch fresh data
     if (dependencies.updateEnhancementsDisplay) {
-      await new Promise(resolve => setTimeout(resolve, 200)); // Wait 200ms for DB update
-      await dependencies.updateEnhancementsDisplay();
+      // If the response includes updated usage data, use it directly
+      if (response.enhancementsUsed !== undefined && response.enhancementsLimit !== undefined) {
+        console.log("[Prompanion] Using usage data from enhancement response:", {
+          enhancementsUsed: response.enhancementsUsed,
+          enhancementsLimit: response.enhancementsLimit
+        });
+        // Update state and UI directly
+        if (state) {
+          state.enhancementsUsed = response.enhancementsUsed;
+          state.enhancementsLimit = response.enhancementsLimit;
+        }
+        const countEl = document.getElementById("enhancements-count");
+        const limitEl = document.getElementById("enhancements-limit");
+        if (countEl) {
+          countEl.textContent = response.enhancementsUsed;
+          console.log("[Prompanion] Updated enhancements count to:", response.enhancementsUsed);
+        }
+        if (limitEl) {
+          limitEl.textContent = response.enhancementsLimit;
+        }
+        // Also update via renderStatus to ensure consistency
+        if (renderStatus) {
+          renderStatus({
+            ...state,
+            enhancementsUsed: response.enhancementsUsed,
+            enhancementsLimit: response.enhancementsLimit
+          });
+        }
+      } else {
+        // Otherwise, fetch fresh data with a delay to ensure DB update completed
+        console.log("[Prompanion] No usage data in response, fetching fresh data...");
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms for DB update
+        await dependencies.updateEnhancementsDisplay();
+      }
     }
 
     return state;

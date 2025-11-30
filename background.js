@@ -309,7 +309,13 @@ async function generateEnhancements(promptText, settings = {}) {
     const data = await response.json();
     const optionA = typeof data.optionA === "string" ? data.optionA.trim() : fallbackA;
     const optionB = typeof data.optionB === "string" ? data.optionB.trim() : fallbackB;
-    return { optionA, optionB };
+    // Include usage data if available from API response
+    return { 
+      optionA, 
+      optionB,
+      enhancementsUsed: data.enhancementsUsed,
+      enhancementsLimit: data.enhancementsLimit
+    };
   } catch (error) {
     console.error("Prompanion: enhancement generation failed", error);
     const errorMessage = error.message || String(error);
@@ -488,8 +494,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         };
         console.log("[Prompanion Background] Using settings:", settings);
         const result = await generateEnhancements(promptText, settings);
-        const { optionA, optionB, error } = result;
-        console.log("[Prompanion Background] Enhancement result - optionA:", optionA, "optionB:", optionB, "error:", error);
+        const { optionA, optionB, error, enhancementsUsed, enhancementsLimit } = result;
+        console.log("[Prompanion Background] Enhancement result - optionA:", optionA, "optionB:", optionB, "error:", error, "usage:", { enhancementsUsed, enhancementsLimit });
         
         // Only update state and open panel if there's no error
         if (!error) {
@@ -542,7 +548,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           ok: !error, 
           optionA, 
           optionB, 
-          error 
+          error,
+          enhancementsUsed, // Pass through usage data
+          enhancementsLimit
         });
       } catch (error) {
         console.error("Prompanion: failed to prepare enhancement", error);
