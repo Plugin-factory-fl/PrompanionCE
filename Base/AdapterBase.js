@@ -1047,6 +1047,14 @@ class AdapterBase {
     toolbar.style.pointerEvents = "";
     toolbar.classList.add(this._selectionToolbarConfig.visibleClass);
   }
+  
+  /**
+   * Public method to request a selection toolbar update
+   * Can be called manually when needed (e.g., after DOM changes)
+   */
+  static requestSelectionToolbarUpdate() {
+    this._handleSelectionChange();
+  }
 }
 
 // Export for use in adapters

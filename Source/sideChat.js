@@ -310,11 +310,24 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
   }
 
   // Get the active conversation - ensure we're using the correct one
-  const activeConversation = getActiveConversation(stateRef);
+  // Find the conversation by ID to ensure we have the correct reference
+  let activeConversation = null;
+  if (stateRef.activeConversationId) {
+    activeConversation = stateRef.conversations.find(c => c.id === stateRef.activeConversationId);
+  }
+  
+  // Fallback to first conversation if not found by ID
+  if (!activeConversation && stateRef.conversations.length > 0) {
+    activeConversation = stateRef.conversations[0];
+    console.warn("[Prompanion] Active conversation not found by ID, using first conversation");
+  }
+  
   console.log("[Prompanion] Active conversation:", {
     found: !!activeConversation,
     id: activeConversation?.id,
-    historyLength: activeConversation?.history?.length
+    historyLength: activeConversation?.history?.length,
+    activeConversationId: stateRef.activeConversationId,
+    conversationsCount: stateRef.conversations?.length
   });
   
   if (!activeConversation) {
@@ -323,13 +336,78 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
     console.error("[Prompanion] Active conversation ID:", stateRef?.activeConversationId);
     return stateRef;
   }
+  
+  // Ensure history array exists
+  if (!Array.isArray(activeConversation.history)) {
+    console.warn("[Prompanion] Conversation history is not an array, initializing...");
+    activeConversation.history = [];
+  }
 
   console.log("[Prompanion] Sending message to conversation:", activeConversation.id, "Current history length:", activeConversation.history.length);
 
   const now = Date.now();
-  activeConversation.history.push({ role: "user", content: message, timestamp: now });
+  const userMessage = { role: "user", content: message, timestamp: now };
+  console.log("[Prompanion] Adding user message to conversation:", {
+    conversationId: activeConversation.id,
+    messageLength: message.length,
+    messagePreview: message.substring(0, 50),
+    historyLengthBefore: activeConversation.history.length,
+    messageContent: message // Log full message for debugging
+  });
+  
+  // Add message to history
+  activeConversation.history.push(userMessage);
+  
+  // Verify it was added immediately
+  const verifyAdded = activeConversation.history[activeConversation.history.length - 1];
+  if (!verifyAdded || verifyAdded.content !== message) {
+    console.error("[Prompanion] CRITICAL: Message was not added to conversation history!", {
+      expectedMessage: message.substring(0, 50),
+      lastMessageInHistory: verifyAdded?.content?.substring(0, 50),
+      historyLength: activeConversation.history.length
+    });
+  }
+  
+  console.log("[Prompanion] User message added, new history length:", activeConversation.history.length);
+  console.log("[Prompanion] Last message in history:", {
+    role: activeConversation.history[activeConversation.history.length - 1]?.role,
+    contentPreview: activeConversation.history[activeConversation.history.length - 1]?.content?.substring(0, 50),
+    fullContent: activeConversation.history[activeConversation.history.length - 1]?.content
+  });
+  
   renderChat(activeConversation.history);
   renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
+  
+  // Ensure chat window scrolls to bottom to show the new message
+  setTimeout(() => {
+    const chatWindow = document.getElementById("chat-window");
+    if (chatWindow) {
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+      console.log("[Prompanion] Scrolled chat window to bottom to show new message");
+    }
+  }, 50);
+  
+  console.log("[Prompanion] Chat rendered, checking DOM...");
+  // Verify the message appears in the DOM
+  setTimeout(() => {
+    const chatWindow = document.getElementById("chat-window");
+    if (chatWindow) {
+      const userMessages = chatWindow.querySelectorAll('.chat-message--user');
+      console.log("[Prompanion] DOM Verification - Found", userMessages.length, "user messages in chat window");
+      if (userMessages.length > 0) {
+        const lastUserMessage = userMessages[userMessages.length - 1];
+        const messageText = lastUserMessage.querySelector('.chat-message__bubble')?.textContent || '';
+        console.log("[Prompanion] Last user message in DOM:", messageText.substring(0, 50));
+        
+        // Ensure the message is visible by scrolling it into view
+        lastUserMessage.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } else {
+        console.warn("[Prompanion] WARNING: No user messages found in DOM after rendering!");
+      }
+    } else {
+      console.error("[Prompanion] ERROR: Chat window not found in DOM!");
+    }
+  }, 100);
   
   if (!saveState || typeof saveState !== 'function') {
     console.error("[Prompanion] saveState is not a function in sendSideChatMessage!", typeof saveState);
@@ -756,14 +834,95 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
     
     console.log("[Prompanion] About to call sendSideChatMessage with:", {
       snippetLength: snippet.length,
+      snippetPreview: snippet.substring(0, 100),
       hasDependencies: !!dependencies,
       hasSaveState: typeof dependencies?.saveState === 'function',
-      chatHistoryLength: chatHistoryToUse.length
+      chatHistoryLength: chatHistoryToUse.length,
+      activeConversationId: stateRef.activeConversationId
     });
+    
+    // Verify snippet is not empty before sending
+    if (!snippet || snippet.trim().length === 0) {
+      console.error("[Prompanion] ERROR: Snippet is empty! Cannot send message.", {
+        snippet,
+        snippetType: typeof snippet,
+        snippetLength: snippet?.length
+      });
+      autoChatInFlight = false;
+      return;
+    }
     
     try {
       await sendSideChatMessage(stateRef, snippet, dependencies, chatHistoryToUse);
       console.log("[Prompanion] Message sent successfully");
+      
+      // Verify the message was added to history
+      // Wait a bit for state to sync, but check BEFORE the API response comes back
+      // The API response is async, so we should check immediately after sendSideChatMessage
+      // but before waiting for the response
+      const verifyConversation = getActiveConversation(stateRef);
+      if (verifyConversation) {
+        // Check the second-to-last message (the user message we just added)
+        // The last message might be the agent response if it came back quickly
+        const historyLength = verifyConversation.history.length;
+        const userMessageIndex = historyLength - 2; // Second to last (before agent response)
+        const lastMessageIndex = historyLength - 1; // Last message (might be agent response)
+        
+        // Try to find the user message we just added
+        let userMessage = null;
+        if (userMessageIndex >= 0 && verifyConversation.history[userMessageIndex]?.role === "user") {
+          userMessage = verifyConversation.history[userMessageIndex];
+        } else if (verifyConversation.history[lastMessageIndex]?.role === "user") {
+          // If last message is still user (API hasn't responded yet), use that
+          userMessage = verifyConversation.history[lastMessageIndex];
+        }
+        
+        console.log("[Prompanion] Verification - Checking conversation:", {
+          historyLength: historyLength,
+          userMessageIndex: userMessageIndex,
+          lastMessageIndex: lastMessageIndex,
+          foundUserMessage: !!userMessage,
+          userMessageRole: userMessage?.role,
+          userMessagePreview: userMessage?.content?.substring(0, 50),
+          lastMessageRole: verifyConversation.history[lastMessageIndex]?.role,
+          lastMessagePreview: verifyConversation.history[lastMessageIndex]?.content?.substring(0, 50),
+          conversationId: verifyConversation.id,
+          activeConversationId: stateRef.activeConversationId
+        });
+        
+        if (userMessage) {
+          // Check if message was added (more lenient check - allow whitespace differences)
+          const snippetTrimmed = snippet.trim();
+          const userMessageContentTrimmed = userMessage.content?.trim() || "";
+          
+          if (userMessageContentTrimmed !== snippetTrimmed) {
+            console.error("[Prompanion] ERROR: User message content doesn't match!", {
+              expectedSnippet: snippetTrimmed.substring(0, 100),
+              actualUserMessage: userMessageContentTrimmed.substring(0, 100),
+              expectedLength: snippetTrimmed.length,
+              actualLength: userMessageContentTrimmed.length,
+              match: userMessageContentTrimmed === snippetTrimmed
+            });
+          } else {
+            console.log("[Prompanion] ✓ Verification passed - User message was added correctly!");
+          }
+        } else {
+          console.warn("[Prompanion] WARNING: Could not find user message in conversation history!", {
+            historyLength: historyLength,
+            allMessages: verifyConversation.history.map((m, i) => ({
+              index: i,
+              role: m.role,
+              contentPreview: m.content?.substring(0, 30)
+            }))
+          });
+        }
+      } else {
+        console.error("[Prompanion] ERROR: Could not find active conversation for verification!", {
+          activeConversationId: stateRef.activeConversationId,
+          conversationsCount: stateRef.conversations?.length,
+          conversationIds: stateRef.conversations?.map(c => c.id)
+        });
+      }
     } catch (error) {
       console.error("[Prompanion] Error sending message:", error);
       throw error;

@@ -290,39 +290,83 @@ function updateSelectionToolbar() {
 }
 
 function captureGrokChatHistory(maxMessages = 20) {
+  // Make these logs VERY visible
+  console.log("%c[Prompanion Grok] ========== captureGrokChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("%c[Prompanion Grok] ========== captureGrokChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
   console.log("%c[Prompanion Grok] ========== captureGrokChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
   console.log("[Prompanion Grok] Current URL:", window.location.href);
+  console.log("[Prompanion Grok] Document ready state:", document.readyState);
+  console.log("[Prompanion Grok] Timestamp:", new Date().toISOString());
+  
+  // Check if we're on a conversation page
+  const isConversationPage = window.location.href.includes("/c/") || 
+                            window.location.href.includes("/chat") ||
+                            document.querySelector("main, [role='main']");
+  console.log("[Prompanion Grok] Is conversation page:", isConversationPage);
   
   const messages = [];
   
   try {
-    // Grok-specific selectors
+    // First, try to find the main conversation container (Grok uses main element)
+    const mainContainer = document.querySelector("main");
+    console.log("[Prompanion Grok] Main container found:", !!mainContainer);
+    
+    // Determine the best search root - prefer main container, then document
+    let searchRoot = document;
+    if (mainContainer) {
+      searchRoot = mainContainer;
+      console.log("[Prompanion Grok] Using main container as search root");
+      console.log("[Prompanion Grok] Main container details:", {
+        tagName: mainContainer.tagName,
+        className: mainContainer.className,
+        childCount: mainContainer.children.length,
+        innerHTMLLength: mainContainer.innerHTML.length,
+        hasText: (mainContainer.innerText || mainContainer.textContent || "").trim().length > 0
+      });
+    } else {
+      console.warn("[Prompanion Grok] ⚠️ Main container not found - searching entire document");
+    }
+    
+    // Grok-specific selectors - try multiple patterns to handle DOM changes
     const assistantSelectors = [
       "[data-role='assistant']",
       "[data-author='assistant']",
-      "[class*='assistant'][class*='message']",
+      "[data-message-author-role='assistant']",
       "div[data-role='assistant']",
-      "article[data-role='assistant']"
+      "article[data-role='assistant']",
+      "[class*='assistant'][class*='message']",
+      "[class*='assistant'][class*='turn']",
+      "div[class*='assistant-message']",
+      "div[class*='assistant-turn']",
+      "[class*='assistant']"
     ];
     
     const userSelectors = [
       "[data-role='user']",
       "[data-author='user']",
-      "[class*='user'][class*='message']",
+      "[data-message-author-role='user']",
       "div[data-role='user']",
-      "article[data-role='user']"
+      "article[data-role='user']",
+      "[class*='user'][class*='message']",
+      "[class*='user'][class*='turn']",
+      "div[class*='user-message']",
+      "div[class*='user-turn']",
+      "[class*='user'][class*='message']"
     ];
     
+    console.log("[Prompanion Grok] Searching for messages with multiple selector strategies");
+    
+    // Try each selector pattern and combine results
     let assistantElements = [];
     let userElements = [];
     
     for (const selector of assistantSelectors) {
       try {
-        const found = Array.from(document.querySelectorAll(selector));
+        const found = Array.from(searchRoot.querySelectorAll(selector));
         if (found.length > 0) {
           console.log(`[Prompanion Grok] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
           assistantElements = found;
-          break;
+          break; // Use first selector that finds elements
         }
       } catch (e) {
         console.warn(`[Prompanion Grok] Selector failed: ${selector}`, e);
@@ -331,18 +375,187 @@ function captureGrokChatHistory(maxMessages = 20) {
     
     for (const selector of userSelectors) {
       try {
-        const found = Array.from(document.querySelectorAll(selector));
+        const found = Array.from(searchRoot.querySelectorAll(selector));
         if (found.length > 0) {
           console.log(`[Prompanion Grok] ✓ Found ${found.length} user messages with selector: ${selector}`);
           userElements = found;
-          break;
+          break; // Use first selector that finds elements
         }
       } catch (e) {
         console.warn(`[Prompanion Grok] Selector failed: ${selector}`, e);
       }
     }
     
-    // Combine and sort by DOM position
+    console.log("[Prompanion Grok] Final element counts after standard selectors:", {
+      assistantCount: assistantElements.length,
+      userCount: userElements.length,
+      totalElements: assistantElements.length + userElements.length
+    });
+    
+    // If no elements found with standard selectors, try searching within main container
+    if (assistantElements.length === 0 && userElements.length === 0 && mainContainer) {
+      console.warn("[Prompanion Grok] ⚠️ No messages found with standard selectors, searching within main container...");
+      
+      // Look for all divs within main that might be messages
+      const allDivsInMain = mainContainer.querySelectorAll("div");
+      console.log(`[Prompanion Grok] Found ${allDivsInMain.length} divs within main container`);
+      
+      // Look for message-like structures - Grok messages are typically in nested divs
+      const potentialMessages = Array.from(allDivsInMain).filter(div => {
+        const text = (div.innerText || div.textContent || "").trim();
+        // Look for divs with substantial text (likely messages) but not UI elements
+        return text.length > 20 && text.length < 50000 && 
+               !div.closest("button") && 
+               !div.closest("nav") && 
+               !div.closest("header") &&
+               !div.closest("footer") &&
+               !div.closest("aside") &&
+               !div.closest("form") &&
+               div.children.length > 0;
+      });
+      
+      console.log(`[Prompanion Grok] Found ${potentialMessages.length} potential message divs in main`);
+      
+      // Sort potential messages by their position in the DOM (top to bottom)
+      const sortedMessages = potentialMessages.sort((a, b) => {
+        const posA = getElementPosition(a);
+        const posB = getElementPosition(b);
+        return posA - posB;
+      });
+      
+      // Use alternating pattern: Grok typically starts with user, then assistant, etc.
+      // First message in conversation is usually user
+      for (let i = 0; i < sortedMessages.length && (assistantElements.length + userElements.length) < maxMessages * 2; i++) {
+        const msg = sortedMessages[i];
+        const text = (msg.innerText || msg.textContent || "").trim();
+        
+        if (text.length > 20) {
+          // Check for explicit markers first
+          const hasAssistantMarker = msg.querySelector("[class*='assistant']") || 
+                                   msg.getAttribute("data-author") === "assistant" ||
+                                   msg.closest("[data-message-author-role='assistant']") ||
+                                   msg.className?.includes("assistant") ||
+                                   msg.getAttribute("data-role") === "assistant" ||
+                                   msg.querySelector("[data-message-author-role='assistant']");
+          
+          const hasUserMarker = msg.querySelector("[class*='user']") || 
+                              msg.getAttribute("data-author") === "user" ||
+                              msg.closest("[data-message-author-role='user']") ||
+                              msg.className?.includes("user") ||
+                              msg.getAttribute("data-role") === "user" ||
+                              msg.querySelector("[data-message-author-role='user']");
+          
+          // If we have clear markers, use them
+          if (hasAssistantMarker && assistantElements.length < maxMessages) {
+            assistantElements.push(msg);
+            console.log(`[Prompanion Grok] Added assistant message from main search (${text.substring(0, 50)}...)`);
+          } else if (hasUserMarker && userElements.length < maxMessages) {
+            userElements.push(msg);
+            console.log(`[Prompanion Grok] Added user message from main search (${text.substring(0, 50)}...)`);
+          } else {
+            // No clear markers - use alternating pattern
+            // Grok conversations typically start with user, then assistant, then user, etc.
+            const totalFound = assistantElements.length + userElements.length;
+            if (totalFound % 2 === 0 && userElements.length < maxMessages) {
+              // Even index (0, 2, 4...) = user message
+              userElements.push(msg);
+              console.log(`[Prompanion Grok] Added user message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
+            } else if (assistantElements.length < maxMessages) {
+              // Odd index (1, 3, 5...) = assistant message
+              assistantElements.push(msg);
+              console.log(`[Prompanion Grok] Added assistant message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
+            }
+          }
+        }
+      }
+      
+      console.log(`[Prompanion Grok] After main search: ${assistantElements.length} assistant, ${userElements.length} user messages`);
+    }
+    
+    // If still no elements found, try alternative approach with other containers
+    if (assistantElements.length === 0 && userElements.length === 0) {
+      console.warn("[Prompanion Grok] ⚠️ Still no messages found, trying broader search...");
+      
+      // Try finding messages by looking for conversation containers
+      const conversationContainers = document.querySelectorAll("main, [role='main'], [class*='conversation'], [class*='chat'], [id*='conversation'], [id*='chat']");
+      console.log("[Prompanion Grok] Found conversation containers:", conversationContainers.length);
+      
+      // Log container structure for debugging
+      if (conversationContainers.length > 0) {
+        const firstContainer = conversationContainers[0];
+        console.log("[Prompanion Grok] First container structure:", {
+          tagName: firstContainer.tagName,
+          className: firstContainer.className,
+          id: firstContainer.id,
+          childCount: firstContainer.children.length,
+          innerHTMLPreview: firstContainer.innerHTML.substring(0, 200)
+        });
+      }
+      
+      // Look for message-like structures within containers
+      for (const container of conversationContainers) {
+        const potentialMessages = container.querySelectorAll("div[class*='message'], div[class*='turn'], article, [class*='group'], [class*='item']");
+        console.log(`[Prompanion Grok] Found ${potentialMessages.length} potential message elements in container`);
+        
+        // Try to identify role by looking for common patterns
+        for (const msg of potentialMessages) {
+          const text = (msg.innerText || msg.textContent || "").trim();
+          if (text.length > 10) {
+            // Heuristic: if it contains common assistant patterns, it's likely assistant
+            const isLikelyAssistant = msg.querySelector("[class*='assistant']") || 
+                                     msg.getAttribute("data-author") === "assistant" ||
+                                     msg.closest("[data-message-author-role='assistant']") ||
+                                     msg.className?.includes("assistant") ||
+                                     msg.getAttribute("data-role") === "assistant";
+            
+            if (isLikelyAssistant && assistantElements.length < maxMessages) {
+              assistantElements.push(msg);
+              console.log(`[Prompanion Grok] Added assistant element from fallback search`);
+            } else if (!isLikelyAssistant && userElements.length < maxMessages) {
+              userElements.push(msg);
+              console.log(`[Prompanion Grok] Added user element from fallback search`);
+            }
+          }
+        }
+      }
+    }
+    
+    // Last resort: search for any divs with substantial text that might be messages
+    if (assistantElements.length === 0 && userElements.length === 0) {
+      console.warn("[Prompanion Grok] ⚠️ Still no messages found, trying last-resort search...");
+      const allDivs = document.querySelectorAll("div");
+      let foundCount = 0;
+      for (const div of allDivs) {
+        const text = (div.innerText || div.textContent || "").trim();
+        // Look for divs with substantial text (likely messages) but not UI elements
+        if (text.length > 50 && text.length < 5000 && 
+            !div.closest("button") && 
+            !div.closest("nav") && 
+            !div.closest("header") &&
+            !div.closest("footer") &&
+            !div.closest("form") &&
+            div.children.length > 0) {
+          // Try to determine role from context
+          const parent = div.parentElement;
+          const hasAssistantMarker = div.className?.includes("assistant") || 
+                                    parent?.className?.includes("assistant") ||
+                                    div.getAttribute("data-author") === "assistant";
+          
+          if (hasAssistantMarker && assistantElements.length < maxMessages) {
+            assistantElements.push(div);
+            foundCount++;
+          } else if (userElements.length < maxMessages) {
+            userElements.push(div);
+            foundCount++;
+          }
+          
+          if (foundCount >= maxMessages * 2) break;
+        }
+      }
+      console.log(`[Prompanion Grok] Last-resort search found ${foundCount} potential messages`);
+    }
+    
+    // Combine and sort by DOM position (maintain conversation order)
     const allElements = [];
     assistantElements.forEach(el => {
       if (el && el.isConnected) {
@@ -355,25 +568,152 @@ function captureGrokChatHistory(maxMessages = 20) {
       }
     });
     
+    // Sort by position in document (top to bottom)
     allElements.sort((a, b) => a.position - b.position);
+    
+    console.log("[Prompanion Grok] Processing", allElements.length, "message elements");
     
     for (const { el, role } of allElements) {
       if (messages.length >= maxMessages) break;
       
-      const content = (el.innerText || el.textContent || "").trim();
-      if (content && content.length > 3) {
-        messages.push({
-          role: role === 'assistant' ? 'assistant' : 'user',
-          content: content.replace(/\s+/g, " ").trim(),
-          timestamp: Date.now()
+      // Extract content using multiple strategies
+      const contentSelectors = [
+        "[data-message-content]",
+        "[data-testid='message-content']",
+        ".markdown",
+        ".prose",
+        "[class*='markdown']",
+        "[class*='prose']",
+        "div[class*='text']",
+        "div[class*='content']",
+        "div[role='textbox']",
+        "div[contenteditable='false']"
+      ];
+      
+      let content = null;
+      for (const selector of contentSelectors) {
+        const contentEl = el.querySelector(selector);
+        if (contentEl) {
+          const extracted = (contentEl.innerText || contentEl.textContent)?.trim();
+          if (extracted && extracted.length > 0) {
+            content = extracted;
+            console.log(`[Prompanion Grok] Extracted content using selector "${selector}": ${content.substring(0, 50)}...`);
+            break;
+          }
+        }
+      }
+      
+      // Fallback: get text from element itself, but filter out UI elements
+      if (!content) {
+        const textNodes = [];
+        const walker = document.createTreeWalker(
+          el,
+          NodeFilter.SHOW_TEXT,
+          {
+            acceptNode: (node) => {
+              const parent = node.parentElement;
+              if (parent && (
+                parent.tagName === "BUTTON" ||
+                parent.tagName === "INPUT" ||
+                parent.closest("button") ||
+                parent.closest("input")
+              )) {
+                return NodeFilter.FILTER_REJECT;
+              }
+              return NodeFilter.FILTER_ACCEPT;
+            }
+          }
+        );
+        
+        let node;
+        while ((node = walker.nextNode())) {
+          const text = node.textContent?.trim();
+          if (text && text.length > 0) {
+            textNodes.push(text);
+          }
+        }
+        
+        if (textNodes.length > 0) {
+          content = textNodes.join(" ").trim();
+        }
+      }
+      
+      // Final fallback
+      if (!content) {
+        content = (el.innerText || el.textContent)?.trim();
+      }
+      
+      // Clean and validate content
+      if (content) {
+        content = content.replace(/\s+/g, " ").trim();
+        
+        // Filter out very short or UI-only content
+        if (content.length > 3 && !/^(copy|regenerate|thumbs up|thumbs down|share|attach)$/i.test(content)) {
+          messages.push({
+            role: role === 'assistant' ? 'assistant' : 'user',
+            content: content,
+            timestamp: Date.now()
+          });
+          console.log(`[Prompanion Grok] Added ${role} message (${content.length} chars): ${content.substring(0, 50)}...`);
+        } else {
+          console.log(`[Prompanion Grok] Skipped ${role} message - too short or UI-only: "${content.substring(0, 30)}"`);
+        }
+      } else {
+        console.warn(`[Prompanion Grok] Could not extract content from ${role} message element:`, {
+          tagName: el.tagName,
+          className: el.className,
+          hasChildren: el.children.length > 0,
+          innerTextLength: (el.innerText || "").length,
+          textContentLength: (el.textContent || "").length
         });
       }
     }
     
     console.log(`[Prompanion Grok] ✓ Captured ${messages.length} messages from Grok conversation`);
+    if (messages.length === 0) {
+      console.warn("[Prompanion Grok] ⚠️ No messages captured - check if conversation elements exist in DOM");
+      console.warn("[Prompanion Grok] DOM Diagnostic Info:", {
+        bodyChildren: document.body?.children?.length || 0,
+        mainElements: document.querySelectorAll("main").length,
+        articles: document.querySelectorAll("article").length,
+        divsWithDataRole: document.querySelectorAll("div[data-role], div[data-author], div[data-message-author-role]").length,
+        allDivs: document.querySelectorAll("div").length,
+        sampleDivClasses: Array.from(document.querySelectorAll("div")).slice(0, 10).map(d => d.className).filter(c => c),
+        url: window.location.href
+      });
+      
+      // Try one more aggressive search: look for any divs with substantial text that might be messages
+      console.warn("[Prompanion Grok] Attempting final aggressive search for message-like content...");
+      const allTextDivs = Array.from(document.querySelectorAll("div")).filter(div => {
+        const text = (div.innerText || div.textContent || "").trim();
+        return text.length > 20 && text.length < 10000 && 
+               !div.closest("button") && 
+               !div.closest("nav") && 
+               !div.closest("header") &&
+               !div.closest("footer") &&
+               !div.closest("aside") &&
+               !div.closest("form") &&
+               div.children.length > 0;
+      });
+      
+      console.warn(`[Prompanion Grok] Found ${allTextDivs.length} potential message divs in final search`);
+      if (allTextDivs.length > 0) {
+        console.warn("[Prompanion Grok] Sample divs found:", allTextDivs.slice(0, 5).map(div => ({
+          className: div.className,
+          id: div.id,
+          textPreview: (div.innerText || div.textContent || "").substring(0, 100),
+          dataAttributes: Array.from(div.attributes).filter(attr => attr.name.startsWith("data-")).map(attr => `${attr.name}="${attr.value}"`)
+        })));
+      }
+    }
     return messages;
   } catch (error) {
     console.error("[Prompanion Grok] ✗ Error capturing Grok chat history:", error);
+    console.error("[Prompanion Grok] Error details:", {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     return [];
   }
 }
@@ -388,11 +728,15 @@ function getElementPosition(element) {
   return position;
 }
 
-function submitSelectionToSideChat(text) {
+async function submitSelectionToSideChat(text) {
+  // Make these logs VERY visible
+  console.log("%c[Prompanion Grok] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[Prompanion Grok] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
   console.log("%c[Prompanion Grok] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
   
   const snippet = typeof text === "string" ? text.trim() : "";
   console.log("[Prompanion Grok] Snippet:", snippet?.substring(0, 50));
+  console.log("[Prompanion Grok] selectionAskInFlight:", selectionAskInFlight);
   
   if (!snippet || selectionAskInFlight) {
     console.log("[Prompanion Grok] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
@@ -406,20 +750,48 @@ function submitSelectionToSideChat(text) {
     console.log("%c[Prompanion Grok] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
     try {
       chatHistory = captureGrokChatHistory(20);
-      console.log(`%c[Prompanion Grok] ✓ Captured ${chatHistory.length} messages`, 
+      console.log(`%c[Prompanion Grok] ✓ Captured ${chatHistory.length} messages from conversation for SideChat context`, 
         chatHistory.length > 0 ? "color: green; font-size: 14px; font-weight: bold;" : "color: red; font-size: 14px; font-weight: bold;");
-      if (chatHistory.length === 0) {
-        console.warn("[Prompanion Grok] ⚠️ No messages found in DOM");
+      
+      // Log sample of captured history for debugging
+      if (chatHistory.length > 0) {
+        console.log("[Prompanion Grok] Sample captured messages:", {
+          firstMessage: {
+            role: chatHistory[0].role,
+            contentPreview: chatHistory[0].content?.substring(0, 50) + "..."
+          },
+          lastMessage: {
+            role: chatHistory[chatHistory.length - 1].role,
+            contentPreview: chatHistory[chatHistory.length - 1].content?.substring(0, 50) + "..."
+          },
+          totalMessages: chatHistory.length
+        });
+      } else {
+        console.warn("[Prompanion Grok] ⚠️ captureGrokChatHistory returned empty array - no messages found in DOM");
       }
     } catch (error) {
       console.error("[Prompanion Grok] ✗ Failed to capture chat history:", error);
+      console.error("[Prompanion Grok] Error stack:", error.stack);
+      // Continue with empty array - better than failing completely
       chatHistory = [];
     }
     
-    console.log("%c[Prompanion Grok] Sending PROMPANION_SIDECHAT_REQUEST", "color: purple; font-size: 14px; font-weight: bold;");
-    console.log("[Prompanion Grok] Request details:", {
+    console.log("[Prompanion Grok] ========== SENDING PROMPANION_SIDECHAT_REQUEST ==========");
+    console.log("[Prompanion Grok] Sending PROMPANION_SIDECHAT_REQUEST with:", {
       textLength: snippet.length,
-      chatHistoryLength: chatHistory.length
+      textPreview: snippet.substring(0, 50),
+      chatHistoryLength: chatHistory.length,
+      hasChatHistory: chatHistory.length > 0,
+      chatHistorySample: chatHistory.length > 0 ? {
+        firstMessage: {
+          role: chatHistory[0].role,
+          contentPreview: chatHistory[0].content?.substring(0, 50)
+        },
+        lastMessage: {
+          role: chatHistory[chatHistory.length - 1].role,
+          contentPreview: chatHistory[chatHistory.length - 1].content?.substring(0, 50)
+        }
+      } : null
     });
 
     AdapterBase.sendMessage({ 
@@ -427,12 +799,14 @@ function submitSelectionToSideChat(text) {
       text: snippet,
       chatHistory: chatHistory 
     }, (response) => {
+      console.log("[Prompanion Grok] ========== PROMPANION_SIDECHAT_REQUEST RESPONSE ==========");
+      console.log("[Prompanion Grok] Response:", response);
       if (!response?.ok) {
-        console.warn("Prompanion Grok: sidechat request rejected", response?.reason);
+        console.warn("Prompanion: sidechat request rejected", response?.reason);
       }
       selectionAskInFlight = false;
     }).catch((error) => {
-      console.warn("Prompanion Grok: failed to request sidechat from selection", error);
+      console.warn("Prompanion: failed to request sidechat from selection", error);
       selectionAskInFlight = false;
     });
   } catch (error) {
@@ -585,25 +959,22 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
   let inputBarContainer = null;
   
   // CRITICAL: Find the specific subelement within the query-bar container
-  // XPath: /html/body/div[2]/div[3]/div/div/main/div[2]/div/div[2]/div/div[1]/form/div/div/div[2]/div[1]/div
-  // This is form > div > div > div[2] > div[1] > div (the specific input bar subelement)
+  // XPath: /html/body/div[2]/div[3]/div/div/main/div[2]/div/div[2]/div/div[1]/form/div/div/div[2]/div[2]
+  // This is form > div > div > div[2] > div[2] (the target container for the button)
   
   // Strategy 1: Find form first, then navigate to the specific subelement
   const form = document.querySelector("form");
   if (form) {
-    // Navigate: form > div > div > div:nth-child(2) > div:nth-child(1) > div
+    // Navigate: form > div > div > div:nth-child(2) > div:nth-child(2)
     const firstDiv = form.querySelector(":scope > div");
     if (firstDiv) {
       const secondDiv = firstDiv.querySelector(":scope > div");
       if (secondDiv) {
         const thirdDiv = secondDiv.children[1]; // div:nth-child(2) (0-indexed: [1])
-        if (thirdDiv) {
-          const fourthDiv = thirdDiv.children[0]; // div:nth-child(1) (0-indexed: [0])
-          if (fourthDiv) {
-            const targetDiv = fourthDiv.querySelector(":scope > div");
-            if (targetDiv && targetDiv.offsetParent) {
-              inputBarContainer = targetDiv;
-            }
+        if (thirdDiv && thirdDiv.children.length > 1) {
+          const targetDiv = thirdDiv.children[1]; // div:nth-child(2) (0-indexed: [1])
+          if (targetDiv && targetDiv.offsetParent) {
+            inputBarContainer = targetDiv;
           }
         }
       }
@@ -617,19 +988,16 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
                               document.querySelector('[class*="query-bar"][class*="relative"][class*="z-10"]');
     
     if (queryBarContainer && form) {
-      // Look for the specific subelement: form > div > div > div[2] > div[1] > div
+      // Look for the specific subelement: form > div > div > div[2] > div[2]
       const firstDiv = form.querySelector(":scope > div");
       if (firstDiv) {
         const secondDiv = firstDiv.querySelector(":scope > div");
         if (secondDiv && secondDiv.children.length > 1) {
           const thirdDiv = secondDiv.children[1]; // div:nth-child(2)
-          if (thirdDiv && thirdDiv.children.length > 0) {
-            const fourthDiv = thirdDiv.children[0]; // div:nth-child(1)
-            if (fourthDiv) {
-              const targetDiv = fourthDiv.querySelector(":scope > div");
-              if (targetDiv && targetDiv.offsetParent) {
-                inputBarContainer = targetDiv;
-              }
+          if (thirdDiv && thirdDiv.children.length > 1) {
+            const targetDiv = thirdDiv.children[1]; // div:nth-child(2)
+            if (targetDiv && targetDiv.offsetParent) {
+              inputBarContainer = targetDiv;
             }
           }
         }
@@ -640,15 +1008,15 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
   // Strategy 3: Walk up from input node to find the target structure
   if (!inputBarContainer && inputNode) {
     let current = inputNode;
-    // Walk up to find the specific div structure
+    // Walk up to find the specific div structure: form > div > div > div[2] > div[2]
     for (let i = 0; i < 20 && current; i++) {
       if (current.tagName === "DIV" && current.parentElement && current.parentElement.parentElement) {
         const parent = current.parentElement;
         const grandparent = parent.parentElement;
         // Check if we're in the right structure: grandparent has multiple children including this one
         if (grandparent && grandparent.children.length > 1 && grandparent.children[1] === parent) {
-          // We might be in div[2] > div[1] structure
-          if (parent.children.length > 0 && parent.children[0] === current) {
+          // We might be in div[2] > div[2] structure
+          if (parent.children.length > 1 && parent.children[1] === current) {
             // Check if grandparent's parent is a div > div > form structure
             const greatGrandparent = grandparent.parentElement;
             if (greatGrandparent && greatGrandparent.parentElement && 
@@ -675,7 +1043,66 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
   // ALWAYS position in the input bar container if found, never use the fallback container
   if (inputBarContainer && inputBarContainer.offsetParent) {
     const containerRect = inputBarContainer.getBoundingClientRect();
-    const spacing = 10; // 10px from right edge
+    
+    // Find the send/rocketship button to position relative to it
+    let sendButton = null;
+    
+    // Look for the send button in the container - it should be a button with SVG or icon
+    const buttons = inputBarContainer.querySelectorAll("button");
+    for (const btn of buttons) {
+      // Exclude attach buttons
+      const label = (btn.getAttribute("aria-label") || "").toLowerCase();
+      if (label.includes("attach")) continue;
+      
+      // Check if it's visible and positioned to the right (send button is usually rightmost)
+      if (btn.offsetParent) {
+        sendButton = btn;
+        break; // Take the first visible button that's not attach
+      }
+    }
+    
+    // If we found multiple buttons, prefer the rightmost one (send button)
+    if (buttons.length > 1) {
+      const visibleButtons = Array.from(buttons).filter(btn => {
+        const label = (btn.getAttribute("aria-label") || "").toLowerCase();
+        return btn.offsetParent && !label.includes("attach");
+      });
+      if (visibleButtons.length > 0) {
+        sendButton = visibleButtons.reduce((rightmost, btn) => {
+          return btn.getBoundingClientRect().right > rightmost.getBoundingClientRect().right 
+                 ? btn : rightmost;
+        });
+      }
+    }
+    
+    let spacing = 10; // Default spacing from right edge
+    
+    // If we found the send button, position to the left of it
+    if (sendButton) {
+      const sendRect = sendButton.getBoundingClientRect();
+      const containerRect2 = inputBarContainer.getBoundingClientRect();
+      
+      // Calculate send button's right edge relative to container's right edge
+      const sendRightFromContainer = containerRect2.right - sendRect.right;
+      
+      // Position our button to the left of send button
+      // We need: send button width + spacing + our button width
+      const sendButtonWidth = sendRect.width;
+      const ourButtonWidth = BUTTON_SIZE.wrapper || 40;
+      const spacingBetween = 73; // 73px spacing between buttons (8px base + 20px + 30px + 15px extra offset)
+      
+      spacing = sendRightFromContainer + sendButtonWidth + spacingBetween;
+      
+      console.log("[Prompanion Grok] Send button found, positioning relative to it:", {
+        sendButtonWidth: sendButtonWidth,
+        ourButtonWidth: ourButtonWidth,
+        sendRightFromContainer: sendRightFromContainer,
+        calculatedSpacing: spacing,
+        sendButtonAriaLabel: sendButton.getAttribute("aria-label")
+      });
+    } else {
+      console.warn("[Prompanion Grok] Send button not found in container, using default spacing");
+    }
     
     // Ensure container has relative positioning
     const containerStyle = getComputedStyle(inputBarContainer);

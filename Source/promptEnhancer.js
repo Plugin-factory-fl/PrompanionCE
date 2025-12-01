@@ -680,7 +680,7 @@ export function registerEnhanceButton(stateRef, dependencies) {
     
     isProcessing = true;
     try {
-      await handleEnhance(stateRef, dependencies);
+    await handleEnhance(stateRef, dependencies);
     } finally {
       // Reset flag after a short delay to prevent rapid clicks
       setTimeout(() => {

@@ -48,6 +48,8 @@ let selectionToolbarButton = null;
 let selectionToolbarText = "";
 let selectionUpdateRaf = null;
 let highlightObserver = null;
+let positionRetryCount = 0;
+const MAX_POSITION_RETRIES = 5;
 
 // Generic styles moved to styles/AdapterStyles.css
 // Styles are loaded via ensureStyle() function
@@ -512,6 +514,10 @@ function updateSelectionToolbar() {
     return;
   }
   selectionToolbarText = text;
+  console.log("[Prompanion Perplexity] Selection toolbar text updated:", {
+    textLength: text?.length || 0,
+    textPreview: text?.substring(0, 50) || "EMPTY"
+  });
   
   // Position tooltip BELOW the selection to avoid conflict with Perplexity's native UI
   // Measure toolbar dimensions by temporarily positioning offscreen (but keep opacity 0 via class)
@@ -575,13 +581,44 @@ function updateSelectionToolbar() {
 }
 
 function capturePerplexityChatHistory(maxMessages = 20) {
+  // Make these logs VERY visible
+  console.log("%c[Prompanion Perplexity] ========== capturePerplexityChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("%c[Prompanion Perplexity] ========== capturePerplexityChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
   console.log("%c[Prompanion Perplexity] ========== capturePerplexityChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
   console.log("[Prompanion Perplexity] Current URL:", window.location.href);
+  console.log("[Prompanion Perplexity] Document ready state:", document.readyState);
+  console.log("[Prompanion Perplexity] Timestamp:", new Date().toISOString());
+  
+  // Check if we're on a conversation page
+  const isConversationPage = window.location.href.includes("/search") || 
+                            window.location.href.includes("/chat") ||
+                            document.querySelector("main, [role='main']");
+  console.log("[Prompanion Perplexity] Is conversation page:", isConversationPage);
   
   const messages = [];
   
   try {
-    // Perplexity-specific selectors
+    // First, try to find the main conversation container
+    const mainContainer = document.querySelector("main, [role='main']");
+    console.log("[Prompanion Perplexity] Main container found:", !!mainContainer);
+    
+    // Determine the best search root - prefer main container, then document
+    let searchRoot = document;
+    if (mainContainer) {
+      searchRoot = mainContainer;
+      console.log("[Prompanion Perplexity] Using main container as search root");
+      console.log("[Prompanion Perplexity] Main container details:", {
+        tagName: mainContainer.tagName,
+        className: mainContainer.className,
+        childCount: mainContainer.children.length,
+        innerHTMLLength: mainContainer.innerHTML.length,
+        hasText: (mainContainer.innerText || mainContainer.textContent || "").trim().length > 0
+      });
+    } else {
+      console.warn("[Prompanion Perplexity] ⚠️ Main container not found - searching entire document");
+    }
+    
+    // Perplexity-specific selectors - try multiple patterns to handle DOM changes
     const assistantSelectors = [
       "[data-role='assistant']",
       "[data-message-role='assistant']",
@@ -589,7 +626,11 @@ function capturePerplexityChatHistory(maxMessages = 20) {
       "[role='assistant']",
       "[data-type='assistant']",
       "div[data-role='assistant']",
-      "article[data-role='assistant']"
+      "article[data-role='assistant']",
+      "[class*='assistant'][class*='message']",
+      "[class*='assistant'][class*='turn']",
+      "div[class*='assistant-message']",
+      "div[class*='assistant-turn']"
     ];
     
     const userSelectors = [
@@ -599,19 +640,26 @@ function capturePerplexityChatHistory(maxMessages = 20) {
       "[role='user']",
       "[data-type='user']",
       "div[data-role='user']",
-      "article[data-role='user']"
+      "article[data-role='user']",
+      "[class*='user'][class*='message']",
+      "[class*='user'][class*='turn']",
+      "div[class*='user-message']",
+      "div[class*='user-turn']"
     ];
     
+    console.log("[Prompanion Perplexity] Searching for messages with multiple selector strategies");
+    
+    // Try each selector pattern and combine results
     let assistantElements = [];
     let userElements = [];
     
     for (const selector of assistantSelectors) {
       try {
-        const found = Array.from(document.querySelectorAll(selector));
+        const found = Array.from(searchRoot.querySelectorAll(selector));
         if (found.length > 0) {
           console.log(`[Prompanion Perplexity] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
           assistantElements = found;
-          break;
+          break; // Use first selector that finds elements
         }
       } catch (e) {
         console.warn(`[Prompanion Perplexity] Selector failed: ${selector}`, e);
@@ -620,18 +668,187 @@ function capturePerplexityChatHistory(maxMessages = 20) {
     
     for (const selector of userSelectors) {
       try {
-        const found = Array.from(document.querySelectorAll(selector));
+        const found = Array.from(searchRoot.querySelectorAll(selector));
         if (found.length > 0) {
           console.log(`[Prompanion Perplexity] ✓ Found ${found.length} user messages with selector: ${selector}`);
           userElements = found;
-          break;
+          break; // Use first selector that finds elements
         }
       } catch (e) {
         console.warn(`[Prompanion Perplexity] Selector failed: ${selector}`, e);
       }
     }
     
-    // Combine and sort by DOM position
+    console.log("[Prompanion Perplexity] Final element counts after standard selectors:", {
+      assistantCount: assistantElements.length,
+      userCount: userElements.length,
+      totalElements: assistantElements.length + userElements.length
+    });
+    
+    // If no elements found with standard selectors, try searching within main container
+    if (assistantElements.length === 0 && userElements.length === 0 && mainContainer) {
+      console.warn("[Prompanion Perplexity] ⚠️ No messages found with standard selectors, searching within main container...");
+      
+      // Look for all divs within main that might be messages
+      const allDivsInMain = mainContainer.querySelectorAll("div");
+      console.log(`[Prompanion Perplexity] Found ${allDivsInMain.length} divs within main container`);
+      
+      // Look for message-like structures - Perplexity messages are typically in nested divs
+      const potentialMessages = Array.from(allDivsInMain).filter(div => {
+        const text = (div.innerText || div.textContent || "").trim();
+        // Look for divs with substantial text (likely messages) but not UI elements
+        return text.length > 20 && text.length < 50000 && 
+               !div.closest("button") && 
+               !div.closest("nav") && 
+               !div.closest("header") &&
+               !div.closest("footer") &&
+               !div.closest("aside") &&
+               !div.closest("form") &&
+               div.children.length > 0;
+      });
+      
+      console.log(`[Prompanion Perplexity] Found ${potentialMessages.length} potential message divs in main`);
+      
+      // Sort potential messages by their position in the DOM (top to bottom)
+      const sortedMessages = potentialMessages.sort((a, b) => {
+        const posA = getElementPosition(a);
+        const posB = getElementPosition(b);
+        return posA - posB;
+      });
+      
+      // Use alternating pattern: Perplexity typically starts with user, then assistant, etc.
+      // First message in conversation is usually user
+      for (let i = 0; i < sortedMessages.length && (assistantElements.length + userElements.length) < maxMessages * 2; i++) {
+        const msg = sortedMessages[i];
+        const text = (msg.innerText || msg.textContent || "").trim();
+        
+        if (text.length > 20) {
+          // Check for explicit markers first
+          const hasAssistantMarker = msg.querySelector("[class*='assistant']") || 
+                                   msg.getAttribute("data-author") === "assistant" ||
+                                   msg.closest("[data-message-role='assistant']") ||
+                                   msg.className?.includes("assistant") ||
+                                   msg.getAttribute("data-role") === "assistant" ||
+                                   msg.querySelector("[data-message-role='assistant']");
+          
+          const hasUserMarker = msg.querySelector("[class*='user']") || 
+                              msg.getAttribute("data-author") === "user" ||
+                              msg.closest("[data-message-role='user']") ||
+                              msg.className?.includes("user") ||
+                              msg.getAttribute("data-role") === "user" ||
+                              msg.querySelector("[data-message-role='user']");
+          
+          // If we have clear markers, use them
+          if (hasAssistantMarker && assistantElements.length < maxMessages) {
+            assistantElements.push(msg);
+            console.log(`[Prompanion Perplexity] Added assistant message from main search (${text.substring(0, 50)}...)`);
+          } else if (hasUserMarker && userElements.length < maxMessages) {
+            userElements.push(msg);
+            console.log(`[Prompanion Perplexity] Added user message from main search (${text.substring(0, 50)}...)`);
+          } else {
+            // No clear markers - use alternating pattern
+            // Perplexity conversations typically start with user, then assistant, then user, etc.
+            const totalFound = assistantElements.length + userElements.length;
+            if (totalFound % 2 === 0 && userElements.length < maxMessages) {
+              // Even index (0, 2, 4...) = user message
+              userElements.push(msg);
+              console.log(`[Prompanion Perplexity] Added user message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
+            } else if (assistantElements.length < maxMessages) {
+              // Odd index (1, 3, 5...) = assistant message
+              assistantElements.push(msg);
+              console.log(`[Prompanion Perplexity] Added assistant message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
+            }
+          }
+        }
+      }
+      
+      console.log(`[Prompanion Perplexity] After main search: ${assistantElements.length} assistant, ${userElements.length} user messages`);
+    }
+    
+    // If still no elements found, try alternative approach with other containers
+    if (assistantElements.length === 0 && userElements.length === 0) {
+      console.warn("[Prompanion Perplexity] ⚠️ Still no messages found, trying broader search...");
+      
+      // Try finding messages by looking for conversation containers
+      const conversationContainers = document.querySelectorAll("main, [role='main'], [class*='conversation'], [class*='chat'], [id*='conversation'], [id*='chat']");
+      console.log("[Prompanion Perplexity] Found conversation containers:", conversationContainers.length);
+      
+      // Log container structure for debugging
+      if (conversationContainers.length > 0) {
+        const firstContainer = conversationContainers[0];
+        console.log("[Prompanion Perplexity] First container structure:", {
+          tagName: firstContainer.tagName,
+          className: firstContainer.className,
+          id: firstContainer.id,
+          childCount: firstContainer.children.length,
+          innerHTMLPreview: firstContainer.innerHTML.substring(0, 200)
+        });
+      }
+      
+      // Look for message-like structures within containers
+      for (const container of conversationContainers) {
+        const potentialMessages = container.querySelectorAll("div[class*='message'], div[class*='turn'], article, [class*='group'], [class*='item']");
+        console.log(`[Prompanion Perplexity] Found ${potentialMessages.length} potential message elements in container`);
+        
+        // Try to identify role by looking for common patterns
+        for (const msg of potentialMessages) {
+          const text = (msg.innerText || msg.textContent || "").trim();
+          if (text.length > 10) {
+            // Heuristic: if it contains common assistant patterns, it's likely assistant
+            const isLikelyAssistant = msg.querySelector("[class*='assistant']") || 
+                                     msg.getAttribute("data-author") === "assistant" ||
+                                     msg.closest("[data-message-role='assistant']") ||
+                                     msg.className?.includes("assistant") ||
+                                     msg.getAttribute("data-role") === "assistant";
+            
+            if (isLikelyAssistant && assistantElements.length < maxMessages) {
+              assistantElements.push(msg);
+              console.log(`[Prompanion Perplexity] Added assistant element from fallback search`);
+            } else if (!isLikelyAssistant && userElements.length < maxMessages) {
+              userElements.push(msg);
+              console.log(`[Prompanion Perplexity] Added user element from fallback search`);
+            }
+          }
+        }
+      }
+    }
+    
+    // Last resort: search for any divs with substantial text that might be messages
+    if (assistantElements.length === 0 && userElements.length === 0) {
+      console.warn("[Prompanion Perplexity] ⚠️ Still no messages found, trying last-resort search...");
+      const allDivs = document.querySelectorAll("div");
+      let foundCount = 0;
+      for (const div of allDivs) {
+        const text = (div.innerText || div.textContent || "").trim();
+        // Look for divs with substantial text (likely messages) but not UI elements
+        if (text.length > 50 && text.length < 5000 && 
+            !div.closest("button") && 
+            !div.closest("nav") && 
+            !div.closest("header") &&
+            !div.closest("footer") &&
+            !div.closest("form") &&
+            div.children.length > 0) {
+          // Try to determine role from context
+          const parent = div.parentElement;
+          const hasAssistantMarker = div.className?.includes("assistant") || 
+                                    parent?.className?.includes("assistant") ||
+                                    div.getAttribute("data-author") === "assistant";
+          
+          if (hasAssistantMarker && assistantElements.length < maxMessages) {
+            assistantElements.push(div);
+            foundCount++;
+          } else if (userElements.length < maxMessages) {
+            userElements.push(div);
+            foundCount++;
+          }
+          
+          if (foundCount >= maxMessages * 2) break;
+        }
+      }
+      console.log(`[Prompanion Perplexity] Last-resort search found ${foundCount} potential messages`);
+    }
+    
+    // Combine and sort by DOM position (maintain conversation order)
     const allElements = [];
     assistantElements.forEach(el => {
       if (el && el.isConnected) {
@@ -644,25 +861,152 @@ function capturePerplexityChatHistory(maxMessages = 20) {
       }
     });
     
+    // Sort by position in document (top to bottom)
     allElements.sort((a, b) => a.position - b.position);
+    
+    console.log("[Prompanion Perplexity] Processing", allElements.length, "message elements");
     
     for (const { el, role } of allElements) {
       if (messages.length >= maxMessages) break;
       
-      const content = (el.innerText || el.textContent || "").trim();
-      if (content && content.length > 3) {
-        messages.push({
-          role: role === 'assistant' ? 'assistant' : 'user',
-          content: content.replace(/\s+/g, " ").trim(),
-          timestamp: Date.now()
+      // Extract content using multiple strategies
+      const contentSelectors = [
+        "[data-message-content]",
+        "[data-testid='message-content']",
+        ".markdown",
+        ".prose",
+        "[class*='markdown']",
+        "[class*='prose']",
+        "div[class*='text']",
+        "div[class*='content']",
+        "div[role='textbox']",
+        "div[contenteditable='false']"
+      ];
+      
+      let content = null;
+      for (const selector of contentSelectors) {
+        const contentEl = el.querySelector(selector);
+        if (contentEl) {
+          const extracted = (contentEl.innerText || contentEl.textContent)?.trim();
+          if (extracted && extracted.length > 0) {
+            content = extracted;
+            console.log(`[Prompanion Perplexity] Extracted content using selector "${selector}": ${content.substring(0, 50)}...`);
+            break;
+          }
+        }
+      }
+      
+      // Fallback: get text from element itself, but filter out UI elements
+      if (!content) {
+        const textNodes = [];
+        const walker = document.createTreeWalker(
+          el,
+          NodeFilter.SHOW_TEXT,
+          {
+            acceptNode: (node) => {
+              const parent = node.parentElement;
+              if (parent && (
+                parent.tagName === "BUTTON" ||
+                parent.tagName === "INPUT" ||
+                parent.closest("button") ||
+                parent.closest("input")
+              )) {
+                return NodeFilter.FILTER_REJECT;
+              }
+              return NodeFilter.FILTER_ACCEPT;
+            }
+          }
+        );
+        
+        let node;
+        while ((node = walker.nextNode())) {
+          const text = node.textContent?.trim();
+          if (text && text.length > 0) {
+            textNodes.push(text);
+          }
+        }
+        
+        if (textNodes.length > 0) {
+          content = textNodes.join(" ").trim();
+        }
+      }
+      
+      // Final fallback
+      if (!content) {
+        content = (el.innerText || el.textContent)?.trim();
+      }
+      
+      // Clean and validate content
+      if (content) {
+        content = content.replace(/\s+/g, " ").trim();
+        
+        // Filter out very short or UI-only content
+        if (content.length > 3 && !/^(copy|regenerate|thumbs up|thumbs down|share|attach)$/i.test(content)) {
+          messages.push({
+            role: role === 'assistant' ? 'assistant' : 'user',
+            content: content,
+            timestamp: Date.now()
+          });
+          console.log(`[Prompanion Perplexity] Added ${role} message (${content.length} chars): ${content.substring(0, 50)}...`);
+        } else {
+          console.log(`[Prompanion Perplexity] Skipped ${role} message - too short or UI-only: "${content.substring(0, 30)}"`);
+        }
+      } else {
+        console.warn(`[Prompanion Perplexity] Could not extract content from ${role} message element:`, {
+          tagName: el.tagName,
+          className: el.className,
+          hasChildren: el.children.length > 0,
+          innerTextLength: (el.innerText || "").length,
+          textContentLength: (el.textContent || "").length
         });
       }
     }
     
     console.log(`[Prompanion Perplexity] ✓ Captured ${messages.length} messages from Perplexity conversation`);
+    if (messages.length === 0) {
+      console.warn("[Prompanion Perplexity] ⚠️ No messages captured - check if conversation elements exist in DOM");
+      console.warn("[Prompanion Perplexity] DOM Diagnostic Info:", {
+        bodyChildren: document.body?.children?.length || 0,
+        mainElements: document.querySelectorAll("main").length,
+        articles: document.querySelectorAll("article").length,
+        divsWithDataRole: document.querySelectorAll("div[data-role], div[data-author], div[data-message-role]").length,
+        allDivs: document.querySelectorAll("div").length,
+        sampleDivClasses: Array.from(document.querySelectorAll("div")).slice(0, 10).map(d => d.className).filter(c => c),
+        url: window.location.href
+      });
+      
+      // Try one more aggressive search: look for any divs with substantial text that might be messages
+      console.warn("[Prompanion Perplexity] Attempting final aggressive search for message-like content...");
+      const allTextDivs = Array.from(document.querySelectorAll("div")).filter(div => {
+        const text = (div.innerText || div.textContent || "").trim();
+        return text.length > 20 && text.length < 10000 && 
+               !div.closest("button") && 
+               !div.closest("nav") && 
+               !div.closest("header") &&
+               !div.closest("footer") &&
+               !div.closest("aside") &&
+               !div.closest("form") &&
+               div.children.length > 0;
+      });
+      
+      console.warn(`[Prompanion Perplexity] Found ${allTextDivs.length} potential message divs in final search`);
+      if (allTextDivs.length > 0) {
+        console.warn("[Prompanion Perplexity] Sample divs found:", allTextDivs.slice(0, 5).map(div => ({
+          className: div.className,
+          id: div.id,
+          textPreview: (div.innerText || div.textContent || "").substring(0, 100),
+          dataAttributes: Array.from(div.attributes).filter(attr => attr.name.startsWith("data-")).map(attr => `${attr.name}="${attr.value}"`)
+        })));
+      }
+    }
     return messages;
   } catch (error) {
     console.error("[Prompanion Perplexity] ✗ Error capturing Perplexity chat history:", error);
+    console.error("[Prompanion Perplexity] Error details:", {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     return [];
   }
 }
@@ -677,11 +1021,15 @@ function getElementPosition(element) {
   return position;
 }
 
-function submitSelectionToSideChat(text) {
+async function submitSelectionToSideChat(text) {
+  // Make these logs VERY visible
+  console.log("%c[Prompanion Perplexity] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[Prompanion Perplexity] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
   console.log("%c[Prompanion Perplexity] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
   
   const snippet = typeof text === "string" ? text.trim() : "";
   console.log("[Prompanion Perplexity] Snippet:", snippet?.substring(0, 50));
+  console.log("[Prompanion Perplexity] selectionAskInFlight:", selectionAskInFlight);
   
   if (!snippet || selectionAskInFlight) {
     console.log("[Prompanion Perplexity] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
@@ -695,20 +1043,48 @@ function submitSelectionToSideChat(text) {
     console.log("%c[Prompanion Perplexity] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
     try {
       chatHistory = capturePerplexityChatHistory(20);
-      console.log(`%c[Prompanion Perplexity] ✓ Captured ${chatHistory.length} messages`, 
+      console.log(`%c[Prompanion Perplexity] ✓ Captured ${chatHistory.length} messages from conversation for SideChat context`, 
         chatHistory.length > 0 ? "color: green; font-size: 14px; font-weight: bold;" : "color: red; font-size: 14px; font-weight: bold;");
-      if (chatHistory.length === 0) {
-        console.warn("[Prompanion Perplexity] ⚠️ No messages found in DOM");
+      
+      // Log sample of captured history for debugging
+      if (chatHistory.length > 0) {
+        console.log("[Prompanion Perplexity] Sample captured messages:", {
+          firstMessage: {
+            role: chatHistory[0].role,
+            contentPreview: chatHistory[0].content?.substring(0, 50) + "..."
+          },
+          lastMessage: {
+            role: chatHistory[chatHistory.length - 1].role,
+            contentPreview: chatHistory[chatHistory.length - 1].content?.substring(0, 50) + "..."
+          },
+          totalMessages: chatHistory.length
+        });
+      } else {
+        console.warn("[Prompanion Perplexity] ⚠️ capturePerplexityChatHistory returned empty array - no messages found in DOM");
       }
     } catch (error) {
       console.error("[Prompanion Perplexity] ✗ Failed to capture chat history:", error);
+      console.error("[Prompanion Perplexity] Error stack:", error.stack);
+      // Continue with empty array - better than failing completely
       chatHistory = [];
     }
     
-    console.log("%c[Prompanion Perplexity] Sending PROMPANION_SIDECHAT_REQUEST", "color: purple; font-size: 14px; font-weight: bold;");
-    console.log("[Prompanion Perplexity] Request details:", {
+    console.log("[Prompanion Perplexity] ========== SENDING PROMPANION_SIDECHAT_REQUEST ==========");
+    console.log("[Prompanion Perplexity] Sending PROMPANION_SIDECHAT_REQUEST with:", {
       textLength: snippet.length,
-      chatHistoryLength: chatHistory.length
+      textPreview: snippet.substring(0, 50),
+      chatHistoryLength: chatHistory.length,
+      hasChatHistory: chatHistory.length > 0,
+      chatHistorySample: chatHistory.length > 0 ? {
+        firstMessage: {
+          role: chatHistory[0].role,
+          contentPreview: chatHistory[0].content?.substring(0, 50)
+        },
+        lastMessage: {
+          role: chatHistory[chatHistory.length - 1].role,
+          contentPreview: chatHistory[chatHistory.length - 1].content?.substring(0, 50)
+        }
+      } : null
     });
 
     AdapterBase.sendMessage({ 
@@ -716,6 +1092,8 @@ function submitSelectionToSideChat(text) {
       text: snippet,
       chatHistory: chatHistory 
     }, (response) => {
+      console.log("[Prompanion Perplexity] ========== PROMPANION_SIDECHAT_REQUEST RESPONSE ==========");
+      console.log("[Prompanion Perplexity] Response:", response);
       if (!response?.ok) {
         console.warn("Prompanion: sidechat request rejected", response?.reason);
       }
@@ -725,7 +1103,7 @@ function submitSelectionToSideChat(text) {
       selectionAskInFlight = false;
     });
   } catch (error) {
-    console.error("Prompanion: sidechat request threw synchronously", error);
+    console.error("Prompanion Perplexity: sidechat request threw synchronously", error);
     selectionAskInFlight = false;
   }
 }
@@ -734,6 +1112,18 @@ function handleSelectionToolbarAction(event) {
   event.preventDefault();
   event.stopPropagation();
   const text = selectionToolbarText;
+  console.log("%c[Prompanion Perplexity] ========== ELABORATE BUTTON CLICKED ==========", "color: green; font-size: 16px; font-weight: bold;");
+  console.log("[Prompanion Perplexity] Selection toolbar text:", {
+    textLength: text?.length || 0,
+    textPreview: text?.substring(0, 100) || "EMPTY",
+    hasText: !!text && text.trim().length > 0
+  });
+  
+  if (!text || !text.trim()) {
+    console.error("[Prompanion Perplexity] ERROR: No text selected! Cannot elaborate.");
+    return;
+  }
+  
   hideSelectionToolbar();
   submitSelectionToSideChat(text);
 }
@@ -853,137 +1243,286 @@ function ensureFloatingButton() {
 }
 
 function placeButton(targetContainer, inputNode, buttonTargetElement = null) {
-  if (!inputNode) {
-    console.log("[Prompanion] placeButton: no inputNode provided");
-    return;
-  }
-  
-  console.log("[Prompanion] placeButton: called with", {
-    inputNode: inputNode.id || inputNode.className,
-    targetContainer: targetContainer?.tagName || targetContainer?.className,
-    buttonTargetElement: buttonTargetElement?.tagName || buttonTargetElement?.className
-  });
-  
+  if (!inputNode) return;
   ensureFloatingButton();
   floatingButtonTargetContainer = targetContainer ?? inputNode;
   floatingButtonTargetInput = inputNode;
-  positionFloatingButton(inputNode, floatingButtonTargetContainer, buttonTargetElement);
-  
-  console.log("[Prompanion] placeButton: button placed", {
-    wrapper: floatingButtonWrapper?.id,
-    button: floatingButtonElement?.id,
-    container: floatingButtonTargetContainer?.tagName
-  });
+  // CRITICAL: Always call positionFloatingButton which will find the correct container
+  // Ignore the targetContainer parameter - positionFloatingButton will find the input bar container
+  positionFloatingButton(inputNode, null);
 }
 
 function positionFloatingButton(inputNode, containerNode = floatingButtonTargetContainer, buttonTargetElement = null) {
   if (!floatingButtonWrapper) {
-    console.log("[Prompanion] positionFloatingButton: no wrapper");
+    console.log("[Prompanion Perplexity] positionFloatingButton: no wrapper");
     return;
   }
   
-  // Try to find the target element if not provided
-  if (!buttonTargetElement) {
-    const targetXPath = "//*[@id='root']/div[1]/div/div/div[2]/div/div[1]/div[1]/div/div[3]/div/div/div[2]/div/div/div/span/div/div[1]/div/div[2]";
-    buttonTargetElement = findElementByXPath(targetXPath);
+  // Find the target element using the provided XPath
+  const targetXPath = "//*[@id='root']/div[1]/div/div/div[2]/div/div[1]/div[1]/div/div[3]/div/div/div[2]/div/div/div/span/div/div[1]/div/div[3]";
+  let targetElement = buttonTargetElement || findElementByXPath(targetXPath);
+  
+  // If XPath doesn't work, try alternative strategies
+  if (!targetElement && inputNode) {
+    // Strategy 1: Walk up from input to find sibling elements that might be the target
+    let current = inputNode.parentElement;
+    let depth = 0;
+    while (current && depth < 15) {
+      // Look for div[3] in the structure - the target is typically a sibling or nearby
+      const siblings = Array.from(current.children || []);
+      // The target might be the 3rd child of a parent div
+      if (siblings.length >= 3) {
+        const potentialTarget = siblings[2]; // 0-indexed, so [2] is the 3rd child
+        if (potentialTarget && potentialTarget.offsetParent) {
+          targetElement = potentialTarget;
+          console.log("[Prompanion Perplexity] Found target element via sibling search");
+          break;
+        }
+      }
+      current = current.parentElement;
+      depth++;
+    }
   }
   
-  const target = containerNode ?? inputNode;
-  if (!target) {
-    console.log("[Prompanion] positionFloatingButton: no target");
+  // Strategy 2: Try to find elements near the input that match the pattern
+  if (!targetElement && inputNode) {
+    // Look for elements in the same container as the input
+    const inputContainer = inputNode.closest("div[class*='relative'], div[class*='flex'], form");
+    if (inputContainer) {
+      // Look for div elements that are likely the target (3rd child of a span/div structure)
+      const allDivs = inputContainer.querySelectorAll("div");
+      for (const div of allDivs) {
+        const parent = div.parentElement;
+        if (parent && parent.children.length >= 3 && parent.children[2] === div) {
+          // This might be div[3] - check if it's positioned to the right of input
+          const divRect = div.getBoundingClientRect();
+          const inputRect = inputNode.getBoundingClientRect();
+          if (divRect.left > inputRect.right && div.offsetParent) {
+            targetElement = div;
+            console.log("[Prompanion Perplexity] Found target element via pattern matching");
+            break;
+          }
+        }
+      }
+    }
+  }
+  
+  if (!targetElement) {
+    // Check retry count to prevent infinite loops
+    if (positionRetryCount >= MAX_POSITION_RETRIES) {
+      console.warn("[Prompanion Perplexity] Target element not found after max retries, using fallback positioning");
+      positionRetryCount = 0; // Reset for next attempt
+      // Use fallback: position relative to input container
+      if (inputNode) {
+        const container = containerNode && containerNode !== document.body ? containerNode : inputNode.parentElement;
+        if (container) {
+          const containerStyle = getComputedStyle(container);
+          if (containerStyle.position === "static") {
+            container.style.position = "relative";
+          }
+          if (floatingButtonWrapper.parentElement !== container) {
+            container.append(floatingButtonWrapper);
+          }
+          floatingButtonWrapper.style.position = "absolute";
+          floatingButtonWrapper.style.top = "50%";
+          floatingButtonWrapper.style.right = "12px";
+          floatingButtonWrapper.style.transform = "translateY(-50%)";
+          floatingButtonWrapper.style.left = "auto";
+          floatingButtonWrapper.style.display = "flex";
+        }
+      }
+      return;
+    }
+    
+    positionRetryCount++;
+    console.warn(`[Prompanion Perplexity] Target element not found, retrying (${positionRetryCount}/${MAX_POSITION_RETRIES})...`);
+    // Retry after a short delay
+    if (inputNode && floatingButtonWrapper) {
+      setTimeout(() => {
+        positionFloatingButton(inputNode, containerNode, null);
+      }, 300);
+    }
     return;
   }
   
-  console.log("[Prompanion] positionFloatingButton: positioning button", {
-    target: target.tagName,
-    targetClass: target.className,
-    wrapperId: floatingButtonWrapper.id,
-    buttonTargetElement: buttonTargetElement?.tagName || buttonTargetElement?.className
+  // Reset retry count on success
+  positionRetryCount = 0;
+  
+  console.log("[Prompanion Perplexity] positionFloatingButton: found target element", {
+    tagName: targetElement.tagName,
+    className: targetElement.className,
+    id: targetElement.id
   });
   
-  // Ensure target has position: relative for absolute positioning
-  const targetStyle = getComputedStyle(target);
-  if (targetStyle.position === "static") {
-    target.style.position = "relative";
-    console.log("[Prompanion] positionFloatingButton: set target position to relative");
+  // Find the input bar container - the one that contains both input and buttons
+  // This should be a relatively small container, not the entire chat window
+  let inputBarContainer = null;
+  
+  // Strategy 1: Walk up from target element to find the container that also contains the input
+  let current = targetElement.parentElement;
+  let depth = 0;
+  while (current && depth < 15) {
+    // Check if this container contains both the target element and the input
+    const containsTarget = current.contains(targetElement);
+    const containsInput = inputNode && current.contains(inputNode);
+    
+    if (containsTarget && containsInput) {
+      // This is likely the input bar container
+      const style = getComputedStyle(current);
+      const hasRelativePosition = style.position === "relative" || style.position === "absolute";
+      const hasFlex = style.display === "flex" || style.display === "grid";
+      
+      if (hasRelativePosition || hasFlex || 
+          current.classList.contains("relative") || 
+          current.classList.contains("flex")) {
+        inputBarContainer = current;
+        console.log("[Prompanion Perplexity] Found input bar container via target element walk");
+        break;
+      }
+    }
+    current = current.parentElement;
+    depth++;
   }
   
-  // Append wrapper to target if not already there
-  if (floatingButtonWrapper.parentElement !== target) {
-    console.log("[Prompanion] positionFloatingButton: appending wrapper to target");
-    target.append(floatingButtonWrapper);
+  // Strategy 2: Walk up from input to find container that contains buttons
+  if (!inputBarContainer && inputNode) {
+    current = inputNode.parentElement;
+    depth = 0;
+    while (current && depth < 15) {
+      // Check if this container has buttons (send button, etc.)
+      const hasButtons = current.querySelectorAll("button").length > 0;
+      const containsInput = current.contains(inputNode);
+      
+      if (hasButtons && containsInput) {
+        const style = getComputedStyle(current);
+        const hasRelativePosition = style.position === "relative" || style.position === "absolute";
+        const hasFlex = style.display === "flex" || style.display === "grid";
+        
+        if (hasRelativePosition || hasFlex || 
+            current.classList.contains("relative") || 
+            current.classList.contains("flex")) {
+          inputBarContainer = current;
+          console.log("[Prompanion Perplexity] Found input bar container via input walk");
+          break;
+        }
+      }
+      current = current.parentElement;
+      depth++;
+    }
   }
   
-  // Position button to the RIGHT of the target element (if found) or use default positioning
-  if (buttonTargetElement && buttonTargetElement.isConnected) {
-    // Calculate position relative to the target element
-    const targetRect = buttonTargetElement.getBoundingClientRect();
-    const containerRect = target.getBoundingClientRect();
-    
-    // Position to the right of the target element
-    // Calculate the left position relative to the container
-    const buttonWidth = BUTTON_SIZE.wrapper ? parseInt(BUTTON_SIZE.wrapper.replace("px", "")) : 44;
-    const gap = 12; // Gap between button and target element
-    
-    // Calculate relative position within the container
-    // We want the button to be to the right of the target element
-    const relativeLeft = targetRect.right - containerRect.left + gap;
-    const relativeTop = targetRect.top - containerRect.top + (targetRect.height / 2);
-    
-    // Ensure the button doesn't go off the right edge of the container
-    const containerWidth = containerRect.width;
-    const maxLeft = containerWidth - buttonWidth - 8; // Leave 8px margin from right edge
-    const finalLeft = Math.min(maxLeft, relativeLeft);
-    
-    floatingButtonWrapper.style.left = `${finalLeft}px`;
-    floatingButtonWrapper.style.top = `${relativeTop}px`;
-    floatingButtonWrapper.style.right = "auto";
-    floatingButtonWrapper.style.transform = "translateY(-50%)";
-    
-    console.log("[Prompanion] positionFloatingButton: button positioned to the RIGHT of target element", {
-      targetRect: { left: targetRect.left, right: targetRect.right, top: targetRect.top, width: targetRect.width, height: targetRect.height },
-      containerRect: { left: containerRect.left, right: containerRect.right, top: containerRect.top, width: containerRect.width, height: containerRect.height },
-      relativeLeft,
-      finalLeft,
-      relativeTop,
-      buttonWidth,
-      gap,
-      containerWidth,
-      maxLeft,
-      targetElement: buttonTargetElement.tagName,
-      targetClass: buttonTargetElement.className
-    });
-  } else {
-    // Fallback: position on the right side of container, vertically centered
-    floatingButtonWrapper.style.left = "auto";
-    floatingButtonWrapper.style.right = "12px";
-    floatingButtonWrapper.style.top = "50%";
-    floatingButtonWrapper.style.transform = "translateY(-50%)";
-    
-    console.log("[Prompanion] positionFloatingButton: button positioned on right (fallback - target element not found)");
+  // Fallback: use target element's parent if it's relatively small
+  if (!inputBarContainer) {
+    const targetParent = targetElement.parentElement;
+    if (targetParent) {
+      const parentRect = targetParent.getBoundingClientRect();
+      // If parent is reasonably sized (not the entire window), use it
+      if (parentRect.height < 200 && parentRect.width < 2000) {
+        inputBarContainer = targetParent;
+        console.log("[Prompanion Perplexity] Using target parent as container (fallback)");
+      }
+    }
   }
   
-  // Ensure button is visible
+  // Final fallback
+  if (!inputBarContainer) {
+    inputBarContainer = targetElement.parentElement || containerNode || inputNode?.parentElement;
+  }
+  
+  if (!inputBarContainer) {
+    console.warn("[Prompanion Perplexity] No container found");
+    return;
+  }
+  
+  // Ensure container has relative positioning
+  const containerStyle = getComputedStyle(inputBarContainer);
+  if (containerStyle.position === "static") {
+    inputBarContainer.style.position = "relative";
+  }
+  
+  // Get bounding rects
+  const targetRect = targetElement.getBoundingClientRect();
+  const containerRect = inputBarContainer.getBoundingClientRect();
+  
+  // Find the browser button container - it should be the element that contains the target element
+  // The target element is div[3], so we want to position 8px to the left of its left edge
+  const browserButtonContainer = targetElement;
+  const browserContainerRect = browserButtonContainer.getBoundingClientRect();
+  
+  // Calculate position: 8px to the left of the browser button container's left edge
+  const buttonWidth = BUTTON_SIZE.wrapper ? parseInt(BUTTON_SIZE.wrapper.replace("px", "")) : 44;
+  const spacingFromBrowserButton = 8; // 8px spacing to the left of browser button
+  
+  // Calculate the right position: browser button's left edge relative to container's right edge + spacing
+  const browserLeftFromContainer = browserContainerRect.left - containerRect.left;
+  const rightPosition = containerRect.width - browserLeftFromContainer + spacingFromBrowserButton;
+  
+  // Calculate vertical alignment: align with the target element's center, not container's center
+  const targetCenterY = targetRect.top - containerRect.top + (targetRect.height / 2);
+  const buttonHeight = buttonWidth; // Button is square
+  const topPosition = targetCenterY - (buttonHeight / 2);
+  
+  // Move button to container
+  if (floatingButtonWrapper.parentElement !== inputBarContainer) {
+    inputBarContainer.append(floatingButtonWrapper);
+  }
+  
+  // Apply positioning styles - use top instead of 50% to align with target element
+  floatingButtonWrapper.style.position = "absolute";
+  floatingButtonWrapper.style.top = `${topPosition}px`;
+  floatingButtonWrapper.style.right = `${rightPosition}px`;
+  floatingButtonWrapper.style.transform = "none"; // No transform needed since we're using exact top position
+  floatingButtonWrapper.style.left = "auto";
+  floatingButtonWrapper.style.bottom = "auto";
+  floatingButtonWrapper.style.margin = "0";
   floatingButtonWrapper.style.display = "flex";
   floatingButtonWrapper.style.visibility = "visible";
   floatingButtonWrapper.style.opacity = "1";
   
-  console.log("[Prompanion] positionFloatingButton: button positioned", {
-    left: floatingButtonWrapper.style.left,
-    top: floatingButtonWrapper.style.top,
-    right: floatingButtonWrapper.style.right,
-    transform: floatingButtonWrapper.style.transform,
-    isConnected: floatingButtonWrapper.isConnected,
-    parent: floatingButtonWrapper.parentElement?.tagName
+  // Also schedule for next frame to ensure positioning persists
+  requestAnimationFrame(() => {
+    if (!floatingButtonWrapper || !inputBarContainer || !targetElement) return;
+    
+    // Force move again in case something moved it
+    if (floatingButtonWrapper.parentElement !== inputBarContainer) {
+      inputBarContainer.append(floatingButtonWrapper);
+    }
+    
+    // Recalculate in case container moved
+    const targetRect2 = targetElement.getBoundingClientRect();
+    const containerRect2 = inputBarContainer.getBoundingClientRect();
+    const browserContainerRect2 = browserButtonContainer.getBoundingClientRect();
+    const browserLeftFromContainer2 = browserContainerRect2.left - containerRect2.left;
+    const rightPosition2 = containerRect2.width - browserLeftFromContainer2 + spacingFromBrowserButton;
+    const targetCenterY2 = targetRect2.top - containerRect2.top + (targetRect2.height / 2);
+    const topPosition2 = targetCenterY2 - (buttonHeight / 2);
+    
+    // Force apply styles again
+    floatingButtonWrapper.style.position = "absolute";
+    floatingButtonWrapper.style.top = `${topPosition2}px`;
+    floatingButtonWrapper.style.right = `${rightPosition2}px`;
+    floatingButtonWrapper.style.transform = "none";
+    floatingButtonWrapper.style.left = "auto";
+    floatingButtonWrapper.style.bottom = "auto";
+    floatingButtonWrapper.style.margin = "0";
+  });
+  
+  console.log("[Prompanion Perplexity] Button positioned 8px to the left of browser button:", {
+    targetRect: { left: targetRect.left, right: targetRect.right, top: targetRect.top, width: targetRect.width, height: targetRect.height },
+    browserContainerRect: { left: browserContainerRect.left, right: browserContainerRect.right, top: browserContainerRect.top, width: browserContainerRect.width, height: browserContainerRect.height },
+    containerRect: { left: containerRect.left, right: containerRect.right, top: containerRect.top, width: containerRect.width, height: containerRect.height },
+    browserLeftFromContainer,
+    rightPosition,
+    spacingFromBrowserButton,
+    buttonWidth,
+    topPosition
   });
 }
 
 function refreshFloatingButtonPosition() {
   if (floatingButtonTargetInput) {
-    // Try to find the target element again (in case DOM changed)
-    const targetXPath = "//*[@id='root']/div[1]/div/div/div[2]/div/div[1]/div[1]/div/div[3]/div/div/div[2]/div/div/div/span/div/div[1]/div/div[2]";
-    const buttonTargetElement = findElementByXPath(targetXPath);
-    positionFloatingButton(floatingButtonTargetInput, floatingButtonTargetContainer, buttonTargetElement);
+    // Find the target element again using XPath
+    positionFloatingButton(floatingButtonTargetInput, null, null);
   }
 }
 
@@ -1078,8 +1617,8 @@ function locateComposer() {
   console.log("[Prompanion] locateComposer: found input", input.id, input.className);
   
   // Find target element for button placement using XPath
-  // Target: //*[@id="root"]/div[1]/div/div/div[2]/div/div[1]/div[1]/div/div[3]/div/div/div[2]/div/div/div/span/div/div[1]/div/div[2]
-  const targetXPath = "//*[@id='root']/div[1]/div/div/div[2]/div/div[1]/div[1]/div/div[3]/div/div/div[2]/div/div/div/span/div/div[1]/div/div[2]";
+  // Target: //*[@id="root"]/div[1]/div/div/div[2]/div/div[1]/div[1]/div/div[3]/div/div/div[2]/div/div/div/span/div/div[1]/div/div[3]
+  const targetXPath = "//*[@id='root']/div[1]/div/div/div[2]/div/div[1]/div[1]/div/div[3]/div/div/div[2]/div/div/div/span/div/div[1]/div/div[3]";
   let buttonTargetElement = findElementByXPath(targetXPath);
   
   console.log("[Prompanion] locateComposer: button target element", buttonTargetElement);

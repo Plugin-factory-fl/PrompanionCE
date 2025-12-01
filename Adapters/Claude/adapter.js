@@ -9,6 +9,62 @@ console.log("[Prompanion] ========== CLAUDE ADAPTER LOADING ==========");
 console.log("[Prompanion] Timestamp:", new Date().toISOString());
 console.log("[Prompanion] Location:", window.location.href);
 
+// CRITICAL: Fix Claude's accessibility bug IMMEDIATELY, before anything else runs
+// This must run before Claude's code can set aria-hidden on fieldsets
+(function() {
+  const originalSetAttribute = Element.prototype.setAttribute;
+  const originalSetAttributeNode = Element.prototype.setAttributeNode;
+  
+  // Intercept setAttribute
+  Element.prototype.setAttribute = function(name, value) {
+    if (name === 'aria-hidden' && value === 'true' && this.tagName === 'FIELDSET') {
+      const hasFocusable = this.querySelector('textarea, input, [contenteditable="true"], button, [tabindex]:not([tabindex="-1"])');
+      if (hasFocusable) {
+        // Silently prevent the attribute from being set
+        return;
+      }
+    }
+    return originalSetAttribute.call(this, name, value);
+  };
+  
+  // Also intercept setAttributeNode (less common but some libraries use it)
+  Element.prototype.setAttributeNode = function(attr) {
+    if (attr.name === 'aria-hidden' && attr.value === 'true' && this.tagName === 'FIELDSET') {
+      const hasFocusable = this.querySelector('textarea, input, [contenteditable="true"], button, [tabindex]:not([tabindex="-1"])');
+      if (hasFocusable) {
+        // Return the attribute node but don't actually set it
+        return attr;
+      }
+    }
+    return originalSetAttributeNode.call(this, attr);
+  };
+  
+  // Also intercept direct property access (element.ariaHidden = true)
+  const fieldsetProto = HTMLFieldSetElement.prototype;
+  const originalAriaHiddenDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'ariaHidden') || 
+                                       Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'ariaHidden');
+  
+  if (originalAriaHiddenDescriptor) {
+    Object.defineProperty(HTMLFieldSetElement.prototype, 'ariaHidden', {
+      get: originalAriaHiddenDescriptor.get,
+      set: function(value) {
+        if (value === 'true' || value === true) {
+          const hasFocusable = this.querySelector('textarea, input, [contenteditable="true"], button, [tabindex]:not([tabindex="-1"])');
+          if (hasFocusable) {
+            // Don't set it
+            return;
+          }
+        }
+        return originalAriaHiddenDescriptor.set.call(this, value);
+      },
+      configurable: true,
+      enumerable: true
+    });
+  }
+  
+  console.log("[Prompanion] Installed early aria-hidden prevention for Claude accessibility bug");
+})();
+
 // Import constants from AdapterBase
 if (typeof AdapterBase === "undefined") {
   console.error("[Prompanion] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
@@ -142,6 +198,9 @@ function ensureSelectionToolbar() {
   
   const toolbar = document.createElement("div");
   toolbar.id = SELECTION_TOOLBAR_ID;
+  // Explicitly set role to toolbar to prevent being interpreted as a dialog
+  toolbar.setAttribute("role", "toolbar");
+  toolbar.setAttribute("aria-label", "Text selection actions");
   
   const dismiss = document.createElement("button");
   dismiss.type = "button";
@@ -651,9 +710,113 @@ function locateComposer() {
   return { input, container };
 }
 
+/**
+ * Workaround for Claude's accessibility bug: prevents aria-hidden from being set on fieldsets
+ * that contain focusable elements (like textareas)
+ */
+function fixAriaHiddenOnFieldsets() {
+  // Store original setAttribute to intercept calls
+  const originalSetAttribute = Element.prototype.setAttribute;
+  
+  // Override setAttribute to prevent aria-hidden on fieldsets with focusable children
+  Element.prototype.setAttribute = function(name, value) {
+    if (name === 'aria-hidden' && value === 'true' && this.tagName === 'FIELDSET') {
+      const hasFocusable = this.querySelector('textarea, input, [contenteditable="true"], button, [tabindex]:not([tabindex="-1"])');
+      if (hasFocusable) {
+        console.warn("[Prompanion] Preventing aria-hidden from being set on fieldset containing focusable element (Claude accessibility bug workaround)");
+        // Don't set the attribute - just return
+        return;
+      }
+    }
+    return originalSetAttribute.call(this, name, value);
+  };
+  
+  // Also watch for attribute changes and remove immediately if set (backup in case setAttribute override doesn't catch it)
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'aria-hidden') {
+        const target = mutation.target;
+        if (target instanceof HTMLElement && target.tagName === 'FIELDSET') {
+          const hasFocusable = target.querySelector('textarea, input, [contenteditable="true"], button, [tabindex]:not([tabindex="-1"])');
+          if (hasFocusable && target.getAttribute('aria-hidden') === 'true') {
+            // Remove immediately and also in next frame to catch any race conditions
+            target.removeAttribute('aria-hidden');
+            requestAnimationFrame(() => {
+              if (target.getAttribute('aria-hidden') === 'true') {
+                target.removeAttribute('aria-hidden');
+              }
+            });
+          }
+        }
+      }
+    });
+  });
+
+  // Observe all fieldsets in the document
+  const observeFieldsets = () => {
+    const fieldsets = document.querySelectorAll('fieldset');
+    fieldsets.forEach((fieldset) => {
+      observer.observe(fieldset, {
+        attributes: true,
+        attributeFilter: ['aria-hidden']
+      });
+      
+      // Also check and fix immediately if aria-hidden is already set
+      const hasFocusable = fieldset.querySelector('textarea, input, [contenteditable="true"], button, [tabindex]:not([tabindex="-1"])');
+      if (hasFocusable && fieldset.getAttribute('aria-hidden') === 'true') {
+        fieldset.removeAttribute('aria-hidden');
+      }
+    });
+  };
+
+  observeFieldsets();
+
+  // Also observe for new fieldsets added to the DOM
+  const bodyObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node instanceof HTMLElement) {
+          const fieldsets = node.tagName === 'FIELDSET' ? [node] : node.querySelectorAll('fieldset');
+          fieldsets.forEach((fieldset) => {
+            observer.observe(fieldset, {
+              attributes: true,
+              attributeFilter: ['aria-hidden']
+            });
+            
+            const hasFocusable = fieldset.querySelector('textarea, input, [contenteditable="true"], button, [tabindex]:not([tabindex="-1"])');
+            if (hasFocusable && fieldset.getAttribute('aria-hidden') === 'true') {
+              fieldset.removeAttribute('aria-hidden');
+            }
+          });
+        }
+      });
+    });
+  });
+
+  if (document.body) {
+    bodyObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  // Re-observe fieldsets periodically in case new ones are added
+  const intervalId = setInterval(observeFieldsets, 2000);
+
+  return { observer, bodyObserver, originalSetAttribute, intervalId };
+}
+
+let ariaHiddenFixObservers = null;
+
 function init() {
   const composer = locateComposer();
   requestSelectionToolbarUpdate();
+  
+  // Fix Claude's accessibility bug with aria-hidden on fieldsets
+  if (!ariaHiddenFixObservers) {
+    ariaHiddenFixObservers = fixAriaHiddenOnFieldsets();
+  }
+  
   if (composer) {
     placeButton(composer.container, composer.input);
     setupEnhanceTooltip(composer.input, composer.container);
@@ -776,6 +939,10 @@ function ensureEnhanceTooltipElement() {
     console.log("[Prompanion] Creating enhance tooltip element");
     enhanceTooltipElement = document.createElement("div");
     enhanceTooltipElement.className = "prompanion-enhance-tooltip";
+    // Explicitly set role to tooltip to prevent being interpreted as a dialog
+    enhanceTooltipElement.setAttribute("role", "tooltip");
+    enhanceTooltipElement.setAttribute("aria-live", "polite");
+    enhanceTooltipElement.setAttribute("aria-atomic", "true");
     const dismiss = document.createElement("button");
     dismiss.type = "button";
     dismiss.className = "prompanion-enhance-tooltip__dismiss";

@@ -43,6 +43,8 @@ let selectionToolbarButton = null;
 let selectionToolbarText = "";
 let selectionUpdateRaf = null;
 let highlightObserver = null;
+let initInProgress = false;
+let bootstrapObserver = null;
 
 // Generic styles moved to styles/AdapterStyles.css
 // Styles are loaded via ensureStyle() function
@@ -555,6 +557,13 @@ function ensureFloatingButton() {
     floatingButtonWrapper.style.display = "flex";
     floatingButtonWrapper.style.alignItems = "center";
     floatingButtonWrapper.style.justifyContent = "center";
+    // CRITICAL: Don't append to DOM here - let positionFloatingButton handle it
+  } else {
+    // If wrapper already exists in DOM, remove it so positionFloatingButton can place it correctly
+    if (floatingButtonWrapper.parentElement) {
+      console.log("[Prompanion Gemini] ensureFloatingButton: Removing existing wrapper from", floatingButtonWrapper.parentElement);
+      floatingButtonWrapper.remove();
+    }
   }
   floatingButtonWrapper.style.width = floatingButtonWrapper.style.height = BUTTON_SIZE.wrapper;
   floatingButtonElement = document.getElementById(BUTTON_ID) ?? buildButton();
@@ -563,38 +572,191 @@ function ensureFloatingButton() {
 }
 
 function placeButton(targetContainer, inputNode) {
-  if (!inputNode) return;
+  console.log("[Prompanion Gemini] placeButton called");
+  if (!inputNode) {
+    console.warn("[Prompanion Gemini] placeButton: no inputNode");
+    return;
+  }
   ensureFloatingButton();
   floatingButtonTargetContainer = targetContainer ?? inputNode;
   floatingButtonTargetInput = inputNode;
-  positionFloatingButton(inputNode, floatingButtonTargetContainer);
+  console.log("[Prompanion Gemini] placeButton: calling positionFloatingButton");
+  positionFloatingButton(inputNode, null);
 }
 
 function positionFloatingButton(inputNode, containerNode = floatingButtonTargetContainer) {
-  if (!floatingButtonWrapper) return;
-  const target = containerNode ?? inputNode;
-  if (!target) return;
-  if (getComputedStyle(target).position === "static") {
-    target.style.position = "relative";
+  console.log("[Prompanion Gemini] positionFloatingButton called");
+  if (!floatingButtonWrapper) {
+    console.warn("[Prompanion Gemini] positionFloatingButton: floatingButtonWrapper is null");
+    return;
   }
-  if (floatingButtonWrapper.parentElement !== target) {
-    target.append(floatingButtonWrapper);
+  
+  // Find the model selection button
+  let modelButton = null;
+  
+  // Try XPath first
+  try {
+    const xpathResult = document.evaluate(
+      '/html/body/chat-app/main/side-navigation-v2/mat-sidenav-container/mat-sidenav-content/div/div[2]/chat-window/div/input-container/div/input-area-v2/div/div/div[3]/div[1]/bard-mode-switcher/div/button',
+      document,
+      null,
+      XPathResult.FIRST_ORDERED_NODE_TYPE,
+      null
+    );
+    modelButton = xpathResult.singleNodeValue;
+    if (modelButton) {
+      console.log("[Prompanion Gemini] Model button found via XPath");
+    }
+  } catch (error) {
+    console.warn("[Prompanion Gemini] XPath error:", error);
   }
-  floatingButtonWrapper.style.top = "50%";
-  floatingButtonWrapper.style.right = "12px";
+  
+  // Fallback: querySelector
+  if (!modelButton) {
+    modelButton = document.querySelector("bard-mode-switcher button") ||
+                  document.querySelector("bard-mode-switcher div button");
+    if (modelButton) {
+      console.log("[Prompanion Gemini] Model button found via querySelector");
+    }
+  }
+  
+  if (!modelButton) {
+    console.warn("[Prompanion Gemini] Model button not found - cannot position logo");
+    return;
+  }
+  
+  if (!modelButton.offsetParent) {
+    console.warn("[Prompanion Gemini] Model button found but not visible (no offsetParent)");
+    return;
+  }
+  
+  console.log("[Prompanion Gemini] Model button found and visible:", {
+    tagName: modelButton.tagName,
+    className: modelButton.className,
+    rect: modelButton.getBoundingClientRect()
+  });
+  
+  // Find the container using the provided XPath
+  // XPath: //*[@id="app-root"]/main/side-navigation-v2/mat-sidenav-container/mat-sidenav-content/div/div[2]/chat-window/div/input-container/div/input-area-v2/div/div/div[2]
+  let container = null;
+  
+  try {
+    const xpathResult = document.evaluate(
+      '//*[@id="app-root"]/main/side-navigation-v2/mat-sidenav-container/mat-sidenav-content/div/div[2]/chat-window/div/input-container/div/input-area-v2/div/div/div[2]',
+      document,
+      null,
+      XPathResult.FIRST_ORDERED_NODE_TYPE,
+      null
+    );
+    container = xpathResult.singleNodeValue;
+    if (container) {
+      console.log("[Prompanion Gemini] Container found via XPath");
+    }
+  } catch (error) {
+    console.warn("[Prompanion Gemini] Container XPath error:", error);
+  }
+  
+  // Fallback: try to find div[2] within input-area-v2
+  if (!container) {
+    const inputArea = document.querySelector('input-area-v2');
+    if (inputArea) {
+      // Find div/div/div[2] structure
+      const firstDiv = inputArea.querySelector('div');
+      if (firstDiv) {
+        const secondDiv = firstDiv.querySelector('div');
+        if (secondDiv && secondDiv.children.length >= 2) {
+          container = secondDiv.children[1]; // div[2] (0-indexed, so [1])
+          console.log("[Prompanion Gemini] Container found via fallback");
+        }
+      }
+    }
+  }
+  
+  if (!container || container === document.body) {
+    console.warn("[Prompanion Gemini] No suitable container found");
+    return;
+  }
+  
+  console.log("[Prompanion Gemini] Selected container:", {
+    tagName: container.tagName,
+    className: container.className,
+    rect: container.getBoundingClientRect()
+  });
+  
+  // Ensure container has relative positioning
+  const containerStyle = getComputedStyle(container);
+  if (containerStyle.position === "static") {
+    container.style.position = "relative";
+  }
+  
+  // Get bounding rects
+  const modelRect = modelButton.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  const spacing = 8; // 8px from right edge of container
+  
+  // Parse buttonWidth - handle both number and string with "px"
+  let buttonWidth = BUTTON_SIZE.wrapper || 40;
+  if (typeof buttonWidth === 'string') {
+    buttonWidth = parseInt(buttonWidth.replace('px', ''), 10) || 40;
+  }
+  
+  // Calculate position using RIGHT positioning
+  // Position button 8px from the right edge of the container
+  // Get model button's vertical center for alignment
+  const modelButtonCenter = modelRect.top + modelRect.height / 2;
+  const containerTop = containerRect.top;
+  const topOffset = modelButtonCenter - containerTop;
+  
+  // Move button to container (remove from any previous parent first)
+  if (floatingButtonWrapper.parentElement !== container) {
+    if (floatingButtonWrapper.parentElement) {
+      floatingButtonWrapper.remove();
+    }
+    container.append(floatingButtonWrapper);
+  }
+  
+  // Apply positioning: 8px from right edge, vertically aligned with model button
+  floatingButtonWrapper.style.position = "absolute";
+  floatingButtonWrapper.style.right = `${spacing}px`;
+  floatingButtonWrapper.style.top = `${topOffset}px`;
   floatingButtonWrapper.style.transform = "translateY(-50%)";
+  floatingButtonWrapper.style.left = "auto";
+  floatingButtonWrapper.style.bottom = "auto";
+  floatingButtonWrapper.style.margin = "0";
+  floatingButtonWrapper.style.display = "flex";
+  floatingButtonWrapper.style.zIndex = "2147483000";
+  
+  console.log("[Prompanion Gemini] Button positioned:", {
+    container: container.tagName,
+    containerClass: container.className,
+    rightPosition: spacing,
+    topOffset: topOffset,
+    modelButtonCenter: modelButtonCenter,
+    containerTop: containerTop,
+    buttonWidth: buttonWidth
+  });
 }
 
 function refreshFloatingButtonPosition() {
-  if (floatingButtonTargetInput) {
-    positionFloatingButton(floatingButtonTargetInput, floatingButtonTargetContainer);
+  // Only refresh if button exists and model button is available
+  if (floatingButtonWrapper) {
+    positionFloatingButton(floatingButtonTargetInput, null);
   }
 }
 
 function ensureDomObserver() {
   if (domObserverStarted) return;
+  let lastMutationTime = 0;
+  const THROTTLE_MS = 1000; // Only process mutations at most once every 1 second
+  
   const observer = new MutationObserver(() => {
-    requestSelectionToolbarUpdate();
+    // Throttle mutations to prevent infinite loops
+    const now = Date.now();
+    if (now - lastMutationTime < THROTTLE_MS) return;
+    if (initInProgress) return;
+    
+    lastMutationTime = now;
+    AdapterBase.requestSelectionToolbarUpdate();
     const composer = locateComposer();
     if (composer) {
       placeButton(composer.container, composer.input);
@@ -650,16 +812,31 @@ function locateComposer() {
 }
 
 function init() {
-  const composer = locateComposer();
-  requestSelectionToolbarUpdate();
-  if (composer) {
-    placeButton(composer.container, composer.input);
-    setupEnhanceTooltip(composer.input, composer.container);
-    ensureDomObserver();
-    return true;
+  // Prevent concurrent calls
+  if (initInProgress) {
+    console.log("[Prompanion Gemini] init() - already in progress, skipping");
+    return false;
   }
-  ensureDomObserver();
-  return false;
+  
+  initInProgress = true;
+  try {
+    console.log("[Prompanion Gemini] init() called");
+    const composer = locateComposer();
+    console.log("[Prompanion Gemini] init() - composer found:", !!composer);
+    AdapterBase.requestSelectionToolbarUpdate();
+    if (composer) {
+      console.log("[Prompanion Gemini] init() - calling placeButton");
+      placeButton(composer.container, composer.input);
+      setupEnhanceTooltip(composer.input, composer.container);
+      ensureDomObserver();
+      return true;
+    }
+    console.log("[Prompanion Gemini] init() - no composer found, setting up observer");
+    ensureDomObserver();
+    return false;
+  } finally {
+    initInProgress = false;
+  }
 }
 
 /**
@@ -731,14 +908,37 @@ console.log("[Prompanion] Registering PROMPANION_INSERT_TEXT handler with Adapte
 AdapterBase.registerMessageHandler("PROMPANION_INSERT_TEXT", handleInsertTextMessage);
 
 function bootstrap() {
+  console.log("[Prompanion Gemini] bootstrap() called");
   ensureHighlightObserver();
-  if (!init()) {
-    const observer = new MutationObserver(() => {
-      if (init()) {
-        observer.disconnect();
+  const initResult = init();
+  console.log("[Prompanion Gemini] bootstrap() - init() returned:", initResult);
+  if (!initResult) {
+    console.log("[Prompanion Gemini] bootstrap() - composer not found, setting up MutationObserver");
+    // Disconnect any existing observer first
+    if (bootstrapObserver) {
+      bootstrapObserver.disconnect();
+      bootstrapObserver = null;
+    }
+    let lastInitTime = 0;
+    const THROTTLE_MS = 500; // Only run init() at most once every 500ms
+    
+    bootstrapObserver = new MutationObserver(() => {
+      // Throttle: only run if enough time has passed since last init
+      const now = Date.now();
+      if (now - lastInitTime < THROTTLE_MS) return;
+      if (initInProgress) return; // Prevent concurrent calls
+      
+      lastInitTime = now;
+      const retryResult = init();
+      if (retryResult) {
+        console.log("[Prompanion Gemini] bootstrap() - composer found on retry, disconnecting observer");
+        if (bootstrapObserver) {
+          bootstrapObserver.disconnect();
+          bootstrapObserver = null;
+        }
       }
     });
-    observer.observe(document.documentElement, { childList: true, subtree: true });
+    bootstrapObserver.observe(document.documentElement, { childList: true, subtree: true });
   }
 }
 
@@ -997,6 +1197,13 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage)
 
 window.addEventListener("prompanion-panel-resize", () => {
   refreshFloatingButtonPosition();
+});
+
+// Also recalculate on window resize to keep button position correct
+window.addEventListener("resize", () => {
+  if (floatingButtonTargetInput) {
+    refreshFloatingButtonPosition();
+  }
 });
 
 document.addEventListener("mousedown", (e) => {
