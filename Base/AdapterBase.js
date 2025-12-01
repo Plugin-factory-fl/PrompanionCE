@@ -492,6 +492,39 @@ class AdapterBase {
       return Promise.reject(error);
     }
     
+    // Truncate chat history if message is too large to prevent "request entity too large" errors
+    // Chrome extension messages have a ~64MB limit, but API requests typically have much smaller limits (~1-10MB)
+    // We'll limit to ~500KB for the entire message to be safe
+    const MAX_MESSAGE_SIZE = 500 * 1024; // 500KB
+    if (message.type === "PROMPANION_SIDECHAT_REQUEST" && Array.isArray(message.chatHistory) && message.chatHistory.length > 0) {
+      const originalHistoryLength = message.chatHistory.length;
+      let messageSize = JSON.stringify(message).length;
+      if (messageSize > MAX_MESSAGE_SIZE) {
+        console.warn(`[AdapterBase] Message size (${messageSize} bytes) exceeds limit (${MAX_MESSAGE_SIZE} bytes), truncating chat history`);
+        
+        // Truncate chat history by removing oldest messages until under limit
+        let truncatedHistory = [...message.chatHistory];
+        while (truncatedHistory.length > 0) {
+          const testMessage = { ...message, chatHistory: truncatedHistory };
+          messageSize = JSON.stringify(testMessage).length;
+          if (messageSize <= MAX_MESSAGE_SIZE) {
+            break;
+          }
+          // Remove oldest message (first in array)
+          truncatedHistory.shift();
+        }
+        
+        if (truncatedHistory.length < originalHistoryLength) {
+          console.log(`[AdapterBase] Truncated chat history from ${originalHistoryLength} to ${truncatedHistory.length} messages`);
+          message.chatHistory = truncatedHistory;
+        } else if (truncatedHistory.length === 0) {
+          // If even empty history is too large (shouldn't happen, but be safe), clear it
+          console.warn(`[AdapterBase] Message still too large after truncating all history, clearing chat history`);
+          message.chatHistory = [];
+        }
+      }
+    }
+    
     return new Promise((resolve, reject) => {
       try {
         chrome.runtime.sendMessage(message, (response) => {

@@ -823,10 +823,8 @@ function handleSelectionToolbarAction(event) {
   submitSelectionToSideChat(text);
 }
 
-function handleSelectionChange() {
-  console.log("[Prompanion Grok] handleSelectionChange fired");
-  requestSelectionToolbarUpdate();
-}
+// Selection change is now handled by AdapterBase.initSelectionToolbar()
+// No need for a separate handler - removed to avoid duplicate listeners
 
 // Generic setButtonTextContent removed - use AdapterBase.setButtonTextContent()
 
@@ -1567,11 +1565,9 @@ if (readyState === "complete" || readyState === "interactive") {
   document.addEventListener("DOMContentLoaded", bootstrap);
 }
 
-console.log("[Prompanion Grok] Registering selection change event listeners");
-document.addEventListener("selectionchange", handleSelectionChange);
-window.addEventListener("scroll", handleSelectionChange, true);
-window.addEventListener("resize", handleSelectionChange);
-console.log("[Prompanion Grok] Selection change event listeners registered");
+// Selection change is handled by AdapterBase.initSelectionToolbar()
+// Scroll and resize listeners removed to avoid performance issues
+// AdapterBase will handle selection changes efficiently
 
 // Verify message listener is registered
 console.log("[Prompanion Grok] ========== VERIFYING MESSAGE LISTENER ==========");

@@ -37,13 +37,81 @@ export async function callOpenAI(messages, chatHistory = []) {
   // The last message is the user's current message
   const lastMessage = messages[messages.length - 1];
   
+  // Truncate chat history to prevent "request entity too large" errors
+  // Limit to most recent messages and truncate if needed
+  let chatHistoryForRequest = messages.slice(0, -1); // All messages except the last one
+  const MAX_REQUEST_SIZE = 50 * 1024; // 50KB max request body size (reduced from 200KB)
+  const MAX_CHAT_HISTORY_MESSAGES = 10; // Absolute maximum messages (reduced from 20)
+  
+  // First limit message count
+  if (chatHistoryForRequest.length > MAX_CHAT_HISTORY_MESSAGES) {
+    console.warn(`[Prompanion OpenAI Client] Truncating chat history from ${chatHistoryForRequest.length} to ${MAX_CHAT_HISTORY_MESSAGES} messages`);
+    chatHistoryForRequest = chatHistoryForRequest.slice(-MAX_CHAT_HISTORY_MESSAGES);
+  }
+  
+  // Build request body and check size
+  let requestBody = {
+    message: lastMessage.content,
+    chatHistory: chatHistoryForRequest
+  };
+  
+  let requestBodySize = JSON.stringify(requestBody).length;
+  
+  // If still too large, truncate system message content
+  if (requestBodySize > MAX_REQUEST_SIZE) {
+    console.warn(`[Prompanion OpenAI Client] Request body size (${requestBodySize} bytes) exceeds limit, truncating system message`);
+    
+    const systemMessage = chatHistoryForRequest.find(msg => msg.role === "system");
+    if (systemMessage && systemMessage.content) {
+      // Truncate system message content to reduce size
+      const maxSystemMessageLength = 5000; // 5KB max for system message (reduced from 10KB)
+      if (systemMessage.content.length > maxSystemMessageLength) {
+        systemMessage.content = systemMessage.content.substring(0, maxSystemMessageLength) + "\n\n[Context truncated for size...]";
+        requestBody = {
+          message: lastMessage.content,
+          chatHistory: chatHistoryForRequest
+        };
+        requestBodySize = JSON.stringify(requestBody).length;
+        console.log(`[Prompanion OpenAI Client] System message truncated, new request size: ${requestBodySize} bytes`);
+      }
+    }
+    
+    // If still too large after truncating system message, remove oldest non-system messages
+    if (requestBodySize > MAX_REQUEST_SIZE) {
+      const nonSystemMessages = chatHistoryForRequest.filter(msg => msg.role !== "system");
+      const systemMsg = chatHistoryForRequest.find(msg => msg.role === "system");
+      
+      let truncatedNonSystem = [...nonSystemMessages];
+      while (truncatedNonSystem.length > 0) {
+        const testBody = {
+          message: lastMessage.content,
+          chatHistory: systemMsg ? [systemMsg, ...truncatedNonSystem] : truncatedNonSystem
+        };
+        const testSize = JSON.stringify(testBody).length;
+        if (testSize <= MAX_REQUEST_SIZE) {
+          break;
+        }
+        truncatedNonSystem.shift(); // Remove oldest message
+      }
+      
+      chatHistoryForRequest = systemMsg ? [systemMsg, ...truncatedNonSystem] : truncatedNonSystem;
+      requestBody = {
+        message: lastMessage.content,
+        chatHistory: chatHistoryForRequest
+      };
+      console.warn(`[Prompanion OpenAI Client] Further truncated to ${chatHistoryForRequest.length} messages, final size: ${JSON.stringify(requestBody).length} bytes`);
+    }
+  }
+  
   // Log for debugging
   console.log("[Prompanion OpenAI Client] Sending messages to API:", {
     totalMessages: messages.length,
-    hasSystemMessage: messages.some(msg => msg.role === "system"),
-    systemMessagePreview: messages.find(msg => msg.role === "system")?.content?.substring(0, 100),
+    chatHistoryMessages: chatHistoryForRequest.length,
+    hasSystemMessage: chatHistoryForRequest.some(msg => msg.role === "system"),
+    systemMessagePreview: chatHistoryForRequest.find(msg => msg.role === "system")?.content?.substring(0, 100),
     lastMessageRole: lastMessage?.role,
-    lastMessagePreview: lastMessage?.content?.substring(0, 50)
+    lastMessagePreview: lastMessage?.content?.substring(0, 50),
+    requestBodySize: JSON.stringify(requestBody).length
   });
 
   const response = await fetch(`${BACKEND_URL}/api/chat`, {
@@ -52,10 +120,7 @@ export async function callOpenAI(messages, chatHistory = []) {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`
     },
-    body: JSON.stringify({
-      message: lastMessage.content,
-      chatHistory: messages.slice(0, -1) // All messages except the last one (includes system message)
-    })
+    body: JSON.stringify(requestBody)
   });
 
   if (!response.ok) {
@@ -65,6 +130,9 @@ export async function callOpenAI(messages, chatHistory = []) {
     }
     if (response.status === 403) {
       throw new Error("LIMIT_REACHED");
+    }
+    if (response.status === 413 || (errorData.error && (errorData.error.toLowerCase().includes("entity too large") || errorData.error.toLowerCase().includes("request entity too large")))) {
+      throw new Error("Request too large. Please try with a shorter conversation history.");
     }
     throw new Error(errorData.error || "Failed to get chat response");
   }

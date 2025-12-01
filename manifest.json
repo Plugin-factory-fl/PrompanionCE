@@ -96,6 +96,24 @@
       ],
       "js": ["Base/AdapterBase.js", "Adapters/Perplexity/adapter.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://bolt.new/*",
+        "https://*.bolt.new/*"
+      ],
+      "js": ["Base/AdapterBase.js", "Adapters/Bolt/adapter.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://chat.deepseek.com/*",
+        "https://www.deepseek.com/*",
+        "https://deepseek.com/*",
+        "https://*.deepseek.com/*"
+      ],
+      "js": ["Base/AdapterBase.js", "Adapters/Deepseek/adapter.js"],
+      "run_at": "document_idle"
     }
   ],
   "commands": {

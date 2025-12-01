@@ -185,53 +185,76 @@ function buildChatApiMessages(history, llmChatHistory = []) {
   
   // If LLM chat history is provided, add it as context in a system message
   if (Array.isArray(llmChatHistory) && llmChatHistory.length > 0) {
+    // Truncate chat history to prevent "request entity too large" errors
+    // Limit to most recent messages and truncate content if needed
+    const MAX_CHAT_HISTORY_MESSAGES = 5; // Limit to 5 most recent messages (reduced from 10)
+    const MAX_CONTENT_LENGTH_PER_MESSAGE = 1000; // Limit each message content to 1000 chars (reduced from 2000)
+    const MAX_TOTAL_CONTEXT_LENGTH = 4000; // Limit total context text to 4000 chars (reduced from 8000)
+    
+    let truncatedHistory = llmChatHistory.slice(-MAX_CHAT_HISTORY_MESSAGES); // Get most recent messages
+    
+    // Truncate each message's content
+    truncatedHistory = truncatedHistory.map(msg => ({
+      ...msg,
+      content: msg.content && msg.content.length > MAX_CONTENT_LENGTH_PER_MESSAGE
+        ? msg.content.substring(0, MAX_CONTENT_LENGTH_PER_MESSAGE) + "..."
+        : msg.content
+    }));
+    
     // Format the LLM conversation history as context
-    const contextText = llmChatHistory
+    let contextText = truncatedHistory
       .map((msg) => {
         const role = msg.role === "assistant" ? "Assistant" : "User";
         return `${role}: ${msg.content}`;
       })
       .join("\n\n");
     
+    // If context is still too long, truncate it further
+    if (contextText.length > MAX_TOTAL_CONTEXT_LENGTH) {
+      contextText = contextText.substring(0, MAX_TOTAL_CONTEXT_LENGTH) + "\n\n[Chat history truncated for length...]";
+    }
+    
     // Get the user's question (the highlighted text they want to elaborate on)
     const userQuestion = history.find(msg => msg.role === "user")?.content || "";
     
-    const systemMessageContent = `You are helping the user elaborate on a specific part of a conversation they had with an AI assistant. 
+    // Build system message - truncate context further if total message would be too long
+    const MAX_SYSTEM_MESSAGE_LENGTH = 6000; // 6KB max for entire system message
+    const instructionsPrefix = `You are helping the user elaborate on a specific part of a conversation they had with an AI assistant.
 
-CRITICAL REQUIREMENTS - YOU MUST FOLLOW THESE:
-1. The user has highlighted text from the conversation below and wants you to elaborate on it
-2. You MUST ALWAYS reference the original conversation context in your response
-3. When discussing the highlighted topic, you MUST explicitly mention relevant details from the conversation (e.g., if the conversation was about Samsung phones and the user highlights "200MP camera", you MUST mention "Samsung" and say something like "In terms of Samsung's 200MP cameras" or "Regarding Samsung's 200MP camera technology")
-4. Your response MUST conclude by connecting back to the original conversation context using phrases like:
-   - "In terms of [specific topic/company/product from the conversation]..."
-   - "Regarding [specific detail from the conversation]..."
-   - "When it comes to [context from conversation]..."
-5. Do NOT provide generic information - always tie it back to the specific conversation context provided
+CRITICAL REQUIREMENTS:
+1. Reference the original conversation context in your response
+2. When discussing the highlighted topic, mention relevant details from the conversation
+3. Conclude by connecting back to the original context using phrases like "In terms of [topic]..." or "Regarding [detail]..."
 
-Here is the relevant conversation history for context:
+Conversation context:
 
-${contextText}
+`;
+    const instructionsSuffix = `
 
 The user wants to elaborate on: "${userQuestion}"
 
-Your response MUST:
-- Directly address the highlighted text
-- Reference and relate back to the original conversation context throughout
-- Mention specific details, companies, products, or topics from the conversation when relevant
-- ALWAYS conclude by connecting your explanation back to the original context using the format: "In terms of [topic/company/product from context], [your explanation]"
-
-Example: If the conversation mentioned "Samsung" and "200MP camera", and the user highlights "200MP camera", you MUST mention Samsung and conclude with something like "In terms of Samsung's 200MP cameras, they are a unique innovation and Samsung achieved this by..."`;
+Your response must address the highlighted text and reference the conversation context.`;
+    
+    // Calculate max context length to keep total under limit
+    const fixedTextLength = instructionsPrefix.length + instructionsSuffix.length;
+    const maxContextLength = Math.max(0, MAX_SYSTEM_MESSAGE_LENGTH - fixedTextLength - 100); // 100 char buffer
+    
+    // Truncate context if needed
+    if (contextText.length > maxContextLength) {
+      contextText = contextText.substring(0, maxContextLength) + "\n\n[Context truncated for size...]";
+    }
+    
+    const systemMessageContent = instructionsPrefix + contextText + instructionsSuffix;
     
     messages.push({
       role: "system",
       content: systemMessageContent
     });
     
-    console.log("[Prompanion] Added chat history context to API call:", llmChatHistory.length, "messages");
-    console.log("[Prompanion] System message created with context:", {
+    console.log("[Prompanion] Added chat history context to API call:", {
+      originalHistoryLength: llmChatHistory.length,
+      truncatedHistoryLength: truncatedHistory.length,
       contextTextLength: contextText.length,
-      contextPreview: contextText.substring(0, 200) + "...",
-      userQuestion: userQuestion.substring(0, 100),
       systemMessageLength: systemMessageContent.length
     });
   } else {

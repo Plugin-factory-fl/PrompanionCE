@@ -5,9 +5,9 @@
 // This eliminates duplicate listener registrations and provides unified message handling.
 // ============================================================================
 
-console.log("[Prompanion Bolt] ========== BOLT ADAPTER LOADING ==========");
-console.log("[Prompanion Bolt] Timestamp:", new Date().toISOString());
-console.log("[Prompanion Bolt] Location:", window.location.href);
+console.log("[Prompanion Lovable] ========== LOVABLE ADAPTER LOADING ==========");
+console.log("[Prompanion Lovable] Timestamp:", new Date().toISOString());
+console.log("[Prompanion Lovable] Location:", window.location.href);
 
 // Import constants from AdapterBase
 if (typeof AdapterBase === "undefined") {
@@ -292,7 +292,7 @@ function updateSelectionToolbar() {
   toolbar.classList.add(SELECTION_TOOLBAR_VISIBLE_CLASS);
 }
 
-function captureBoltChatHistory(maxMessages = 20) {
+function captureLovableChatHistory(maxMessages = 20) {
   const messages = [];
   
   try {
@@ -395,10 +395,10 @@ function captureBoltChatHistory(maxMessages = 20) {
       }
     }
     
-    console.log(`[Prompanion] Captured ${messages.length} messages from Bolt conversation`);
+    console.log(`[Prompanion Lovable] Captured ${messages.length} messages from Lovable conversation`);
     return messages;
   } catch (error) {
-    console.error("[Prompanion] Error capturing GPT chat history:", error);
+    console.error("[Prompanion Lovable] Error capturing Lovable chat history:", error);
     return [];
   }
 }
@@ -419,18 +419,18 @@ async function submitSelectionToSideChat(text) {
   selectionAskInFlight = true;
   
   try {
-    // Capture chat history from Bolt conversation for context
+    // Capture chat history from Lovable conversation for context
     let chatHistory = [];
-    console.log("%c[Prompanion Bolt] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
+    console.log("%c[Prompanion Lovable] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
     try {
-      chatHistory = captureBoltChatHistory(20);
-      console.log(`%c[Prompanion Bolt] ✓ Captured ${chatHistory.length} messages`, 
+      chatHistory = captureLovableChatHistory(20);
+      console.log(`%c[Prompanion Lovable] ✓ Captured ${chatHistory.length} messages`, 
         chatHistory.length > 0 ? "color: green; font-size: 14px; font-weight: bold;" : "color: red; font-size: 14px; font-weight: bold;");
       if (chatHistory.length === 0) {
-        console.warn("[Prompanion Bolt] ⚠️ No messages found in DOM");
+        console.warn("[Prompanion Lovable] ⚠️ No messages found in DOM");
       }
     } catch (error) {
-      console.error("[Prompanion Bolt] ✗ Failed to capture chat history:", error);
+      console.error("[Prompanion Lovable] ✗ Failed to capture chat history:", error);
       chatHistory = [];
     };
 
@@ -461,10 +461,8 @@ function handleSelectionToolbarAction(event) {
   submitSelectionToSideChat(text);
 }
 
-function handleSelectionChange() {
-  console.log("[Prompanion] handleSelectionChange fired");
-  requestSelectionToolbarUpdate();
-}
+// Selection change is now handled by AdapterBase.initSelectionToolbar()
+// No need for a separate handler - removed to avoid duplicate listeners
 
 // Generic setButtonTextContent removed - use AdapterBase.setButtonTextContent()
 
@@ -483,10 +481,10 @@ function requestPromptEnhancement(promptText) {
     .catch((error) => {
       const errorMessage = error?.message || "";
       if (errorMessage.includes("Extension context invalidated")) {
-        console.error("[Prompanion Bolt] Extension context invalidated - user should reload page");
+        console.error("[Prompanion Lovable] Extension context invalidated - user should reload page");
         // The notification is already shown by AdapterBase._showContextInvalidatedNotification()
       } else {
-        console.warn("[Prompanion Bolt] Enhancement request failed:", error);
+        console.warn("[Prompanion Lovable] Enhancement request failed:", error);
       }
       return { ok: false, reason: errorMessage || "UNKNOWN_ERROR" };
     });
@@ -542,7 +540,7 @@ function buildButton() {
   // Use AdapterBase for generic hover tooltip
   AdapterBase.attachTooltip(button, "Open Prompanion to enhance your prompts for the best response.", BUTTON_ID);
   button.addEventListener("click", () => AdapterBase.togglePanel()
-    .catch((e) => console.error("Prompanion: failed to open sidebar from Bolt adapter", e)));
+    .catch((e) => console.error("Prompanion: failed to open sidebar from Lovable adapter", e)));
   button.addEventListener("mouseenter", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("focus", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("mouseleave", () => AdapterBase.hideTooltip(button));
@@ -551,14 +549,17 @@ function buildButton() {
 }
 
 function ensureFloatingButton() {
+  console.log("[Prompanion Lovable] ensureFloatingButton called");
   if (floatingButtonWrapper && floatingButtonElement) {
     floatingButtonWrapper.style.width = floatingButtonWrapper.style.height = BUTTON_SIZE.wrapper;
     floatingButtonElement.style.width = floatingButtonElement.style.height = BUTTON_SIZE.element;
+    console.log("[Prompanion Lovable] Floating button already exists");
     return;
   }
   ensureStyle();
   floatingButtonWrapper = document.getElementById(`${BUTTON_ID}-wrapper`);
   if (!floatingButtonWrapper) {
+    console.log("[Prompanion Lovable] Creating new floating button wrapper");
     floatingButtonWrapper = document.createElement("div");
     floatingButtonWrapper.id = `${BUTTON_ID}-wrapper`;
     floatingButtonWrapper.style.position = "absolute";
@@ -567,91 +568,673 @@ function ensureFloatingButton() {
     floatingButtonWrapper.style.display = "flex";
     floatingButtonWrapper.style.alignItems = "center";
     floatingButtonWrapper.style.justifyContent = "center";
+    floatingButtonWrapper.style.visibility = "visible";
+    floatingButtonWrapper.style.opacity = "1";
   }
   floatingButtonWrapper.style.width = floatingButtonWrapper.style.height = BUTTON_SIZE.wrapper;
   floatingButtonElement = document.getElementById(BUTTON_ID) ?? buildButton();
   floatingButtonElement.style.width = floatingButtonElement.style.height = BUTTON_SIZE.element;
-  if (!floatingButtonElement.isConnected) floatingButtonWrapper.append(floatingButtonElement);
+  if (!floatingButtonElement.isConnected) {
+    floatingButtonWrapper.append(floatingButtonElement);
+    console.log("[Prompanion Lovable] Button element appended to wrapper");
+  }
+  console.log("[Prompanion Lovable] Floating button ensured:", {
+    hasWrapper: !!floatingButtonWrapper,
+    hasElement: !!floatingButtonElement,
+    wrapperId: floatingButtonWrapper.id,
+    elementId: floatingButtonElement.id
+  });
 }
 
-function placeButton(targetContainer, inputNode) {
-  if (!inputNode) return;
+function placeButton(targetContainer, inputNode, buttonTargetElement = null) {
+  if (!inputNode) {
+    console.warn("[Prompanion Lovable] placeButton: no input node provided");
+    return;
+  }
+  console.log("[Prompanion Lovable] placeButton called:", {
+    hasTargetContainer: !!targetContainer,
+    hasInputNode: !!inputNode,
+    hasButtonTargetElement: !!buttonTargetElement,
+    inputTagName: inputNode.tagName
+  });
   ensureFloatingButton();
   floatingButtonTargetContainer = targetContainer ?? inputNode;
   floatingButtonTargetInput = inputNode;
-  positionFloatingButton(inputNode, floatingButtonTargetContainer);
+  
+  // Skip XPath to avoid CSP issues - rely on fallback strategies in positionFloatingButton
+  // buttonTargetElement will be found via fallback strategies
+  
+  positionFloatingButton(inputNode, floatingButtonTargetContainer, buttonTargetElement);
+  
+  // Verify button was placed
+  setTimeout(() => {
+    if (floatingButtonWrapper && floatingButtonWrapper.offsetParent) {
+      console.log("[Prompanion Lovable] ✓ Button successfully placed and visible");
+    } else {
+      console.warn("[Prompanion Lovable] ⚠️ Button wrapper exists but is not visible:", {
+        hasWrapper: !!floatingButtonWrapper,
+        isConnected: floatingButtonWrapper?.isConnected,
+        parentElement: floatingButtonWrapper?.parentElement?.tagName,
+        display: floatingButtonWrapper ? getComputedStyle(floatingButtonWrapper).display : 'N/A',
+        visibility: floatingButtonWrapper ? getComputedStyle(floatingButtonWrapper).visibility : 'N/A',
+        opacity: floatingButtonWrapper ? getComputedStyle(floatingButtonWrapper).opacity : 'N/A'
+      });
+    }
+  }, 100);
 }
 
-function positionFloatingButton(inputNode, containerNode = floatingButtonTargetContainer) {
-  if (!floatingButtonWrapper) return;
-  const target = containerNode ?? inputNode;
-  if (!target) return;
-  if (getComputedStyle(target).position === "static") {
-    target.style.position = "relative";
+/**
+ * Finds an element using XPath-like path (without using document.evaluate to avoid CSP issues)
+ * Converts XPath /html/body/div[2]/div/main/div/section/div[2]/div/div/div/form/div[2]/div[3]
+ * to DOM traversal
+ * @param {string} xpath - The XPath expression (for reference, we'll use a CSS selector approach instead)
+ * @returns {HTMLElement|null} The found element or null
+ */
+function findElementByXPath(xpath) {
+  // Instead of using document.evaluate (which triggers CSP), use CSS selectors and DOM traversal
+  // The XPath /html/body/div[2]/div/main/div/section/div[2]/div/div/div/form/div[2]/div[3]
+  // translates to: body > div:nth-child(2) > div > main > div > section > div:nth-child(2) > div > div > div > form > div:nth-child(2) > div:nth-child(3)
+  
+  try {
+    // Start from body
+    let current = document.body;
+    if (!current) return null;
+    
+    // Navigate: body > div[2] > div > main > div > section > div[2] > div > div > div > form > div[2] > div[3]
+    // body > div:nth-child(2)
+    const bodyDivs = Array.from(current.children).filter(c => c.tagName === 'DIV');
+    if (bodyDivs.length < 2) return null;
+    current = bodyDivs[1]; // div[2] (0-indexed)
+    
+    // > div
+    const div1 = current.querySelector(':scope > div');
+    if (!div1) return null;
+    current = div1;
+    
+    // > main
+    const main = current.querySelector(':scope > main');
+    if (!main) return null;
+    current = main;
+    
+    // > div
+    const div2 = current.querySelector(':scope > div');
+    if (!div2) return null;
+    current = div2;
+    
+    // > section
+    const section = current.querySelector(':scope > section');
+    if (!section) return null;
+    current = section;
+    
+    // > div[2]
+    const sectionDivs = Array.from(current.children).filter(c => c.tagName === 'DIV');
+    if (sectionDivs.length < 2) return null;
+    current = sectionDivs[1]; // div[2]
+    
+    // > div > div > div
+    for (let i = 0; i < 3; i++) {
+      const div = current.querySelector(':scope > div');
+      if (!div) return null;
+      current = div;
+    }
+    
+    // > form
+    const form = current.querySelector(':scope > form');
+    if (!form) return null;
+    current = form;
+    
+    // > div[2]
+    const formDivs = Array.from(current.children).filter(c => c.tagName === 'DIV');
+    if (formDivs.length < 2) return null;
+    current = formDivs[1]; // div[2]
+    
+    // > div[3]
+    const finalDivs = Array.from(current.children).filter(c => c.tagName === 'DIV');
+    if (finalDivs.length < 3) return null;
+    current = finalDivs[2]; // div[3] (0-indexed, so index 2)
+    
+    return current instanceof HTMLElement ? current : null;
+  } catch (e) {
+    console.error("[Prompanion Lovable] XPath-like traversal failed:", e);
+    return null;
   }
-  if (floatingButtonWrapper.parentElement !== target) {
-    target.append(floatingButtonWrapper);
+}
+
+function positionFloatingButton(inputNode, containerNode = floatingButtonTargetContainer, buttonTargetElement = null) {
+  if (!floatingButtonWrapper) {
+    console.error("[Prompanion Lovable] Cannot position button - wrapper not created! Calling ensureFloatingButton...");
+    ensureFloatingButton();
+    if (!floatingButtonWrapper) {
+      console.error("[Prompanion Lovable] Still no wrapper after ensureFloatingButton!");
+      return;
+    }
   }
-  floatingButtonWrapper.style.top = "50%";
-  floatingButtonWrapper.style.right = "12px";
-  floatingButtonWrapper.style.transform = "translateY(-50%)";
+  
+  console.log("[Prompanion Lovable] positionFloatingButton called", {
+    hasInputNode: !!inputNode,
+    hasContainerNode: !!containerNode,
+    hasButtonTargetElement: !!buttonTargetElement,
+    hasWrapper: !!floatingButtonWrapper,
+    wrapperId: floatingButtonWrapper?.id
+  });
+  
+  // Skip XPath entirely to avoid CSP issues - use fallback strategies only
+  let targetElement = buttonTargetElement;
+  
+  if (targetElement) {
+    console.log("[Prompanion Lovable] Target element found via XPath:", {
+      tagName: targetElement.tagName,
+      className: targetElement.className,
+      id: targetElement.id,
+      children: targetElement.children.length,
+      isConnected: targetElement.isConnected,
+      offsetParent: targetElement.offsetParent !== null
+    });
+  } else {
+    console.warn("[Prompanion Lovable] Target element not found via XPath, trying fallback strategies");
+    
+    // Strategy 1: Try to find the speak button directly by various means
+    let speakButton = null;
+    
+    // Try aria-label/title
+    speakButton = document.querySelector('button[aria-label*="speak" i], button[aria-label*="Speak" i], button[title*="speak" i], button[title*="Speak" i]');
+    
+    // Try to find button with audio/waveform icon (common for voice input)
+    if (!speakButton) {
+      const allButtons = Array.from(document.querySelectorAll('button'));
+      for (const btn of allButtons) {
+        const svg = btn.querySelector('svg');
+        if (svg) {
+          const paths = svg.querySelectorAll('path');
+          for (const path of paths) {
+            const d = path.getAttribute('d') || '';
+            // Look for waveform-like patterns or audio icon patterns
+            if (d.includes('M') && d.split('M').length > 3) {
+              speakButton = btn;
+              console.log("[Prompanion Lovable] Found speak button via SVG pattern");
+              break;
+            }
+          }
+          if (speakButton) break;
+        }
+      }
+    }
+    
+    // Try to find button near the input (last button in form)
+    if (!speakButton && inputNode) {
+      const form = inputNode.closest('form');
+      if (form) {
+        const buttons = Array.from(form.querySelectorAll('button'));
+        // Get the last visible button (likely the send/speak button)
+        for (let i = buttons.length - 1; i >= 0; i--) {
+          const btn = buttons[i];
+          if (btn.offsetParent !== null) {
+            speakButton = btn;
+            console.log("[Prompanion Lovable] Found speak button as last visible button in form");
+            break;
+          }
+        }
+      }
+    }
+    
+    if (speakButton) {
+      targetElement = speakButton.parentElement;
+      console.log("[Prompanion Lovable] Found target element via speak button:", {
+        speakButtonTag: speakButton.tagName,
+        speakButtonAriaLabel: speakButton.getAttribute('aria-label'),
+        targetElementTag: targetElement.tagName,
+        targetElementClassName: targetElement.className
+      });
+    } else {
+      // Try to find any button in the form area
+      const form = inputNode?.closest('form');
+      if (form) {
+        const buttons = form.querySelectorAll('button');
+        if (buttons.length > 0) {
+          targetElement = buttons[buttons.length - 1].parentElement;
+          console.log("[Prompanion Lovable] Found target element via form button (last button)");
+        }
+      }
+    }
+  }
+  
+  if (!targetElement) {
+    console.warn("[Prompanion Lovable] Target element not found, using fallback positioning");
+    // Fallback to simple positioning - at least make the button visible
+    if (inputNode) {
+      // Try to find the form or a container with buttons
+      let container = inputNode.closest('form');
+      if (!container) {
+        container = containerNode && containerNode !== document.body ? containerNode : inputNode.parentElement;
+      }
+      
+      // Walk up to find a container with buttons
+      if (container) {
+        let current = container;
+        let depth = 0;
+        while (current && depth < 5) {
+          const buttons = current.querySelectorAll('button');
+          if (buttons.length > 0) {
+            container = current;
+            break;
+          }
+          current = current.parentElement;
+          depth++;
+        }
+      }
+      
+      if (container) {
+        const containerStyle = getComputedStyle(container);
+        if (containerStyle.position === "static") {
+          container.style.position = "relative";
+        }
+        if (floatingButtonWrapper.parentElement !== container) {
+          container.append(floatingButtonWrapper);
+          console.log("[Prompanion Lovable] Button appended to fallback container:", {
+            containerTag: container.tagName,
+            containerClassName: container.className
+          });
+        }
+        floatingButtonWrapper.style.position = "absolute";
+        floatingButtonWrapper.style.top = "50%";
+        floatingButtonWrapper.style.right = "12px";
+        floatingButtonWrapper.style.transform = "translateY(-50%)";
+        floatingButtonWrapper.style.left = "auto";
+        floatingButtonWrapper.style.display = "flex";
+        floatingButtonWrapper.style.visibility = "visible";
+        floatingButtonWrapper.style.opacity = "1";
+        floatingButtonWrapper.style.zIndex = "2147483000";
+        floatingButtonWrapper.style.pointerEvents = "auto";
+        
+        // Force button element visibility
+        if (floatingButtonElement) {
+          floatingButtonElement.style.display = "block";
+          floatingButtonElement.style.visibility = "visible";
+          floatingButtonElement.style.opacity = "1";
+        }
+        
+        console.log("[Prompanion Lovable] Button positioned using fallback (should be visible now):", {
+          containerRect: container.getBoundingClientRect(),
+          wrapperRect: floatingButtonWrapper.getBoundingClientRect(),
+          isConnected: floatingButtonWrapper.isConnected,
+          offsetParent: floatingButtonWrapper.offsetParent !== null
+        });
+      } else {
+        console.error("[Prompanion Lovable] No container found for fallback positioning!");
+      }
+    } else {
+      console.error("[Prompanion Lovable] No input node for fallback positioning!");
+    }
+    return;
+  }
+  
+  console.log("[Prompanion Lovable] positionFloatingButton: found target element", {
+    tagName: targetElement.tagName,
+    className: targetElement.className,
+    id: targetElement.id
+  });
+  
+  // Find the input bar container - the one that contains both input and buttons
+  let inputBarContainer = null;
+  
+  // Strategy 1: Walk up from target element to find the container that also contains the input
+  let current = targetElement.parentElement;
+  let depth = 0;
+  while (current && depth < 15) {
+    const containsTarget = current.contains(targetElement);
+    const containsInput = inputNode && current.contains(inputNode);
+    
+    if (containsTarget && containsInput) {
+      const style = getComputedStyle(current);
+      const hasRelativePosition = style.position === "relative" || style.position === "absolute";
+      const hasFlex = style.display === "flex" || style.display === "grid";
+      
+      if (hasRelativePosition || hasFlex || 
+          current.classList.contains("relative") || 
+          current.classList.contains("flex")) {
+        inputBarContainer = current;
+        console.log("[Prompanion Lovable] Found input bar container via target element walk");
+        break;
+      }
+    }
+    current = current.parentElement;
+    depth++;
+  }
+  
+  // Strategy 2: Walk up from input to find container that contains buttons
+  if (!inputBarContainer && inputNode) {
+    current = inputNode.parentElement;
+    depth = 0;
+    while (current && depth < 15) {
+      const hasButtons = current.querySelectorAll("button").length > 0;
+      const containsInput = current.contains(inputNode);
+      const containsTarget = current.contains(targetElement);
+      
+      if (hasButtons && containsInput && containsTarget) {
+        const style = getComputedStyle(current);
+        const hasRelativePosition = style.position === "relative" || style.position === "absolute";
+        const hasFlex = style.display === "flex" || style.display === "grid";
+        
+        if (hasRelativePosition || hasFlex || 
+            current.classList.contains("relative") || 
+            current.classList.contains("flex")) {
+          inputBarContainer = current;
+          console.log("[Prompanion Lovable] Found input bar container via input walk");
+          break;
+        }
+      }
+      current = current.parentElement;
+      depth++;
+    }
+  }
+  
+  // Fallback: use target element's parent if it's relatively small
+  if (!inputBarContainer) {
+    const targetParent = targetElement.parentElement;
+    if (targetParent) {
+      const parentRect = targetParent.getBoundingClientRect();
+      if (parentRect.height < 200 && parentRect.width < 2000) {
+        inputBarContainer = targetParent;
+        console.log("[Prompanion Lovable] Using target parent as container (fallback)");
+      }
+    }
+  }
+  
+  // Final fallback
+  if (!inputBarContainer) {
+    inputBarContainer = targetElement.parentElement || containerNode || inputNode?.parentElement;
+  }
+  
+  if (!inputBarContainer) {
+    console.warn("[Prompanion Lovable] No container found");
+    return;
+  }
+  
+  // Ensure container has relative positioning
+  const containerStyle = getComputedStyle(inputBarContainer);
+  if (containerStyle.position === "static") {
+    inputBarContainer.style.position = "relative";
+  }
+  
+  // Get bounding rects
+  const targetRect = targetElement.getBoundingClientRect();
+  const containerRect = inputBarContainer.getBoundingClientRect();
+  
+  // Find the speak button within the target element
+  const speakButton = targetElement.querySelector('button') || targetElement;
+  const speakRect = speakButton.getBoundingClientRect();
+  
+  // Calculate position: to the left of the speak button
+  const buttonWidth = BUTTON_SIZE.wrapper ? parseInt(BUTTON_SIZE.wrapper.replace("px", "")) : 44;
+  const spacing = 8; // 8px spacing to the left of speak button
+  
+  // Calculate the right position: speak button's left edge relative to container's right edge + spacing
+  const speakLeftFromContainer = speakRect.left - containerRect.left;
+  const rightPosition = containerRect.width - speakLeftFromContainer + spacing;
+  
+  // Calculate vertical alignment: align with the target element's center
+  const targetCenterY = targetRect.top - containerRect.top + (targetRect.height / 2);
+  const buttonHeight = buttonWidth; // Button is square
+  const topPosition = targetCenterY - (buttonHeight / 2);
+  
+  // Move button to container
+  if (floatingButtonWrapper.parentElement !== inputBarContainer) {
+    inputBarContainer.append(floatingButtonWrapper);
+    console.log("[Prompanion Lovable] Button wrapper appended to inputBarContainer");
+  }
+  
+  // Find the speak button within the target element
+  const speakButton = targetElement.querySelector('button') || targetElement;
+  const speakRect = speakButton.getBoundingClientRect();
+  
+  console.log("[Prompanion Lovable] Speak button found:", {
+    isButton: speakButton.tagName === 'BUTTON',
+    speakRect: { left: speakRect.left, right: speakRect.right, top: speakRect.top, width: speakRect.width, height: speakRect.height }
+  });
+  
+  // Apply positioning styles - force visibility
+  floatingButtonWrapper.style.position = "absolute";
+  floatingButtonWrapper.style.top = `${topPosition}px`;
+  floatingButtonWrapper.style.right = `${rightPosition}px`;
+  floatingButtonWrapper.style.transform = "none";
+  floatingButtonWrapper.style.left = "auto";
+  floatingButtonWrapper.style.bottom = "auto";
+  floatingButtonWrapper.style.margin = "0";
+  floatingButtonWrapper.style.display = "flex";
+  floatingButtonWrapper.style.visibility = "visible";
+  floatingButtonWrapper.style.opacity = "1";
+  floatingButtonWrapper.style.zIndex = "2147483000";
+  floatingButtonWrapper.style.pointerEvents = "auto";
+  
+  // Force the button element to be visible too
+  if (floatingButtonElement) {
+    floatingButtonElement.style.display = "block";
+    floatingButtonElement.style.visibility = "visible";
+    floatingButtonElement.style.opacity = "1";
+  }
+  
+  console.log("[Prompanion Lovable] Button styles applied:", {
+    position: floatingButtonWrapper.style.position,
+    top: floatingButtonWrapper.style.top,
+    right: floatingButtonWrapper.style.right,
+    display: floatingButtonWrapper.style.display,
+    visibility: floatingButtonWrapper.style.visibility,
+    opacity: floatingButtonWrapper.style.opacity,
+    zIndex: floatingButtonWrapper.style.zIndex,
+    isConnected: floatingButtonWrapper.isConnected,
+    offsetParent: floatingButtonWrapper.offsetParent !== null
+  });
+  
+  // Ensure positioning persists
+  requestAnimationFrame(() => {
+    if (!floatingButtonWrapper || !inputBarContainer || !targetElement) {
+      console.warn("[Prompanion Lovable] Missing elements in requestAnimationFrame:", {
+        hasWrapper: !!floatingButtonWrapper,
+        hasContainer: !!inputBarContainer,
+        hasTarget: !!targetElement
+      });
+      return;
+    }
+    
+    if (floatingButtonWrapper.parentElement !== inputBarContainer) {
+      inputBarContainer.append(floatingButtonWrapper);
+      console.log("[Prompanion Lovable] Button re-appended in requestAnimationFrame");
+    }
+    
+    // Recalculate in case container moved
+    const targetRect2 = targetElement.getBoundingClientRect();
+    const containerRect2 = inputBarContainer.getBoundingClientRect();
+    const speakRect2 = speakButton.getBoundingClientRect();
+    const speakLeftFromContainer2 = speakRect2.left - containerRect2.left;
+    const rightPosition2 = containerRect2.width - speakLeftFromContainer2 + spacing;
+    const targetCenterY2 = targetRect2.top - containerRect2.top + (targetRect2.height / 2);
+    const topPosition2 = targetCenterY2 - (buttonHeight / 2);
+    
+    // Force apply styles again
+    floatingButtonWrapper.style.position = "absolute";
+    floatingButtonWrapper.style.top = `${topPosition2}px`;
+    floatingButtonWrapper.style.right = `${rightPosition2}px`;
+    floatingButtonWrapper.style.transform = "none";
+    floatingButtonWrapper.style.left = "auto";
+    floatingButtonWrapper.style.bottom = "auto";
+    floatingButtonWrapper.style.margin = "0";
+    floatingButtonWrapper.style.display = "flex";
+    floatingButtonWrapper.style.visibility = "visible";
+    floatingButtonWrapper.style.opacity = "1";
+    floatingButtonWrapper.style.zIndex = "2147483000";
+    floatingButtonWrapper.style.pointerEvents = "auto";
+    
+    // Final verification
+    const rect = floatingButtonWrapper.getBoundingClientRect();
+    console.log("[Prompanion Lovable] Button final position in requestAnimationFrame:", {
+      top: floatingButtonWrapper.style.top,
+      right: floatingButtonWrapper.style.right,
+      visible: floatingButtonWrapper.offsetParent !== null,
+      boundingRect: { width: rect.width, height: rect.height, top: rect.top, left: rect.left },
+      display: getComputedStyle(floatingButtonWrapper).display,
+      visibility: getComputedStyle(floatingButtonWrapper).visibility,
+      opacity: getComputedStyle(floatingButtonWrapper).opacity
+    });
+  });
+  
+  console.log("[Prompanion Lovable] Button positioned to the left of speak button:", {
+    targetRect: { left: targetRect.left, right: targetRect.right, top: targetRect.top, width: targetRect.width, height: targetRect.height },
+    speakRect: { left: speakRect.left, right: speakRect.right, top: speakRect.top, width: speakRect.width, height: speakRect.height },
+    containerRect: { left: containerRect.left, right: containerRect.right, top: containerRect.top, width: containerRect.width, height: containerRect.height },
+    speakLeftFromContainer,
+    rightPosition,
+    spacing,
+    buttonWidth,
+    topPosition
+  });
 }
 
 function refreshFloatingButtonPosition() {
   if (floatingButtonTargetInput) {
-    positionFloatingButton(floatingButtonTargetInput, floatingButtonTargetContainer);
+    // Skip XPath to avoid CSP - rely on fallback strategies
+    positionFloatingButton(floatingButtonTargetInput, floatingButtonTargetContainer, null);
   }
 }
 
 function ensureDomObserver() {
-  if (domObserverStarted) return;
+  if (domObserverStarted) {
+    console.log("[Prompanion Lovable] DOM observer already started");
+    return;
+  }
+  console.log("[Prompanion Lovable] Starting DOM observer");
   const observer = new MutationObserver(() => {
     requestSelectionToolbarUpdate();
     const composer = locateComposer();
     if (composer) {
+      console.log("[Prompanion Lovable] DOM observer: composer found, placing button");
       placeButton(composer.container, composer.input);
       setupEnhanceTooltip(composer.input, composer.container);
+      // Also refresh button position in case target element appeared
+      refreshFloatingButtonPosition();
+    } else {
+      console.log("[Prompanion Lovable] DOM observer: composer not found yet");
     }
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
   domObserverStarted = true;
+  console.log("[Prompanion Lovable] DOM observer started");
 }
 
 function locateComposer() {
-  // Lovable-specific composer selectors - adjust based on actual DOM structure
-  const wrappers = [
+  console.log("[Prompanion Lovable] locateComposer: searching for input...");
+  
+  // Lovable-specific composer selectors - try multiple strategies
+  const selectors = [
     "textarea[placeholder*='message']",
-    "textarea[placeholder*='Message']", 
-    "form[class*='composer']",
-    "div[class*='input']",
-    "div[class*='composer']",
-    "main form"
-  ].map(sel => document.querySelector(sel)).filter(Boolean);
+    "textarea[placeholder*='Message']",
+    "textarea[placeholder*='Ask']",
+    "textarea[placeholder*='ask']",
+    "input[type='text'][placeholder*='message']",
+    "input[type='text'][placeholder*='Message']",
+    "[contenteditable='true'][role='textbox']",
+    "div[contenteditable='true']",
+    "form textarea",
+    "form input[type='text']",
+    "main textarea",
+    "main input[type='text']"
+  ];
+  
   let input = null;
-  for (const wrapper of wrappers) {
-    const editable = wrapper.querySelector("textarea, input[type='text'], [contenteditable='true'][role='textbox']") ??
-                     wrapper.querySelector("div[contenteditable='true']");
-    if (editable instanceof HTMLElement) { input = editable; break; }
+  for (const selector of selectors) {
+    try {
+      const element = document.querySelector(selector);
+      if (element instanceof HTMLElement && element.offsetParent !== null) {
+        // Check if element is visible
+        const style = getComputedStyle(element);
+        if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+          input = element;
+          console.log(`[Prompanion Lovable] locateComposer: found input with selector: ${selector}`);
+          break;
+        }
+      }
+    } catch (e) {
+      console.warn(`[Prompanion Lovable] Selector failed: ${selector}`, e);
+    }
   }
+  
   if (!input) {
-    const textarea = document.querySelector("[data-testid='conversation-turn-textbox'] textarea:not([readonly])");
-    if (textarea instanceof HTMLTextAreaElement && !textarea.className.includes("_fallbackTextarea")) input = textarea;
+    console.warn("[Prompanion Lovable] locateComposer: input not found with standard selectors");
+    // Try broader search
+    const allTextareas = Array.from(document.querySelectorAll("textarea"));
+    const allInputs = Array.from(document.querySelectorAll("input[type='text']"));
+    const allContentEditable = Array.from(document.querySelectorAll("[contenteditable='true']"));
+    
+    const candidates = [...allTextareas, ...allInputs, ...allContentEditable];
+    for (const candidate of candidates) {
+      if (candidate instanceof HTMLElement && candidate.offsetParent !== null) {
+        const style = getComputedStyle(candidate);
+        if (style.display !== 'none' && style.visibility !== 'hidden') {
+          // Check if it's likely an input field (not too large, has reasonable dimensions)
+          const rect = candidate.getBoundingClientRect();
+          if (rect.width > 100 && rect.height > 20 && rect.height < 200) {
+            input = candidate;
+            console.log(`[Prompanion Lovable] locateComposer: found input via broader search:`, {
+              tagName: candidate.tagName,
+              className: candidate.className,
+              placeholder: candidate.placeholder
+            });
+            break;
+          }
+        }
+      }
+    }
   }
-  if (!input) return null;
-  return { input, container: input.closest("[data-testid='composer-footer']") ??
-                             input.closest("[data-testid='composer-container']") ??
-                             input.parentElement ?? document.body };
+  
+  if (!input) {
+    console.warn("[Prompanion Lovable] locateComposer: input not found");
+    return null;
+  }
+  
+  // Find container - walk up to find a suitable container
+  let container = input.parentElement;
+  let depth = 0;
+  while (container && depth < 10) {
+    const style = getComputedStyle(container);
+    const hasRelativePosition = style.position === "relative" || style.position === "absolute";
+    const hasFlex = style.display === "flex" || style.display === "grid";
+    const hasButtons = container.querySelectorAll("button").length > 0;
+    
+    if ((hasRelativePosition || hasFlex) && hasButtons) {
+      console.log("[Prompanion Lovable] locateComposer: found container with buttons");
+      return { input, container };
+    }
+    container = container.parentElement;
+    depth++;
+  }
+  
+  // Fallback to parent or body
+  container = input.closest("form") || input.parentElement || document.body;
+  console.log("[Prompanion Lovable] locateComposer: using fallback container");
+  
+  // Skip XPath to avoid CSP issues - target element will be found via fallback strategies
+  // in positionFloatingButton
+  
+  return { input, container, buttonTargetElement: null };
 }
 
 function init() {
+  console.log("[Prompanion Lovable] ========== INIT CALLED ==========");
   const composer = locateComposer();
   requestSelectionToolbarUpdate();
   if (composer) {
-    placeButton(composer.container, composer.input);
+    console.log("[Prompanion Lovable] Composer found, placing button:", {
+      inputTagName: composer.input.tagName,
+      inputClassName: composer.input.className,
+      containerTagName: composer.container.tagName,
+      containerClassName: composer.container.className,
+      hasButtonTargetElement: !!composer.buttonTargetElement
+    });
+    placeButton(composer.container, composer.input, composer.buttonTargetElement);
     setupEnhanceTooltip(composer.input, composer.container);
     ensureDomObserver();
     return true;
   }
+  console.warn("[Prompanion Lovable] Composer not found on init, will retry with observer");
   ensureDomObserver();
   return false;
 }
@@ -759,14 +1342,81 @@ console.log("[Prompanion] Registering PROMPANION_INSERT_TEXT handler with Adapte
 AdapterBase.registerMessageHandler("PROMPANION_INSERT_TEXT", handleInsertTextMessage);
 
 function bootstrap() {
+  console.log("[Prompanion Lovable] ========== BOOTSTRAP CALLED ==========");
+  console.log("[Prompanion Lovable] Document ready state:", document.readyState);
+  console.log("[Prompanion Lovable] URL:", window.location.href);
+  
+  // Ensure button is created first
+  ensureFloatingButton();
+  console.log("[Prompanion Lovable] Button ensured:", {
+    hasWrapper: !!floatingButtonWrapper,
+    hasElement: !!floatingButtonElement,
+    wrapperConnected: floatingButtonWrapper?.isConnected
+  });
+  
   ensureHighlightObserver();
-  if (!init()) {
+  const initResult = init();
+  console.log("[Prompanion Lovable] Initial init result:", initResult);
+  
+  // Verify button visibility after a short delay
+  setTimeout(() => {
+    if (floatingButtonWrapper) {
+      const isVisible = floatingButtonWrapper.offsetParent !== null;
+      console.log("[Prompanion Lovable] Button visibility check:", {
+        isVisible,
+        isConnected: floatingButtonWrapper.isConnected,
+        parentElement: floatingButtonWrapper.parentElement?.tagName,
+        display: getComputedStyle(floatingButtonWrapper).display,
+        visibility: getComputedStyle(floatingButtonWrapper).visibility,
+        opacity: getComputedStyle(floatingButtonWrapper).opacity,
+        position: getComputedStyle(floatingButtonWrapper).position
+      });
+      
+      if (!isVisible) {
+        console.warn("[Prompanion Lovable] Button not visible, attempting fallback placement");
+        const composer = locateComposer();
+        if (composer && composer.input) {
+          placeButton(composer.container, composer.input, null);
+        }
+      }
+    } else {
+      console.error("[Prompanion Lovable] Button wrapper not created!");
+    }
+  }, 500);
+  
+  if (!initResult) {
+    console.log("[Prompanion Lovable] Initial init failed, setting up retry observer");
+    let retryCount = 0;
+    const maxRetries = 50; // Stop after 50 attempts (about 5 seconds)
     const observer = new MutationObserver(() => {
-      if (init()) {
+      retryCount++;
+      if (retryCount > maxRetries) {
+        console.warn("[Prompanion Lovable] Max retries reached, stopping observer");
+        observer.disconnect();
+        return;
+      }
+      const result = init();
+      if (result) {
+        console.log("[Prompanion Lovable] Init succeeded after", retryCount, "retries");
         observer.disconnect();
       }
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
+    
+    // Also try periodically in case mutations aren't firing
+    const intervalId = setInterval(() => {
+      if (init()) {
+        console.log("[Prompanion Lovable] Init succeeded via interval");
+        clearInterval(intervalId);
+        observer.disconnect();
+      }
+    }, 500);
+    
+    // Stop interval after 10 seconds
+    setTimeout(() => {
+      clearInterval(intervalId);
+      observer.disconnect();
+    }, 10000);
   }
 }
 
@@ -1094,11 +1744,9 @@ if (readyState === "complete" || readyState === "interactive") {
   document.addEventListener("DOMContentLoaded", bootstrap);
 }
 
-console.log("[Prompanion] Registering selection change event listeners");
-document.addEventListener("selectionchange", handleSelectionChange);
-window.addEventListener("scroll", handleSelectionChange, true);
-window.addEventListener("resize", handleSelectionChange);
-console.log("[Prompanion] Selection change event listeners registered");
+// Selection change is handled by AdapterBase.initSelectionToolbar()
+// Scroll and resize listeners removed to avoid performance issues
+// AdapterBase will handle selection changes efficiently
 
 // Verify message listener is registered
 console.log("[Prompanion] ========== VERIFYING MESSAGE LISTENER ==========");
