@@ -1114,6 +1114,8 @@ async function init() {
   }
 
   // Final check: re-read storage to catch any updates that happened during init
+  // Add a small delay to ensure any background script saves have completed
+  await new Promise(resolve => setTimeout(resolve, 100));
   const finalState = await loadState();
   console.log("[Prompanion Sidepanel] Final state check:", {
     hasOriginalPrompt: !!finalState?.originalPrompt,
@@ -1124,10 +1126,12 @@ async function init() {
     optionB: finalState?.optionB?.substring(0, 50)
   });
   if (finalState && hasPrompts(finalState)) {
-    if (promptsNeedUpdate(currentState, finalState)) {
-      console.log("[Prompanion Sidepanel] State needs update, applying changes");
-      updateAndRenderPrompts(currentState, finalState);
-    }
+    // Always update prompts if they exist in storage, even if they match
+    // This ensures we show the latest prompts even if currentState already has them
+    console.log("[Prompanion Sidepanel] Final state check - prompts found, ensuring they're displayed");
+    updateAndRenderPrompts(currentState, finalState);
+  } else {
+    console.log("[Prompanion Sidepanel] Final state check - no prompts in storage");
   }
 
   if (chrome?.runtime?.sendMessage) {

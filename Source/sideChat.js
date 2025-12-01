@@ -203,12 +203,12 @@ function buildChatApiMessages(history, llmChatHistory = []) {
     
     // Format the LLM conversation history as context
     let contextText = truncatedHistory
-      .map((msg) => {
-        const role = msg.role === "assistant" ? "Assistant" : "User";
+        .map((msg) => {
+          const role = msg.role === "assistant" ? "Assistant" : "User";
         return `${role}: ${msg.content}`;
-      })
-      .join("\n\n");
-    
+        })
+        .join("\n\n");
+      
     // If context is still too long, truncate it further
     if (contextText.length > MAX_TOTAL_CONTEXT_LENGTH) {
       contextText = contextText.substring(0, MAX_TOTAL_CONTEXT_LENGTH) + "\n\n[Chat history truncated for length...]";
@@ -424,7 +424,7 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
         
         // Ensure the message is visible by scrolling it into view
         lastUserMessage.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      } else {
+  } else {
         console.warn("[Prompanion] WARNING: No user messages found in DOM after rendering!");
       }
     } else {
@@ -1015,10 +1015,10 @@ export async function openSideChatSection(retries = 10) {
   
   // Wait for DOM to be ready with retries
   for (let attempt = 0; attempt < retries; attempt++) {
-    const chatSection = document.querySelector(".panel__section--chat details");
-    if (chatSection) {
+  const chatSection = document.querySelector(".panel__section--chat details");
+  if (chatSection) {
       if (!chatSection.open) {
-        chatSection.open = true;
+    chatSection.open = true;
       }
       
       // Wait for the section to be fully expanded
@@ -1046,16 +1046,16 @@ export async function openSideChatSection(retries = 10) {
       // Small delay to ensure DOM is fully updated
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      return true;
-    }
-    
+    return true;
+  }
+  
     // Wait before retrying
     if (attempt < retries - 1) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
   
-  console.warn("[SideChat] Could not find Side Chat section element after", retries, "attempts");
+      console.warn("[SideChat] Could not find Side Chat section element after", retries, "attempts");
   return false;
 }
 

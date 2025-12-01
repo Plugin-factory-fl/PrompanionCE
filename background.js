@@ -151,14 +151,14 @@ function buildSystemPrompt(model, outputType, levelOfDetail) {
       length: "short and focused"
     },
     2: {
+      text: "Provide clear, concise responses. The enhanced prompt must be exactly 5-7 sentences total - clear and focused.",
+      style: "clear, concise, and exactly 5-7 sentences",
+      length: "exactly 5-7 sentences total"
+    },
+    3: {
       text: "Provide well-structured responses with clear organization. Include necessary context and explanations.",
       style: "balanced, informative, and well-organized",
       length: "moderate length with good structure"
-    },
-    3: {
-      text: "Provide comprehensive, detailed responses with extensive context, examples, and thorough explanations.",
-      style: "comprehensive, detailed, and thorough",
-      length: "extensive and comprehensive"
     }
   };
 
@@ -364,8 +364,8 @@ async function generateEnhancements(promptText, settings = {}) {
 function buildRegenerateSystemPrompt(model, outputType, levelOfDetail) {
   const detailInstructions = {
     1: "Keep it concise and to-the-point. Focus on clarity and brevity.",
-    2: "Provide well-structured re-wording with clear organization.",
-    3: "Provide comprehensive re-wording with thorough improvements and context."
+    2: "Provide clear, organized re-wording with helpful context.",
+    3: "Provide well-structured re-wording with clear organization and necessary explanations."
   };
 
   const detail = detailInstructions[levelOfDetail] || detailInstructions[2];
@@ -572,27 +572,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             optionA: nextState.optionA?.substring(0, 50), 
             optionB: nextState.optionB?.substring(0, 50) 
           });
-          // Try to save state, but don't fail enhancement if storage fails
+          
+          // CRITICAL: Save state BEFORE sending response to ensure prompts are persisted
           try {
             await writeState(nextState);
             console.log("[Prompanion Background] ========== STATE SAVED TO STORAGE ==========");
+            
+            // Verify the save by reading back from storage
+            const verifyState = await readState();
+            if (verifyState.originalPrompt === promptText && verifyState.optionA === optionA) {
+              console.log("[Prompanion Background] ✓ Storage save verified - prompts are persisted");
+            } else {
+              console.warn("[Prompanion Background] ⚠️ Storage verification failed - prompts may not match");
+            }
           } catch (storageError) {
             // Log but don't throw - enhancement should still work
             console.error("[Prompanion Background] Failed to save state, but enhancement completed:", storageError);
           }
-          console.log("[Prompanion Background] State saved, sending PROMPANION_STATE_PUSH message");
           
-          // Send message to any listeners (including sidepanel if it's loaded)
+          // Send STATE_PUSH message to update sidepanel if it's open
+          console.log("[Prompanion Background] Sending PROMPANION_STATE_PUSH message");
           chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState }, (response) => {
             if (chrome.runtime.lastError) {
               // This is normal if sidepanel isn't loaded yet - state is saved to storage
               console.log("[Prompanion Background] STATE_PUSH message sent (sidepanel may not be loaded yet):", chrome.runtime.lastError.message);
             } else {
-              console.log("[Prompanion Background] STATE_PUSH message sent successfully");
+              console.log("[Prompanion Background] ✓ STATE_PUSH message sent successfully - sidepanel updated");
             }
           });
           
-          // If we have usage data from the enhancement, send it to update the sidepanel count
+          // Send usage update
           if (enhancementsUsed !== undefined && enhancementsLimit !== undefined) {
             chrome.runtime.sendMessage({ 
               type: "PROMPANION_USAGE_UPDATE", 
@@ -600,7 +609,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               enhancementsLimit 
             }, (response) => {
               if (chrome.runtime.lastError) {
-                // Sidepanel might not be open, that's okay
                 console.log("[Prompanion Background] Usage update message sent (sidepanel may not be open)");
               } else {
                 console.log("[Prompanion Background] Usage update message sent successfully");
@@ -608,6 +616,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             });
           }
           
+          // Open panel if requested
           if (message.openPanel !== false) {
             const tabId = await getTabId(sender);
             if (tabId) {
@@ -618,6 +627,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
         }
         
+        // Send response AFTER state is saved and messages are sent
         sendResponse?.({ 
           ok: !error, 
           optionA, 
@@ -626,23 +636,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           enhancementsUsed, // Pass through usage data
           enhancementsLimit
         });
-        
-        // If enhancement was successful, send a message to update the sidepanel count
-        // This ensures the count updates even if the sidepanel is open
-        if (!error && enhancementsUsed !== undefined) {
-          chrome.runtime.sendMessage({ 
-            type: "PROMPANION_USAGE_UPDATE", 
-            enhancementsUsed,
-            enhancementsLimit 
-          }, (response) => {
-            if (chrome.runtime.lastError) {
-              // Sidepanel might not be open, that's okay
-              console.log("[Prompanion Background] Usage update message sent (sidepanel may not be open)");
-            } else {
-              console.log("[Prompanion Background] Usage update message sent successfully");
-            }
-          });
-        }
       } catch (error) {
         console.error("Prompanion: failed to prepare enhancement", error);
         sendResponse?.({ ok: false, reason: error?.message ?? "UNKNOWN", error: "UNKNOWN" });

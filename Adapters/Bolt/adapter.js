@@ -1736,16 +1736,16 @@ function positionEnhanceTooltip() {
     }
   } else {
     // Normal mode: position above if there's space, otherwise below
-    if (top - tooltipHeight < 0) {
-      top = rect.bottom + 8;
-      enhanceTooltipElement.style.transform = "translate(-50%, 0%)";
-    } else {
-      enhanceTooltipElement.style.transform = "translate(-50%, -100%)";
-    }
-    
-    // Ensure tooltip doesn't go below viewport
-    if (top + tooltipHeight > viewportHeight) {
-      top = viewportHeight - tooltipHeight - 8;
+  if (top - tooltipHeight < 0) {
+    top = rect.bottom + 8;
+    enhanceTooltipElement.style.transform = "translate(-50%, 0%)";
+  } else {
+    enhanceTooltipElement.style.transform = "translate(-50%, -100%)";
+  }
+  
+  // Ensure tooltip doesn't go below viewport
+  if (top + tooltipHeight > viewportHeight) {
+    top = viewportHeight - tooltipHeight - 8;
     }
   }
   

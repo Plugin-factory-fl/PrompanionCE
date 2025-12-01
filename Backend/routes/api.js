@@ -30,16 +30,16 @@ function buildSystemPrompt(model, outputType, levelOfDetail) {
       examples: "Instead of 'Please provide a detailed explanation of...', use 'Explain...'. Instead of 'I would like you to create a comprehensive list that includes...', use 'List...'. Strip away all filler words and get straight to the core request."
     },
     2: {
-      text: "MEDIUM DETAIL: The prompt should be explained in a way you would explain it to a high school student. The ideas in the prompt should be lightly elaborated on, leaving only a few stones unturned if needed. Use clear, accessible language. Provide enough context to understand the request without being overly academic or technical. CRITICAL: You MUST ADD new content to expand the word count to 2-3x the original. Do NOT just reword - you must ADD: brief explanations of key terms, context about why something matters, simple examples or analogies, background information, and light elaboration on the main ideas. The enhanced prompt should be noticeably longer with new information added.",
+      text: "MEDIUM DETAIL: The enhanced prompt MUST be EXACTLY 5-7 sentences total. Count your sentences carefully - the final output must be between 5 and 7 sentences, no more, no less. Write in plain paragraph form - NO numbered lists, NO bullet points, NO sections, NO colons followed by lists. Just 5-7 complete sentences in a single paragraph. Each sentence should be clear and focused. After writing, count your sentences and adjust if needed to ensure it's exactly 5-7 sentences.",
+      style: "exactly 5-7 sentences in plain paragraph form",
+      length: "exactly 5-7 sentences total, counted and verified",
+      examples: "CORRECT (7 sentences): 'Write an informative blog post about [topic]. The post should engage a general audience. Include an introduction that captures attention. Develop main ideas with clear explanations. Use relevant examples where helpful. Conclude with key takeaways. Keep the language accessible.' WRONG: Any numbered lists, sections, or more than 7 sentences."
+    },
+    3: {
+      text: "HIGH DETAIL: The prompt should be explained in a way you would explain it to a high school student. The ideas in the prompt should be lightly elaborated on, leaving only a few stones unturned if needed. Use clear, accessible language. Provide enough context to understand the request without being overly academic or technical. CRITICAL: You MUST ADD new content to expand the word count to 2-3x the original. Do NOT just reword - you must ADD: brief explanations of key terms, context about why something matters, simple examples or analogies, background information, and light elaboration on the main ideas. The enhanced prompt should be noticeably longer with new information added.",
       style: "clear, accessible, and moderately detailed",
       length: "moderate length with light elaboration (typically 2-3x the original word count)",
       examples: "EXAMPLE: Original 'write a blog post' becomes 'Write a blog post that explains [topic] in an accessible way. The post should be informative and engaging, using clear language that helps readers understand the key concepts. Include relevant examples or analogies to illustrate the main points, and structure it with a clear introduction, body paragraphs that develop the ideas, and a conclusion that summarizes the key takeaways.' Notice how we ADDED explanations, context, structure details, and examples - we didn't just reword 'write a blog post'."
-    },
-    3: {
-      text: "HIGH DETAIL: The prompt should be at college-level reading. No stone is left unturned, all the details are there and ideas clearly articulated. Include comprehensive context, background information, specific requirements, constraints, and thorough explanations. Leave nothing to interpretation - be explicit about every aspect. CRITICAL: You MUST ADD extensive new content to expand the word count to 3-5x the original or more. Do NOT just reword - you must ADD: comprehensive context and background, detailed explanations of all terms and concepts, multiple examples, explicit format/structure/tone specifications, detailed constraints and edge cases, thorough articulation of reasoning and purpose, and any relevant technical details. The enhanced prompt should be substantially longer with extensive new information added.",
-      style: "comprehensive, detailed, and thoroughly articulated",
-      length: "extensive with complete detail (typically 3-5x the original word count or more)",
-      examples: "EXAMPLE: Original 'write a blog post' becomes 'Write a comprehensive, well-researched blog post that thoroughly explores [topic] at a college-level reading standard. The post should provide extensive context about why this topic matters, including relevant background information and historical context where applicable. Use clear, articulate language that leaves no aspect of the topic unaddressed. Structure the post with a compelling introduction that establishes the topic's significance, detailed body paragraphs that develop each key point with thorough explanations and multiple concrete examples, and a comprehensive conclusion that synthesizes the main ideas and their implications. Specify the desired tone (e.g., informative yet engaging), approximate word count or length, target audience, and any particular angles or perspectives to emphasize. Include considerations for how to handle potential counterarguments or alternative viewpoints, and ensure all technical terms are clearly explained for readers who may be less familiar with the subject matter.' Notice how we ADDED extensive context, structure details, specifications, considerations, and explanations - we didn't just reword 'write a blog post'."
     }
   };
 
@@ -136,19 +136,28 @@ function buildSystemPrompt(model, outputType, levelOfDetail) {
     modelGuideline.base + "\n" +
     `Current task: ${outputInfo.focus}.\n\n` +
     `═══════════════════════════════════════════════════════════════\n` +
-    `LEVEL OF DETAIL REQUIREMENT - THIS IS CRITICAL AND MUST BE FOLLOWED EXACTLY:\n` +
+    `${levelOfDetail === 2 ? '═══════════════════════════════════════════════════════════════\n' +
+    'MEDIUM LEVEL - CRITICAL: EXACTLY 5-7 SENTENCES, NO NUMBERED LISTS\n' +
+    '═══════════════════════════════════════════════════════════════\n\n' +
+    'MEDIUM LEVEL OUTPUT MUST BE:\n' +
+    '- Exactly 5-7 sentences total (count them!)\n' +
+    '- Plain paragraph form - NO numbered lists, NO bullet points, NO sections\n' +
+    '- Single flowing paragraph with 5-7 complete sentences\n\n' +
+    'EXAMPLE (7 sentences): "Build a website that advocates for tokenized gold. The site should include a homepage explaining what tokenized gold is and its benefits. Add an informative section detailing how tokenization works. Include investment opportunities and case studies. Provide a contact page for inquiries. Make the design user-friendly and visually appealing. Ensure the content is clear and accessible."\n\n' : ''}` +
+    `${levelOfDetail !== 2 ? `LEVEL OF DETAIL REQUIREMENT - THIS IS CRITICAL AND MUST BE FOLLOWED EXACTLY:\n` +
     `═══════════════════════════════════════════════════════════════\n\n` +
     `${detail.text}\n\n` +
     `EXAMPLES OF WHAT THIS MEANS:\n` +
-    `${detail.examples}\n\n` +
+    `${detail.examples}\n\n` : ''}` +
     `CRITICAL REQUIREMENT: Both Option A and Option B MUST be at the EXACT SAME level of detail. ` +
-    `If the level is LOW, BOTH prompts must be extremely brief and minimal - like a Twitter post (typically 10-30 words). ` +
-    `If the level is MEDIUM, BOTH prompts must be explained like to a high school student with light elaboration, and MUST be significantly longer than the original (aim for 2-3x the original word count). ` +
-    `If the level is HIGH, BOTH prompts must be college-level with no stone left unturned - comprehensive and detailed, and MUST be much longer than medium level (aim for 3-5x the original word count or more).\n\n` +
+    `${levelOfDetail === 1 ? 'If the level is LOW, BOTH prompts must be extremely brief and minimal - like a Twitter post (typically 10-30 words).' : ''}` +
+    `${levelOfDetail === 2 ? 'If the level is MEDIUM, BOTH prompts must be EXACTLY 5-7 sentences total in plain paragraph form with NO numbered lists.' : ''}` +
+    `${levelOfDetail === 3 ? 'If the level is HIGH, BOTH prompts must be explained like to a high school student with light elaboration, and MUST be significantly longer than the original (aim for 2-3x the original word count). Numbered lists or structured sections are acceptable for HIGH level.' : ''}\n\n` +
     `═══════════════════════════════════════════════════════════════\n` +
     `CRITICAL: DO NOT JUST REWORD - YOU MUST ADD CONTENT\n` +
     `═══════════════════════════════════════════════════════════════\n\n` +
-    `${levelOfDetail === 2 ? 'FOR MEDIUM LEVEL: You MUST actively ADD new content to expand the prompt. Do NOT just rephrase the original words. You MUST:\n' +
+    `${levelOfDetail === 2 ? 'MEDIUM LEVEL: Write exactly 5-7 sentences in plain paragraph form. NO numbered lists. Count your sentences.\n\n' : ''}` +
+    `${levelOfDetail === 3 ? 'FOR HIGH LEVEL: You MUST actively ADD new content to expand the prompt. Do NOT just rephrase the original words. You MUST:\n' +
     '- Add brief explanations of key terms or concepts mentioned\n' +
     '- Add context about why the request matters or what it\'s for\n' +
     '- Add simple examples or analogies to clarify the request\n' +
@@ -156,31 +165,20 @@ function buildSystemPrompt(model, outputType, levelOfDetail) {
     '- Add light elaboration on the main ideas\n' +
     '- The result should be 2-3x LONGER than the original, not just reworded\n' +
     'EXAMPLE: If original is "write a blog post", expand to something like "Write a blog post that explains [topic] in an accessible way. The post should be informative and engaging, using clear language that helps readers understand the key concepts. Include relevant examples or analogies to illustrate the main points, and structure it with a clear introduction, body paragraphs that develop the ideas, and a conclusion that summarizes the key takeaways."\n\n' : ''}` +
-    `${levelOfDetail === 3 ? 'FOR HIGH LEVEL: You MUST extensively ADD new content to expand the prompt. Do NOT just rephrase the original words. You MUST:\n' +
-    '- Add comprehensive context and background information\n' +
-    '- Add detailed explanations of all key terms, concepts, and requirements\n' +
-    '- Add multiple examples to illustrate different aspects\n' +
-    '- Add explicit specifications for format, structure, tone, style, and length\n' +
-    '- Add detailed constraints, considerations, and edge cases\n' +
-    '- Add thorough articulation of the reasoning and purpose behind the request\n' +
-    '- Add any relevant technical details, methodologies, or approaches\n' +
-    '- The result should be 3-5x LONGER than the original, not just reworded\n' +
-    'EXAMPLE: If original is "write a blog post", expand to something like "Write a comprehensive, well-researched blog post that thoroughly explores [topic] at a college-level reading standard. The post should provide extensive context about why this topic matters, including relevant background information and historical context where applicable. Use clear, articulate language that leaves no aspect of the topic unaddressed. Structure the post with a compelling introduction that establishes the topic\'s significance, detailed body paragraphs that develop each key point with thorough explanations and multiple concrete examples, and a comprehensive conclusion that synthesizes the main ideas and their implications. Specify the desired tone (e.g., informative yet engaging), approximate word count or length, target audience, and any particular angles or perspectives to emphasize. Include considerations for how to handle potential counterarguments or alternative viewpoints, and ensure all technical terms are clearly explained for readers who may be less familiar with the subject matter."\n\n' : ''}` +
     `The enhanced prompts MUST match this level of detail exactly. ` +
-    `For MEDIUM level: Actively EXPAND the prompt by ADDING new content to reach 2-3x the original word count. ` +
-    `For HIGH level: Extensively EXPAND the prompt by ADDING comprehensive content to reach 3-5x the original word count or more. ` +
+    `For MEDIUM level: Write EXACTLY 5-7 sentences total. The entire enhanced prompt must be 5-7 clear, concise sentences. ` +
+    `For HIGH level: Actively EXPAND the prompt by ADDING new content to reach 2-3x the original word count. ` +
     `Do NOT just reword the original - you MUST add new information, explanations, context, and details. ` +
     `Do NOT create prompts that are longer or more detailed than the selected level. ` +
     `Do NOT create prompts that are shorter or less detailed than the selected level.\n\n` +
     `Option A should focus on: clarity, specificity, and structure. Make it more precise and easier for the AI to understand exactly what is needed. ` +
     `The prompt must be ${detail.style} and ${detail.length} - matching the level of detail setting EXACTLY. ` +
-    `${levelOfDetail === 2 ? 'CRITICAL: Do NOT just reword - you MUST ADD new content (explanations, context, examples) to expand it to 2-3x the original word count.' : ''}` +
-    `${levelOfDetail === 3 ? 'CRITICAL: Do NOT just reword - you MUST ADD extensive new content (comprehensive context, detailed explanations, multiple examples, specifications) to expand it to 3-5x the original word count or more.' : ''}\n\n` +
+    `${levelOfDetail === 3 ? 'CRITICAL: Do NOT just reword - you MUST ADD new content (explanations, context, examples) to expand it to 2-3x the original word count.' : ''}\n\n` +
     `Option B should focus on: a different enhancement approach (alternative framing, perspective, or methodology) while maintaining the EXACT SAME level of detail as Option A. ` +
     `This version must also be ${detail.style} and ${detail.length} - the same as Option A. ` +
     `Both prompts should be approximately the same length and depth. ` +
-    `${levelOfDetail === 2 ? 'Both must be 2-3x the original word count with light elaboration - ADD content, don\'t just reword.' : ''}` +
-    `${levelOfDetail === 3 ? 'Both must be 3-5x the original word count or more with extensive elaboration - ADD comprehensive content, don\'t just reword.' : ''}\n\n` +
+    `${levelOfDetail === 2 ? 'Both Option A and Option B must be exactly 5-7 sentences each in plain paragraph form with NO numbered lists.' : ''}` +
+    `${levelOfDetail === 3 ? 'Both must be 2-3x the original word count with light elaboration - ADD content, don\'t just reword.' : ''}\n\n` +
     `${outputInfo.considerations}\n\n` +
     `Both versions should be complete, standalone prompts that improve upon the original. ` +
     `Both must match the selected level of detail - they should be approximately the same length and depth. ` +
@@ -191,9 +189,94 @@ function buildSystemPrompt(model, outputType, levelOfDetail) {
     `The delimiters and structural markers mentioned above are for YOUR understanding of how to structure prompts - they should NOT appear in the user's final enhanced prompts. ` +
     `The enhanced prompts should read naturally without any formatting markers or section headers. ` +
     `Do not add explanations or meta-commentary - just provide the enhanced prompts.\n\n` +
+    `${levelOfDetail === 2 ? 'FINAL CHECK FOR MEDIUM: Count sentences in both options - must be 5-7 each with NO numbered lists.\n\n' : ''}` +
     `Reply ONLY with valid JSON in this exact format: {"optionA":"enhanced prompt A here","optionB":"enhanced prompt B here"}`;
 
   return systemPrompt;
+}
+
+/**
+ * Counts sentences in a text string
+ * @param {string} text - Text to count sentences in
+ * @returns {number} Number of sentences
+ */
+function countSentences(text) {
+  if (!text || typeof text !== 'string') return 0;
+  // Split by sentence-ending punctuation, filter out empty strings
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  return sentences.length;
+}
+
+/**
+ * Processes Medium level prompts to enforce 5-7 sentences and remove numbered lists
+ * @param {string} promptText - The prompt text to process
+ * @returns {string} Processed prompt with exactly 5-7 sentences, no numbered lists
+ */
+function processMediumLevelPrompt(promptText) {
+  if (!promptText || typeof promptText !== 'string') return promptText;
+  
+  let processed = promptText.trim();
+  
+  // Remove phrases that introduce lists FIRST
+  processed = processed.replace(/the following elements?:/gi, '');
+  processed = processed.replace(/include the following:/gi, '');
+  processed = processed.replace(/include:/gi, '');
+  
+  // Remove numbered list markers - simple and direct: "1. ", "2. ", "1) ", "2) ", etc.
+  // This will remove the numbers but keep the sentence content
+  processed = processed.replace(/\d+[.)]\s+/g, '');
+  
+  // Remove markdown bold markers
+  processed = processed.replace(/\*\*/g, '');
+  
+  // Clean up extra whitespace
+  processed = processed.replace(/\s+/g, ' ').trim();
+  
+  // Convert colons that seem like list separators to periods
+  processed = processed.replace(/:\s*([A-Z])/g, '. $1');
+  
+  // Split into sentences by sentence-ending punctuation
+  const sentences = processed.split(/[.!?]+/)
+    .map(s => s.trim())
+    .filter(s => {
+      // Remove any remaining numbered list prefixes
+      const cleaned = s.replace(/^\d+[.)]\s*/, '').trim();
+      return cleaned.length > 15; // Minimum sentence length
+    })
+    .map(s => s.replace(/^\d+[.)]\s*/, '').trim()) // Remove numbered list prefixes
+    .filter(s => s.length > 0);
+  
+  // Select 5-7 sentences
+  let selectedSentences = sentences;
+  if (sentences.length > 7) {
+    selectedSentences = sentences.slice(0, 7);
+  } else if (sentences.length < 5 && sentences.length > 0) {
+    selectedSentences = sentences;
+  }
+  
+  if (selectedSentences.length === 0) {
+    return promptText; // Fallback if processing failed
+  }
+  
+  // Join sentences with periods, ensure proper capitalization
+  const result = selectedSentences.map((s, i) => {
+    let cleaned = s.trim();
+    // Remove any remaining numbered list patterns
+    cleaned = cleaned.replace(/^\d+[.)]\s*/, '');
+    // Capitalize first letter
+    if (cleaned.length > 0) {
+      cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    }
+    return cleaned;
+  }).filter(s => s.length > 0).join('. ');
+  
+  // Ensure it ends with proper punctuation
+  const finalResult = result.trim();
+  if (!/[.!?]$/.test(finalResult)) {
+    return finalResult + '.';
+  }
+  
+  return finalResult;
 }
 
 /**
@@ -253,11 +336,11 @@ router.post('/enhance', async (req, res) => {
     // Calculate max_tokens based on level of detail to allow longer responses
     let maxTokens = 1000; // Default
     if (levelOfDetail === 1) {
-      maxTokens = 500; // Low detail - shorter responses
+      maxTokens = 500; // Low detail - shorter responses (very concise)
     } else if (levelOfDetail === 2) {
-      maxTokens = 2000; // Medium detail - allow 2-3x expansion
+      maxTokens = 1500; // Medium detail - allow 1.5-2x expansion
     } else if (levelOfDetail === 3) {
-      maxTokens = 4000; // High detail - allow 3-5x expansion
+      maxTokens = 2000; // High detail - allow 2-3x expansion
     }
 
     console.log(`[API] Enhancement request - Level: ${levelOfDetail}, Max tokens: ${maxTokens}, Model: ${model || 'chatgpt'}`);
@@ -269,7 +352,7 @@ router.post('/enhance', async (req, res) => {
         'Authorization': `Bearer ${OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // Use a more capable model for better expansion
+        model: 'gpt-3.5-turbo', // Use GPT-3.5 Turbo for cost efficiency
         temperature: 0.7,
         max_tokens: maxTokens,
         messages: [
@@ -303,6 +386,20 @@ router.post('/enhance', async (req, res) => {
       return res.status(500).json({ error: 'Failed to parse OpenAI response' });
     }
 
+    // Post-process Medium level responses to enforce 5-7 sentences and remove numbered lists
+    let finalOptionA = parsed.optionA || prompt;
+    let finalOptionB = parsed.optionB || prompt;
+    
+    if (levelOfDetail === 2) {
+      console.log(`[API] BEFORE post-processing - Option A: "${finalOptionA.substring(0, 100)}..."`);
+      console.log(`[API] BEFORE post-processing - Option A has numbered lists: ${/\d+[.)]\s+/.test(finalOptionA)}`);
+      finalOptionA = processMediumLevelPrompt(finalOptionA);
+      finalOptionB = processMediumLevelPrompt(finalOptionB);
+      console.log(`[API] AFTER post-processing - Option A: "${finalOptionA.substring(0, 100)}..."`);
+      console.log(`[API] AFTER post-processing - Option A has numbered lists: ${/\d+[.)]\s+/.test(finalOptionA)}`);
+      console.log(`[API] Post-processed Medium level prompts - Option A: ${countSentences(finalOptionA)} sentences, Option B: ${countSentences(finalOptionB)} sentences`);
+    }
+
     // Increment user's enhancement count
     const incrementResult = await query(
       'UPDATE users SET enhancements_used = enhancements_used + 1 WHERE id = $1 RETURNING enhancements_used',
@@ -313,8 +410,8 @@ router.post('/enhance', async (req, res) => {
     console.log(`[API] Incremented enhancement count for user ${req.user.userId}: ${user.enhancements_used} -> ${newCount}`);
 
     res.json({
-      optionA: parsed.optionA || prompt,
-      optionB: parsed.optionB || prompt,
+      optionA: finalOptionA,
+      optionB: finalOptionB,
       enhancementsUsed: newCount, // Include updated count in response
       enhancementsLimit: user.enhancements_limit
     });
