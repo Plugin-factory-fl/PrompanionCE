@@ -48,7 +48,7 @@
           </div>
         </div>
         <div class="status-card status-card--highlight">
-          <div class="status-card__label">Platform</div>
+          <div class="status-card__label">Model Being Used</div>
           <div class="status-card__value" id="active-platform">ChatGPT</div>
         </div>
       </section>
@@ -142,7 +142,7 @@
               <!-- Messages injected via JS -->
             </div>
             <div class="chat-tabs-row">
-              <div class="chat-tabs" id="chat-tabs" role="tablist"></div>
+              <div class="chat-tabs" id="chat-tabs" role="tablist" style="display: none;"></div>
               <button type="button" class="btn btn--ghost chat-reset" id="chat-reset">New Chat</button>
             </div>
             <form class="chat-input" id="chat-form">
@@ -174,6 +174,24 @@
             </div>
           </summary>
           <div class="section-content">
+            <div class="prompt-library__search-wrapper">
+              <input
+                type="text"
+                id="library-search"
+                class="prompt-library__search"
+                placeholder="Search prompts..."
+                autocomplete="off"
+              />
+              <button
+                type="button"
+                id="library-search-clear"
+                class="prompt-library__search-clear"
+                aria-label="Clear search"
+                hidden
+              >
+                ×
+              </button>
+            </div>
             <ul class="prompt-library" id="prompt-library">
               <!-- Library items injected via JS -->
             </ul>
@@ -233,6 +251,7 @@
             <span class="form-field__label">Level of Detail</span>
             <input type="range" id="setting-complexity" min="1" max="3" value="2" />
             <span class="range-output" data-for="setting-complexity">Medium</span>
+            <span class="form-field__description" id="complexity-description"></span>
           </label>
 
         </div>
@@ -460,6 +479,14 @@
                 Create New Prompt
               </button>
               <button
+                class="btn btn--ghost btn--pill prompt-library__action"
+                data-action="edit-folder"
+                type="button"
+                aria-label="Edit folder name"
+              >
+                Edit
+              </button>
+              <button
                 class="btn btn--ghost btn--icon prompt-library__action prompt-library__action--danger"
                 data-action="delete-folder"
                 type="button"
@@ -484,6 +511,9 @@
           </button>
           <button class="btn btn--ghost btn--pill prompt-library__copy" data-action="copy" type="button">
             Copy
+          </button>
+          <button class="btn btn--ghost btn--pill prompt-library__edit" data-action="edit-prompt" type="button">
+            Edit
           </button>
           <button
             class="btn btn--ghost btn--pill prompt-library__delete"

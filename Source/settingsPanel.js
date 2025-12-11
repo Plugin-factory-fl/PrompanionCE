@@ -19,6 +19,15 @@ export const detailLevelLabels = {
 };
 
 /**
+ * Detail level descriptions for complexity slider
+ */
+export const detailLevelDescriptions = {
+  1: "Low Detail is best for quick tasks, simple questions, or fast browsing where you don't need a deep breakdown.",
+  2: "Medium Detail gives a balanced, structured refinement suitable for everyday writing, explanations, or general research.",
+  3: "High Detail creates the most comprehensive prompts—ideal for books, image generation, business plans, or any complex project where maximum clarity is needed."
+};
+
+/**
  * Renders tabs in a container
  * @param {HTMLElement} container - Container element to render tabs in
  * @param {Array} items - Array of tab items with value and label
@@ -43,7 +52,7 @@ export function renderTabs(container, items, currentValue) {
 }
 
 /**
- * Updates range output labels
+ * Updates range output labels and descriptions
  */
 export function updateRangeOutputs() {
   document.querySelectorAll("input[type='range']").forEach((input) => {
@@ -51,6 +60,15 @@ export function updateRangeOutputs() {
     if (output) {
       const label = detailLevelLabels[input.value] ?? input.value;
       output.textContent = label;
+    }
+    
+    // Update description for complexity slider
+    if (input.id === 'setting-complexity') {
+      const description = document.getElementById('complexity-description');
+      if (description) {
+        const descriptionText = detailLevelDescriptions[input.value] || '';
+        description.textContent = descriptionText;
+      }
     }
   });
 }
@@ -121,6 +139,16 @@ export function registerSettingsHandlers(stateRef, dependencies = {}) {
     };
     renderSettings(stateRef.settings);
     await saveState(stateRef);
+    
+    // Update status card to reflect model change
+    if (typeof window.renderStatus === 'function') {
+      window.renderStatus({
+        plan: stateRef.plan,
+        enhancementsUsed: stateRef.enhancementsUsed,
+        enhancementsLimit: stateRef.enhancementsLimit,
+        settings: stateRef.settings
+      });
+    }
   });
 
   detailSlider.addEventListener("input", updateRangeOutputs);

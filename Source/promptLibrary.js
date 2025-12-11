@@ -5,6 +5,9 @@
 
 export const LIBRARY_SCHEMA_VERSION = 2;
 
+// Module-level variable to store current search query
+let currentSearchQuery = "";
+
 /**
  * Creates the default library structure with sample prompts
  * @returns {Array} Default library folders with prompts
@@ -89,9 +92,58 @@ export function normalizeLibrary(rawLibrary) {
 }
 
 /**
+ * Filters library data based on search query
+ * @param {Array} library - Library data to filter
+ * @param {string} searchQuery - Search query string (case-insensitive)
+ * @returns {Array} Filtered library data with original indices preserved
+ */
+function filterLibrary(library, searchQuery) {
+  if (!searchQuery || !searchQuery.trim()) {
+    return library.map((folder, index) => ({ ...folder, __originalIndex: index }));
+  }
+  
+  const query = searchQuery.trim().toLowerCase();
+  const filtered = [];
+  
+  library.forEach((folder, originalIndex) => {
+    const folderName = folder.name?.toLowerCase() || "";
+    const folderMatches = folderName.includes(query);
+    
+    // Filter prompts that match the search query, preserving original indices
+    const safePrompts = Array.isArray(folder.prompts) ? folder.prompts : [];
+    const matchingPromptsWithIndices = safePrompts
+      .map((prompt, promptIndex) => ({
+        text: prompt,
+        __originalIndex: promptIndex
+      }))
+      .filter(({ text }) => {
+        const promptText = (text || "").toLowerCase();
+        return promptText.includes(query);
+      });
+    
+    // Include folder if folder name matches OR if it has matching prompts
+    if (folderMatches || matchingPromptsWithIndices.length > 0) {
+      // If folder name matches, show all prompts with their original indices
+      // Otherwise, show only matching prompts with their original indices
+      const promptsToShow = folderMatches
+        ? safePrompts.map((text, index) => ({ text, __originalIndex: index }))
+        : matchingPromptsWithIndices;
+      
+      filtered.push({
+        ...folder,
+        prompts: promptsToShow,
+        __originalIndex: originalIndex // Preserve original index for action handlers
+      });
+    }
+  });
+  
+  return filtered;
+}
+
+/**
  * Renders the library UI into the DOM
  * @param {Array} library - Library data to render
- * @param {Object} options - Rendering options (forceOpen)
+ * @param {Object} options - Rendering options (forceOpen, searchQuery)
  */
 export function renderLibrary(library, options = {}) {
   const container = document.getElementById("prompt-library");
@@ -101,6 +153,10 @@ export function renderLibrary(library, options = {}) {
   if (!container || !folderTemplate || !promptTemplate) {
     return;
   }
+  
+  // Filter library based on search query if provided (from options or module-level variable)
+  const searchQuery = options.searchQuery !== undefined ? options.searchQuery : currentSearchQuery;
+  const filteredLibrary = filterLibrary(library, searchQuery);
   
   const previouslyOpen = new Set(
     Array.from(container.querySelectorAll(".prompt-library__folder details[open]")).map(
@@ -128,6 +184,7 @@ export function renderLibrary(library, options = {}) {
 
   container.innerHTML = "";
 
+  // Show empty state if no library data or no search results
   if (!library.length) {
     const empty = document.createElement("li");
     empty.className = "prompt-library__empty";
@@ -135,8 +192,19 @@ export function renderLibrary(library, options = {}) {
     container.append(empty);
     return;
   }
+  
+  if (searchQuery && !filteredLibrary.length) {
+    const empty = document.createElement("li");
+    empty.className = "prompt-library__empty";
+    empty.textContent = `No prompts found matching "${searchQuery}".`;
+    container.append(empty);
+    return;
+  }
 
-  library.forEach((folder, folderIndex) => {
+  // Use filtered library for rendering, but maintain original indices for actions
+  filteredLibrary.forEach((folder, filteredIndex) => {
+    // Get original index from filtered folder (preserved during filtering)
+    const folderIndex = folder.__originalIndex ?? filteredIndex;
     const fragment = folderTemplate.content.cloneNode(true);
     const folderRoot = fragment.querySelector(".prompt-library__folder");
     const detailsEl = fragment.querySelector("details");
@@ -145,12 +213,16 @@ export function renderLibrary(library, options = {}) {
     const countEl = fragment.querySelector(".prompt-library__count");
     const promptsList = fragment.querySelector(".prompt-library__prompts");
     const addPromptButton = fragment.querySelector("[data-action='add-prompt']");
+    const editFolderButton = fragment.querySelector("[data-action='edit-folder']");
     const deleteFolderButton = fragment.querySelector("[data-action='delete-folder']");
 
     folderRoot.dataset.folderIndex = String(folderIndex);
     summary.dataset.folderIndex = String(folderIndex);
     if (addPromptButton) {
       addPromptButton.dataset.folderIndex = String(folderIndex);
+    }
+    if (editFolderButton) {
+      editFolderButton.dataset.folderIndex = String(folderIndex);
     }
     if (deleteFolderButton) {
       deleteFolderButton.dataset.folderIndex = String(folderIndex);
@@ -175,14 +247,18 @@ export function renderLibrary(library, options = {}) {
       emptyItem.textContent = "No prompts saved yet.";
       promptsList.append(emptyItem);
     } else {
-      safePrompts.forEach((prompt, promptIndex) => {
+      safePrompts.forEach((promptData, filteredPromptIndex) => {
         const promptFragment = promptTemplate.content.cloneNode(true);
         const promptRoot = promptFragment.querySelector(".prompt-library__item");
         const promptText = promptFragment.querySelector(".prompt-library__text");
 
+        // Get original prompt index (preserved during filtering) or use filtered index
+        const promptIndex = promptData.__originalIndex ?? filteredPromptIndex;
+        const promptTextContent = typeof promptData === 'string' ? promptData : promptData.text;
+
         promptRoot.dataset.folderIndex = String(folderIndex);
         promptRoot.dataset.promptIndex = String(promptIndex);
-        promptText.textContent = prompt;
+        promptText.textContent = promptTextContent;
 
         promptsList.append(promptFragment);
       });
@@ -365,6 +441,7 @@ function sendChromeMessage(message) {
   });
 }
 
+
 /**
  * Registers event handlers for the prompt library
  * @param {Object} stateRef - Reference to current state object
@@ -376,9 +453,51 @@ export function registerLibraryHandlers(stateRef, dependencies = {}) {
   const addFolderButton = document.getElementById("add-folder");
   const infoButton = document.getElementById("library-info-btn");
   const infoDialog = document.getElementById("library-info-dialog");
+  const searchInput = document.getElementById("library-search");
+  const searchClearButton = document.getElementById("library-search-clear");
 
   if (!container || !addFolderButton || !saveState) {
     return;
+  }
+
+  // Set up search functionality
+  let searchDebounceTimer = null;
+  if (searchInput) {
+    searchInput.addEventListener("input", (event) => {
+      const query = event.target.value.trim();
+      currentSearchQuery = query;
+      
+      // Show/hide clear button
+      if (searchClearButton) {
+        searchClearButton.hidden = !query;
+      }
+      
+      // Debounce search to avoid excessive re-renders
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        renderLibrary(stateRef.library);
+      }, 150);
+    });
+    
+    // Handle Enter key to prevent form submission
+    searchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+      }
+    });
+  }
+  
+  // Clear search button handler
+  if (searchClearButton) {
+    searchClearButton.addEventListener("click", () => {
+      if (searchInput) {
+        searchInput.value = "";
+        currentSearchQuery = "";
+        searchClearButton.hidden = true;
+        renderLibrary(stateRef.library);
+        searchInput.focus();
+      }
+    });
   }
 
   // Register info button handler
@@ -410,7 +529,7 @@ export function registerLibraryHandlers(stateRef, dependencies = {}) {
 
     const actionTarget = target.closest("[data-action]");
     const action = actionTarget?.dataset.action;
-    if (action === "add-prompt" || action === "delete-folder") {
+    if (action === "add-prompt" || action === "delete-folder" || action === "edit-folder") {
       event.preventDefault();
       event.stopPropagation();
 
@@ -441,6 +560,35 @@ export function registerLibraryHandlers(stateRef, dependencies = {}) {
         }
         folder.prompts.unshift(trimmedPrompt);
         folder.prompts = folder.prompts.slice(0, 200);
+        stateRef.libraryVersion = LIBRARY_SCHEMA_VERSION;
+        renderLibrary(stateRef.library);
+        await saveState(stateRef);
+        return;
+      }
+
+      if (action === "edit-folder") {
+        const trimmedName = await openLibraryDialog({
+          title: "Edit Prompt File Name",
+          label: "Prompt file name",
+          placeholder: "e.g. Sales Objection Handling",
+          mode: "text",
+          defaultValue: folder.name,
+          submitLabel: "Save Changes"
+        });
+        if (!trimmedName) {
+          return;
+        }
+        
+        // Check for duplicate names (case-insensitive), excluding the current folder
+        const duplicate = stateRef.library.some(
+          (f, index) => index !== folderIndex && f.name.toLowerCase() === trimmedName.toLowerCase()
+        );
+        if (duplicate) {
+          alert("A prompt file with that name already exists.");
+          return;
+        }
+        
+        folder.name = trimmedName;
         stateRef.libraryVersion = LIBRARY_SCHEMA_VERSION;
         renderLibrary(stateRef.library);
         await saveState(stateRef);
@@ -553,6 +701,29 @@ export function registerLibraryHandlers(stateRef, dependencies = {}) {
       } catch (error) {
         console.error("Could not copy prompt", error);
       }
+      return;
+    }
+
+    if (action === "edit-prompt") {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      const trimmedPrompt = await openLibraryDialog({
+        title: "Edit Prompt",
+        label: "Prompt",
+        placeholder: "Describe the prompt you want to reuse…",
+        mode: "textarea",
+        defaultValue: prompt,
+        submitLabel: "Save Changes"
+      });
+      if (!trimmedPrompt) {
+        return;
+      }
+      
+      folder.prompts[promptIndex] = trimmedPrompt;
+      stateRef.libraryVersion = LIBRARY_SCHEMA_VERSION;
+      renderLibrary(stateRef.library);
+      await saveState(stateRef);
       return;
     }
 

@@ -93,6 +93,14 @@
   color: var(--color-text-subtle);
 }
 
+.form-field__description {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--settings-text-secondary);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
 /* Form Tabs */
 .form-tabs {
   display: flex;
@@ -172,8 +180,12 @@
 }
 
 .model-pill.is-active {
-  box-shadow: 0 12px 28px rgba(5, 7, 13, 0.45);
+  border: 2px solid #ffffff;
   transform: translateY(-1px);
+}
+
+.model-pill--chatgpt.is-active {
+  border: 2px solid #000000;
 }
 
 .model-pill--chatgpt {
