@@ -80,13 +80,69 @@ function nodeInAssistantMessage(node) {
   if (!element) return false;
   
   // Grok-specific selectors for assistant messages
-  // These will need to be verified/adjusted based on actual Grok DOM structure
-  return !!(
-    element.closest("[data-role='assistant']") ||
-    element.closest("[data-author='assistant']") ||
-    element.closest("[class*='assistant']") ||
-    element.closest("main")?.querySelector("[class*='message']")
-  );
+  // Try multiple strategies to handle platform differences (Mac vs Windows)
+  // Strategy 1: Check for explicit data attributes (most reliable)
+  if (element.closest("[data-role='assistant']") ||
+      element.closest("[data-author='assistant']") ||
+      element.closest("[data-message-author-role='assistant']")) {
+    return true;
+  }
+  
+  // Strategy 2: Check for class names containing "assistant" (case-insensitive)
+  // Walk up the DOM tree to find assistant markers
+  let current = element;
+  let depth = 0;
+  while (current && depth < 10) {
+    const className = current.className;
+    if (typeof className === 'string') {
+      // Case-insensitive check for "assistant" in class name
+      const lowerClassName = className.toLowerCase();
+      if (lowerClassName.includes('assistant') && 
+          !lowerClassName.includes('user') &&
+          !lowerClassName.includes('composer') &&
+          !lowerClassName.includes('input')) {
+        return true;
+      }
+    }
+    
+    // Check data attributes on current element
+    if (current.getAttribute) {
+      const dataRole = current.getAttribute('data-role');
+      const dataAuthor = current.getAttribute('data-author');
+      const dataMessageRole = current.getAttribute('data-message-author-role');
+      if (dataRole === 'assistant' || dataAuthor === 'assistant' || dataMessageRole === 'assistant') {
+        return true;
+      }
+    }
+    
+    current = current.parentElement;
+    depth++;
+  }
+  
+  // Strategy 3: Check if we're in main content area but NOT in composer
+  // This is a fallback for when explicit markers aren't available
+  const mainElement = element.closest("main");
+  if (mainElement) {
+    // If we're in main but NOT in composer, and NOT in user input areas, likely assistant
+    const inComposer = element.closest(".query-bar") || 
+                      element.closest(".tiptap") || 
+                      element.closest("form");
+    if (!inComposer) {
+      // Check if there are message-like structures nearby
+      const hasMessageStructure = mainElement.querySelector("[class*='message'], [class*='turn'], article");
+      if (hasMessageStructure) {
+        // Additional check: make sure we're not in a user message area
+        const inUserMessage = element.closest("[data-role='user']") ||
+                             element.closest("[data-author='user']") ||
+                             element.closest("[class*='user'][class*='message']");
+        if (!inUserMessage) {
+          return true; // Likely assistant message
+        }
+      }
+    }
+  }
+  
+  return false;
 }
 
 function selectionTargetsAssistant(selection) {
@@ -110,6 +166,16 @@ function ensureHighlightObserver() {
     requestSelectionToolbarUpdate();
   });
   highlightObserver.observe(document.body, { childList: true, subtree: true });
+  
+  // CRITICAL: Also listen for selectionchange events to ensure toolbar updates on Windows
+  // This is especially important for cross-platform compatibility
+  if (!document._prompanionGrokSelectionListener) {
+    document._prompanionGrokSelectionListener = () => {
+      requestSelectionToolbarUpdate();
+    };
+    document.addEventListener("selectionchange", document._prompanionGrokSelectionListener);
+    console.log("[Prompanion Grok] Selection change listener registered");
+  }
 }
 
 function nodeInComposer(node) {
@@ -198,18 +264,78 @@ function updateSelectionToolbar() {
   const selection = window.getSelection();
   const text = selection?.toString().trim();
   
+  // Enhanced debugging for Windows compatibility
+  const inComposer = selection ? selectionWithinComposer(selection) : false;
+  const targetsAssistant = selection ? selectionTargetsAssistant(selection) : false;
+  
+  // Detailed debugging for assistant detection
+  let assistantDebugInfo = null;
+  if (selection && !selection.isCollapsed) {
+    const anchorNode = selection.anchorNode;
+    const focusNode = selection.focusNode;
+    assistantDebugInfo = {
+      anchorNodeType: anchorNode?.nodeType,
+      anchorNodeName: anchorNode?.nodeName,
+      focusNodeType: focusNode?.nodeType,
+      focusNodeName: focusNode?.nodeName,
+      anchorInAssistant: anchorNode ? nodeInAssistantMessage(anchorNode) : false,
+      focusInAssistant: focusNode ? nodeInAssistantMessage(focusNode) : false,
+      anchorElement: anchorNode ? AdapterBase.getElementFromNode(anchorNode) : null,
+      focusElement: focusNode ? AdapterBase.getElementFromNode(focusNode) : null
+    };
+    
+    // Try to find what element contains the selection
+    try {
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const commonAncestor = range.commonAncestorContainer;
+        assistantDebugInfo.commonAncestorType = commonAncestor?.nodeType;
+        assistantDebugInfo.commonAncestorName = commonAncestor?.nodeName;
+        assistantDebugInfo.commonAncestorInAssistant = commonAncestor ? nodeInAssistantMessage(commonAncestor) : false;
+        
+        // Walk up to find parent elements with classes
+        let current = AdapterBase.getElementFromNode(commonAncestor);
+        const parentClasses = [];
+        let depth = 0;
+        while (current && depth < 5) {
+          if (current.className && typeof current.className === 'string') {
+            parentClasses.push(current.className);
+          }
+          if (current.getAttribute) {
+            const dataRole = current.getAttribute('data-role');
+            const dataAuthor = current.getAttribute('data-author');
+            if (dataRole || dataAuthor) {
+              parentClasses.push(`data-role="${dataRole}" data-author="${dataAuthor}"`);
+            }
+          }
+          current = current.parentElement;
+          depth++;
+        }
+        assistantDebugInfo.parentClasses = parentClasses;
+      }
+    } catch (e) {
+      assistantDebugInfo.rangeError = e.message;
+    }
+  }
+  
   console.log("[Prompanion Grok] updateSelectionToolbar called", {
     hasSelection: !!selection,
     isCollapsed: selection?.isCollapsed,
     textLength: text?.length,
     textPreview: text?.substring(0, 30),
-    inComposer: selection ? selectionWithinComposer(selection) : false,
-    targetsAssistant: selection ? selectionTargetsAssistant(selection) : false
+    inComposer: inComposer,
+    targetsAssistant: targetsAssistant,
+    assistantDebugInfo: assistantDebugInfo
   });
   
-  if (!selection || selection.isCollapsed || !text || selectionWithinComposer(selection) || 
-      !selectionTargetsAssistant(selection)) {
-    console.log("[Prompanion Grok] Hiding toolbar - conditions not met");
+  if (!selection || selection.isCollapsed || !text || inComposer || !targetsAssistant) {
+    const reasons = [];
+    if (!selection) reasons.push("no selection");
+    if (selection?.isCollapsed) reasons.push("collapsed selection");
+    if (!text) reasons.push("no text");
+    if (inComposer) reasons.push("in composer");
+    if (!targetsAssistant) reasons.push("not targeting assistant");
+    console.log("[Prompanion Grok] Hiding toolbar - conditions not met:", reasons.join(", "));
     hideSelectionToolbar();
     return;
   }
@@ -947,159 +1073,66 @@ function placeButton(targetContainer, inputNode) {
   positionFloatingButton(inputNode, null);
 }
 
+// Track retry attempts to prevent infinite loops
+let positionRetryCount = 0;
+const MAX_POSITION_RETRIES = 10;
+
 function positionFloatingButton(inputNode, containerNode = floatingButtonTargetContainer) {
   if (!floatingButtonWrapper) return;
   
-  // CRITICAL: Always find and use the input bar container (div.relative.z-10)
-  // Ignore the containerNode parameter - we must position relative to the input bar container
-  // to avoid placing the button on top of other buttons (like the Speak button)
-  
-  let inputBarContainer = null;
-  
-  // CRITICAL: Find the specific subelement within the query-bar container
-  // XPath: /html/body/div[2]/div[3]/div/div/main/div[2]/div/div[2]/div/div[1]/form/div/div/div[2]/div[2]
-  // This is form > div > div > div[2] > div[2] (the target container for the button)
-  
-  // Strategy 1: Find form first, then navigate to the specific subelement
+  // Find the form container (input bar) - this is more reliable than model-select-trigger
   const form = document.querySelector("form");
-  if (form) {
-    // Navigate: form > div > div > div:nth-child(2) > div:nth-child(2)
-    const firstDiv = form.querySelector(":scope > div");
-    if (firstDiv) {
-      const secondDiv = firstDiv.querySelector(":scope > div");
-      if (secondDiv) {
-        const thirdDiv = secondDiv.children[1]; // div:nth-child(2) (0-indexed: [1])
-        if (thirdDiv && thirdDiv.children.length > 1) {
-          const targetDiv = thirdDiv.children[1]; // div:nth-child(2) (0-indexed: [1])
-          if (targetDiv && targetDiv.offsetParent) {
-            inputBarContainer = targetDiv;
-          }
-        }
-      }
-    }
-  }
   
-  // Strategy 2: Fallback - find query-bar container (parent) and look for the subelement
-  if (!inputBarContainer) {
-    const queryBarContainer = document.querySelector("div.query-bar.relative.z-10") ||
-                              document.querySelector("div.query-bar[class*='relative'][class*='z-10']") ||
-                              document.querySelector('[class*="query-bar"][class*="relative"][class*="z-10"]');
-    
-    if (queryBarContainer && form) {
-      // Look for the specific subelement: form > div > div > div[2] > div[2]
-      const firstDiv = form.querySelector(":scope > div");
-      if (firstDiv) {
-        const secondDiv = firstDiv.querySelector(":scope > div");
-        if (secondDiv && secondDiv.children.length > 1) {
-          const thirdDiv = secondDiv.children[1]; // div:nth-child(2)
-          if (thirdDiv && thirdDiv.children.length > 1) {
-            const targetDiv = thirdDiv.children[1]; // div:nth-child(2)
-            if (targetDiv && targetDiv.offsetParent) {
-              inputBarContainer = targetDiv;
-            }
-          }
-        }
-      }
-    }
-  }
+  // Also try to find the query-bar container
+  const queryBar = document.querySelector(".query-bar") || 
+                   document.querySelector('[class*="query-bar"]');
   
-  // Strategy 3: Walk up from input node to find the target structure
+  // Use form as primary container, fallback to query-bar, then inputNode's parent
+  let inputBarContainer = form || queryBar;
+  
   if (!inputBarContainer && inputNode) {
+    // Walk up from input node to find form or a suitable container
     let current = inputNode;
-    // Walk up to find the specific div structure: form > div > div > div[2] > div[2]
-    for (let i = 0; i < 20 && current; i++) {
-      if (current.tagName === "DIV" && current.parentElement && current.parentElement.parentElement) {
-        const parent = current.parentElement;
-        const grandparent = parent.parentElement;
-        // Check if we're in the right structure: grandparent has multiple children including this one
-        if (grandparent && grandparent.children.length > 1 && grandparent.children[1] === parent) {
-          // We might be in div[2] > div[2] structure
-          if (parent.children.length > 1 && parent.children[1] === current) {
-            // Check if grandparent's parent is a div > div > form structure
-            const greatGrandparent = grandparent.parentElement;
-            if (greatGrandparent && greatGrandparent.parentElement && 
-                greatGrandparent.parentElement.tagName === "FORM") {
-              inputBarContainer = current;
-              break;
-            }
-          }
-        }
+    let attempts = 0;
+    while (current && attempts < 10) {
+      if (current.tagName === "FORM" || current.classList.contains("query-bar") || 
+          current.classList.toString().includes("query-bar")) {
+        inputBarContainer = current;
+        break;
       }
       current = current.parentElement;
+      attempts++;
     }
   }
   
   // Log what we found
-  console.log("[Prompanion Grok] positionFloatingButton - container search:", {
+  console.log("[Prompanion Grok] positionFloatingButton - input bar container search:", {
     found: !!inputBarContainer,
     containerElement: inputBarContainer,
+    containerTag: inputBarContainer ? inputBarContainer.tagName : null,
     containerClasses: inputBarContainer ? inputBarContainer.className : null,
     containerVisible: inputBarContainer ? (inputBarContainer.offsetParent !== null) : null,
-    containerTagName: inputBarContainer ? inputBarContainer.tagName : null
+    retryCount: positionRetryCount
   });
   
-  // ALWAYS position in the input bar container if found, never use the fallback container
-  if (inputBarContainer && inputBarContainer.offsetParent) {
+  // Position button on the RIGHT side of the input bar container
+  if (inputBarContainer) {
+    // Get bounding rect for the input bar container
     const containerRect = inputBarContainer.getBoundingClientRect();
     
-    // Find the send/rocketship button to position relative to it
-    let sendButton = null;
-    
-    // Look for the send button in the container - it should be a button with SVG or icon
+    // Find all buttons in the container to avoid overlapping
     const buttons = inputBarContainer.querySelectorAll("button");
+    let rightmostButtonRight = 0;
+    
+    // Find the rightmost button's right edge
     for (const btn of buttons) {
-      // Exclude attach buttons
-      const label = (btn.getAttribute("aria-label") || "").toLowerCase();
-      if (label.includes("attach")) continue;
-      
-      // Check if it's visible and positioned to the right (send button is usually rightmost)
-      if (btn.offsetParent) {
-        sendButton = btn;
-        break; // Take the first visible button that's not attach
+      if (btn.offsetParent) { // Only count visible buttons
+        const btnRect = btn.getBoundingClientRect();
+        const btnRight = btnRect.right;
+        if (btnRight > rightmostButtonRight) {
+          rightmostButtonRight = btnRight;
+        }
       }
-    }
-    
-    // If we found multiple buttons, prefer the rightmost one (send button)
-    if (buttons.length > 1) {
-      const visibleButtons = Array.from(buttons).filter(btn => {
-        const label = (btn.getAttribute("aria-label") || "").toLowerCase();
-        return btn.offsetParent && !label.includes("attach");
-      });
-      if (visibleButtons.length > 0) {
-        sendButton = visibleButtons.reduce((rightmost, btn) => {
-          return btn.getBoundingClientRect().right > rightmost.getBoundingClientRect().right 
-                 ? btn : rightmost;
-        });
-      }
-    }
-    
-    let spacing = 10; // Default spacing from right edge
-    
-    // If we found the send button, position to the left of it
-    if (sendButton) {
-      const sendRect = sendButton.getBoundingClientRect();
-      const containerRect2 = inputBarContainer.getBoundingClientRect();
-      
-      // Calculate send button's right edge relative to container's right edge
-      const sendRightFromContainer = containerRect2.right - sendRect.right;
-      
-      // Position our button to the left of send button
-      // We need: send button width + spacing + our button width
-      const sendButtonWidth = sendRect.width;
-      const ourButtonWidth = BUTTON_SIZE.wrapper || 40;
-      const spacingBetween = 73; // 73px spacing between buttons (8px base + 20px + 30px + 15px extra offset)
-      
-      spacing = sendRightFromContainer + sendButtonWidth + spacingBetween;
-      
-      console.log("[Prompanion Grok] Send button found, positioning relative to it:", {
-        sendButtonWidth: sendButtonWidth,
-        ourButtonWidth: ourButtonWidth,
-        sendRightFromContainer: sendRightFromContainer,
-        calculatedSpacing: spacing,
-        sendButtonAriaLabel: sendButton.getAttribute("aria-label")
-      });
-    } else {
-      console.warn("[Prompanion Grok] Send button not found in container, using default spacing");
     }
     
     // Ensure container has relative positioning
@@ -1108,8 +1141,24 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
       inputBarContainer.style.position = "relative";
     }
     
-    // CRITICAL: Force move button to input bar container (this overrides ANY previous parent)
-    // Move immediately first
+    // Get container's bounding rect for relative positioning
+    const containerRect2 = inputBarContainer.getBoundingClientRect();
+    
+    // Calculate position: right side of container, but avoid overlapping buttons
+    const buttonWidth = BUTTON_SIZE.wrapper || 44;
+    const spacing = 10; // 10px spacing from right edge or buttons
+    
+    let rightPosition;
+    if (rightmostButtonRight > 0) {
+      // Position to the right of the rightmost button
+      const rightmostButtonRightRelative = rightmostButtonRight - containerRect2.left;
+      rightPosition = containerRect2.width - rightmostButtonRightRelative - buttonWidth - spacing;
+    } else {
+      // No buttons found, position from right edge of container
+      rightPosition = spacing;
+    }
+    
+    // CRITICAL: Force move button to input bar container
     if (floatingButtonWrapper.parentElement !== inputBarContainer) {
       inputBarContainer.append(floatingButtonWrapper);
     }
@@ -1117,9 +1166,9 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     // Apply positioning styles immediately (force override any previous positioning)
     floatingButtonWrapper.style.position = "absolute";
     floatingButtonWrapper.style.top = "50%";
-    floatingButtonWrapper.style.right = `${spacing}px`;
-    floatingButtonWrapper.style.transform = "translateY(-50%)";
+    floatingButtonWrapper.style.right = `${rightPosition}px`;
     floatingButtonWrapper.style.left = "auto";
+    floatingButtonWrapper.style.transform = "translateY(-50%)";
     floatingButtonWrapper.style.bottom = "auto";
     floatingButtonWrapper.style.margin = "0";
     floatingButtonWrapper.style.display = "flex";
@@ -1133,28 +1182,66 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
         inputBarContainer.append(floatingButtonWrapper);
       }
       
+      // Recalculate position in case layout changed
+      const newContainerRect = inputBarContainer.getBoundingClientRect();
+      const newButtons = inputBarContainer.querySelectorAll("button");
+      let newRightmostButtonRight = 0;
+      
+      for (const btn of newButtons) {
+        if (btn.offsetParent) {
+          const btnRect = btn.getBoundingClientRect();
+          const btnRight = btnRect.right;
+          if (btnRight > newRightmostButtonRight) {
+            newRightmostButtonRight = btnRight;
+          }
+        }
+      }
+      
+      let newRightPosition;
+      if (newRightmostButtonRight > 0) {
+        const newRightmostButtonRightRelative = newRightmostButtonRight - newContainerRect.left;
+        newRightPosition = newContainerRect.width - newRightmostButtonRightRelative - buttonWidth - spacing;
+      } else {
+        newRightPosition = spacing;
+      }
+      
       // Force apply styles again to override anything that changed them
       floatingButtonWrapper.style.position = "absolute";
       floatingButtonWrapper.style.top = "50%";
-      floatingButtonWrapper.style.right = `${spacing}px`;
-      floatingButtonWrapper.style.transform = "translateY(-50%)";
+      floatingButtonWrapper.style.right = `${newRightPosition}px`;
       floatingButtonWrapper.style.left = "auto";
+      floatingButtonWrapper.style.transform = "translateY(-50%)";
       floatingButtonWrapper.style.bottom = "auto";
       floatingButtonWrapper.style.margin = "0";
     });
     
-    console.log("[Prompanion Grok] Button positioned in input bar container:", {
+    // Reset retry count on success
+    positionRetryCount = 0;
+    
+    console.log("[Prompanion Grok] Button positioned on right side of input bar:", {
       containerWidth: containerRect.width,
       containerHeight: containerRect.height,
-      buttonRight: spacing,
+      containerRight: containerRect.right,
+      rightmostButtonRight: rightmostButtonRight,
+      buttonRight: rightPosition,
+      buttonWidth: buttonWidth,
+      spacing: spacing,
       containerElement: inputBarContainer,
-      containerClasses: inputBarContainer.className
+      containerTag: inputBarContainer.tagName,
+      containerClasses: inputBarContainer.className,
+      buttonsFound: buttons.length
     });
   } else {
-    // If we can't find the input bar container, log a warning
-    // Schedule a retry after a short delay to catch the container when it's available
-    console.warn("[Prompanion Grok] Input bar container (div.relative.z-10) not found yet. Will retry...", {
-      searchedSelectors: ["div.relative.z-10", '[class*="relative"][class*="z-10"]'],
+    // If we can't find the input bar container, check retry limit
+    positionRetryCount++;
+    
+    if (positionRetryCount >= MAX_POSITION_RETRIES) {
+      console.warn("[Prompanion Grok] Input bar container (form/query-bar) not found after", MAX_POSITION_RETRIES, "retries. Giving up.");
+      positionRetryCount = 0; // Reset for next attempt
+      return;
+    }
+    
+    console.warn("[Prompanion Grok] Input bar container (form/query-bar) not found yet. Retry", positionRetryCount, "of", MAX_POSITION_RETRIES, {
       inputNode: inputNode,
       containerNode: containerNode
     });
