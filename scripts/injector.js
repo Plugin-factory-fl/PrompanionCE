@@ -155,6 +155,44 @@ function findGeminiMainContainer() {
 }
 
 /**
+ * Finds DeepSeek's main layout container
+ * @returns {HTMLElement|null} The main container element or null
+ */
+function findDeepseekMainContainer() {
+  // Use XPath to find the main content container: //*[@id="root"]/div/div
+  try {
+    const xpathResult = document.evaluate(
+      '//*[@id="root"]/div/div',
+      document,
+      null,
+      XPathResult.FIRST_ORDERED_NODE_TYPE,
+      null
+    );
+    const container = xpathResult.singleNodeValue;
+    if (container instanceof HTMLElement) {
+      return container;
+    }
+  } catch (error) {
+    console.warn('[Prompanion] XPath error finding DeepSeek container:', error);
+  }
+  
+  // Fallback: try querySelector approach
+  const root = document.getElementById('root');
+  if (root) {
+    const firstDiv = root.querySelector('div');
+    if (firstDiv) {
+      const secondDiv = firstDiv.querySelector('div');
+      if (secondDiv) {
+        return secondDiv;
+      }
+      return firstDiv;
+    }
+  }
+  
+  return null;
+}
+
+/**
  * Checks if the current site supports content pushing
  * Some sites (like Gemini) have layouts that don't respond well to margin changes
  * @returns {boolean} True if pushing should be attempted
@@ -220,6 +258,57 @@ function applyGeminiPush(shouldPush) {
 }
 
 /**
+ * Applies push effect to DeepSeek's main container
+ * @param {boolean} shouldPush - Whether to apply or remove the push
+ */
+function applyDeepseekPush(shouldPush) {
+  const container = findDeepseekMainContainer();
+  if (!container) {
+    // If container not found, fall back to standard behavior
+    console.log('[Prompanion] DeepSeek main container not found, using overlay mode');
+    return false;
+  }
+  
+  const panelWidthCalc = 'min(546px, 94vw)';
+  
+  if (shouldPush) {
+    // Store original margin-right if it exists
+    const computedStyle = window.getComputedStyle(container);
+    const currentMarginRight = computedStyle.marginRight;
+    
+    if (!container.dataset.prompanionOriginalMarginRight) {
+      container.dataset.prompanionOriginalMarginRight = currentMarginRight || '0px';
+    }
+    
+    // Apply margin-right to push content left
+    container.style.setProperty('margin-right', panelWidthCalc, 'important');
+    container.style.setProperty('transition', 'margin-right 160ms ease-in-out');
+    container.dataset.prompanionPushed = 'true';
+    
+    console.log('[Prompanion] Applied push to DeepSeek main container:', container);
+  } else {
+    // Restore original margin-right
+    if (container.dataset.prompanionPushed === 'true') {
+      const originalMarginRight = container.dataset.prompanionOriginalMarginRight;
+      
+      if (originalMarginRight && originalMarginRight !== '0px') {
+        container.style.setProperty('margin-right', originalMarginRight, 'important');
+      } else {
+        container.style.removeProperty('margin-right');
+      }
+      
+      container.style.removeProperty('transition');
+      delete container.dataset.prompanionPushed;
+      delete container.dataset.prompanionOriginalMarginRight;
+      
+      console.log('[Prompanion] Removed push from DeepSeek main container');
+    }
+  }
+  
+  return true; // Container found and handled
+}
+
+/**
  * Toggles the side panel visibility
  */
 function togglePanel() {
@@ -227,12 +316,16 @@ function togglePanel() {
   const willShow = !container.classList.contains(PANEL_VISIBLE_CLASS);
   const hostname = window.location.hostname;
   const isGemini = hostname.includes('gemini.google.com');
+  const isDeepseek = hostname.includes('deepseek.com') || hostname.includes('chat.deepseek.com');
   
   container.classList.toggle(PANEL_VISIBLE_CLASS, willShow);
   
   if (isGemini) {
     // Handle Gemini specially using its main container
     applyGeminiPush(willShow);
+  } else if (isDeepseek) {
+    // Handle DeepSeek specially using its main container
+    applyDeepseekPush(willShow);
   } else {
     // Standard push behavior for other sites
     if (shouldPushContent() && document.body) {
@@ -259,10 +352,14 @@ function openPanel() {
   container.classList.add(PANEL_VISIBLE_CLASS);
   const hostname = window.location.hostname;
   const isGemini = hostname.includes('gemini.google.com');
+  const isDeepseek = hostname.includes('deepseek.com') || hostname.includes('chat.deepseek.com');
   
   if (isGemini) {
     // Handle Gemini specially using its main container
     applyGeminiPush(true);
+  } else if (isDeepseek) {
+    // Handle DeepSeek specially using its main container
+    applyDeepseekPush(true);
   } else {
     // Standard push behavior for other sites
     if (shouldPushContent() && document.body) {
@@ -285,10 +382,14 @@ function closePanel(container) {
   container.classList.remove(PANEL_VISIBLE_CLASS);
   const hostname = window.location.hostname;
   const isGemini = hostname.includes('gemini.google.com');
+  const isDeepseek = hostname.includes('deepseek.com') || hostname.includes('chat.deepseek.com');
   
   if (isGemini) {
     // Handle Gemini specially using its main container
     applyGeminiPush(false);
+  } else if (isDeepseek) {
+    // Handle DeepSeek specially using its main container
+    applyDeepseekPush(false);
   } else {
     // Standard push behavior for other sites
     if (shouldPushContent() && document.body) {
