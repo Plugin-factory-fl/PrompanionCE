@@ -55,7 +55,9 @@ async function registerUser(name, email, password) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || "Registration failed");
+      const error = new Error(data.error || "Registration failed");
+      error.status = response.status; // Include status code for better error handling
+      throw error;
     }
 
     return data;
@@ -415,18 +417,7 @@ export function registerAccountHandlers() {
     }
   });
 
-  // REMOVED - We're handling login via button click handler instead
-  // The form submit handler was interfering with the button click
-  
-  // But we still need to prevent default form submission
-  accountForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-    console.log("[Prompanion LoginMenu] Form submit prevented - using button handler");
-  }, true);
-  
-  // Handle the "Log In" button click directly - this is the PRIMARY handler
+  // Handle form submission (Enter key) and button clicks with the same handler
   // Wait a bit to ensure DOM is ready
   setTimeout(() => {
     const loginSubmitButton = accountForm.querySelector('button[value="login"], button.account__submit, button[type="submit"], button[type="button"].account__submit');
@@ -434,7 +425,7 @@ export function registerAccountHandlers() {
       console.log("[Prompanion LoginMenu] Found login submit button:", loginSubmitButton);
       console.log("[Prompanion LoginMenu] Button type BEFORE:", loginSubmitButton.type, "Button value:", loginSubmitButton.value);
       
-      // Remove type="submit" to prevent form submission
+      // Remove type="submit" to prevent form submission from button click
       loginSubmitButton.type = "button";
       console.log("[Prompanion LoginMenu] Button type AFTER:", loginSubmitButton.type);
       
@@ -444,14 +435,39 @@ export function registerAccountHandlers() {
       event.stopImmediatePropagation();
       console.log("[Prompanion LoginMenu] ========== LOG IN BUTTON CLICKED ==========");
       
+      // Store references to ensure we can restore them on error
+      const accountDialogRef = accountDialog;
+      const loginViewRef = loginView;
+      const loggedInViewRef = loggedInView;
+      
+      // Clear any existing error message when starting a new login attempt
+      const existingErrorEl = document.getElementById("login-error-message");
+      if (existingErrorEl) {
+        existingErrorEl.hidden = true;
+        existingErrorEl.textContent = "";
+      }
+      
       const formData = new FormData(accountForm);
       const email = formData.get("email");
       const password = formData.get("password");
 
       console.log("[Prompanion LoginMenu] Form data:", { hasEmail: !!email, hasPassword: !!password, email: email?.substring(0, 10) });
 
+      // Clear any existing error message when attempting login
+      const errorMessageElValidation = document.getElementById("login-error-message");
+      if (errorMessageElValidation) {
+        errorMessageElValidation.hidden = true;
+        errorMessageElValidation.textContent = "";
+      }
+
       if (!email || !password) {
-        alert("Please enter both email and password");
+        shouldPreventClose = false; // Allow dialog to close if user cancels or closes manually
+        if (errorMessageElValidation) {
+          errorMessageElValidation.textContent = "Please enter both email and password";
+          errorMessageElValidation.hidden = false;
+        } else {
+          alert("Please enter both email and password");
+        }
         return;
       }
 
@@ -483,11 +499,50 @@ export function registerAccountHandlers() {
         window.location.reload();
       } catch (error) {
         console.error("[Prompanion LoginMenu] Login error:", error);
+        
+        // Close status dialog only
         if (statusDialog) {
           statusDialog.close();
         }
-        const errorMessage = error.message || "Login failed. Check your internet connection. If the issue persists, contact customer support or try again later.";
-        alert(errorMessage);
+        
+        // CRITICAL: Do NOT close account dialog on error - keep it open for retry
+        // Ensure login view is visible (not logged-in view)
+        if (loginViewRef) {
+          loginViewRef.hidden = false;
+          loginViewRef.style.display = "block";
+          loginViewRef.style.visibility = "visible";
+        }
+        if (loggedInViewRef) {
+          loggedInViewRef.hidden = true;
+          loggedInViewRef.style.display = "none";
+          loggedInViewRef.style.visibility = "hidden";
+        }
+        
+        // Display error message in the login form instead of alert
+        const errorMessageEl = document.getElementById("login-error-message");
+        if (errorMessageEl) {
+          // Extract error message - prefer "Invalid email or password" message from backend
+          let displayMessage = error.message || "Login failed. Check your internet connection. If the issue persists, contact customer support or try again later.";
+          
+          // If it's a password/email error, show simpler message
+          if (displayMessage.includes("Invalid email or password") || displayMessage.includes("invalid")) {
+            displayMessage = "Incorrect password";
+          }
+          
+          errorMessageEl.textContent = displayMessage;
+          errorMessageEl.hidden = false;
+        }
+        
+        // CRITICAL: Ensure dialog stays open - explicitly keep it open
+        if (accountDialogRef) {
+          if (!accountDialogRef.open) {
+            console.warn("[Prompanion LoginMenu] Account dialog was closed, reopening it");
+            accountDialogRef.showModal();
+          }
+        }
+        
+        console.log("[Prompanion LoginMenu] Login failed, keeping dialog open for retry");
+        // DO NOT close the dialog - let user retry
       }
     };
     
@@ -513,18 +568,56 @@ export function registerAccountHandlers() {
         handleLogin(e);
       }, { capture: true });
       
-      // Also prevent form submission completely
-      const preventFormSubmit = (e) => {
-        console.log("[Prompanion LoginMenu] Form submit event fired!");
+      // Clear error message when user starts typing in email or password fields
+      const emailInput = accountForm.querySelector('input[name="email"]');
+      const passwordInput = accountForm.querySelector('input[name="password"]');
+      const errorMessageElForClear = document.getElementById("login-error-message");
+      
+      const clearError = () => {
+        if (errorMessageElForClear && !errorMessageElForClear.hidden) {
+          errorMessageElForClear.hidden = true;
+          errorMessageElForClear.textContent = "";
+        }
+      };
+      
+      if (emailInput) {
+        emailInput.addEventListener("input", clearError);
+        emailInput.addEventListener("focus", clearError);
+        // Handle Enter key in email field
+        emailInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.stopPropagation();
+            handleLogin(e);
+          }
+        });
+      }
+      if (passwordInput) {
+        passwordInput.addEventListener("input", clearError);
+        passwordInput.addEventListener("focus", clearError);
+        // Handle Enter key in password field
+        passwordInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.stopPropagation();
+            handleLogin(e);
+          }
+        });
+      }
+      
+      // Handle form submission (Enter key) - call the same login handler
+      const handleFormSubmit = (e) => {
+        console.log("[Prompanion LoginMenu] Form submit event fired (Enter key pressed)");
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
-        console.log("[Prompanion LoginMenu] Form submit prevented, using button handler instead");
+        // Call the same login handler that button clicks use
         handleLogin(e);
       };
       
-      accountForm.addEventListener("submit", preventFormSubmit, { capture: true });
-      accountForm._submitHandler = preventFormSubmit; // Store reference for removal
+      // Add form submit handler to handle Enter key
+      accountForm.addEventListener("submit", handleFormSubmit, { capture: true });
+      accountForm._submitHandler = handleFormSubmit; // Store reference for removal
       
       // Test if button is clickable
       console.log("[Prompanion LoginMenu] Button element:", {
@@ -552,6 +645,13 @@ export function registerAccountHandlers() {
     if (loginView) {
       loginView.hidden = false;
       loginView.style.display = "block";
+    }
+    
+    // Clear error message when dialog closes
+    const errorMessageEl = document.getElementById("login-error-message");
+    if (errorMessageEl) {
+      errorMessageEl.hidden = true;
+      errorMessageEl.textContent = "";
     }
   });
 
@@ -604,19 +704,41 @@ export function registerAccountHandlers() {
       const password = formData.get("password");
       const confirmPassword = formData.get("confirmPassword");
 
+      // Clear any existing error message
+      const errorMessageEl = document.getElementById("create-account-error-message");
+      if (errorMessageEl) {
+        errorMessageEl.hidden = true;
+        errorMessageEl.textContent = "";
+      }
+
       // Validation
       if (!email || !password) {
-        alert("Please enter both email and password");
+        if (errorMessageEl) {
+          errorMessageEl.textContent = "Please enter both email and password";
+          errorMessageEl.hidden = false;
+        } else {
+          alert("Please enter both email and password");
+        }
         return;
       }
 
       if (password !== confirmPassword) {
-        alert("Passwords do not match");
+        if (errorMessageEl) {
+          errorMessageEl.textContent = "Passwords do not match";
+          errorMessageEl.hidden = false;
+        } else {
+          alert("Passwords do not match");
+        }
         return;
       }
 
       if (password.length < 8) {
-        alert("Password must be at least 8 characters long");
+        if (errorMessageEl) {
+          errorMessageEl.textContent = "Password must be at least 8 characters long";
+          errorMessageEl.hidden = false;
+        } else {
+          alert("Password must be at least 8 characters long");
+        }
         return;
       }
 
@@ -634,8 +756,26 @@ export function registerAccountHandlers() {
         window.location.reload();
       } catch (error) {
         showStatusPopup("close");
+        
+        // Check if this is an "email already exists" error (409 status or error message)
         const errorMessage = error.message || "Account Creation Failed. Check your internet connection. If the issue persists, contact customer support or try again later.";
-        alert(errorMessage);
+        let displayMessage = errorMessage;
+        
+        // Check for email already exists errors (409 conflict status or "already exists" in message)
+        if (error.status === 409 || errorMessage.includes("already exists") || errorMessage.includes("User already exists")) {
+          displayMessage = "An account with this email already exists. Please log in with your password or use a different email.";
+        }
+        
+        // Display error message in the form instead of alert
+        if (errorMessageEl) {
+          errorMessageEl.textContent = displayMessage;
+          errorMessageEl.hidden = false;
+        } else {
+          alert(displayMessage);
+        }
+        
+        // Keep the dialog open so user can retry or go to login
+        // Do NOT close the dialog
       }
     });
 
@@ -650,7 +790,59 @@ export function registerAccountHandlers() {
           toggle.textContent = "Show";
         }
       });
+      
+      // Clear error message when dialog closes
+      const errorMessageEl = document.getElementById("create-account-error-message");
+      if (errorMessageEl) {
+        errorMessageEl.hidden = true;
+        errorMessageEl.textContent = "";
+      }
     });
+    
+    // Add event listeners to clear error message when user types
+    const createAccountEmailInput = createAccountForm.querySelector('input[name="email"]');
+    const createAccountPasswordInput = createAccountForm.querySelector('input[name="password"]');
+    const createAccountConfirmPasswordInput = createAccountForm.querySelector('input[name="confirmPassword"]');
+    const createAccountNameInput = createAccountForm.querySelector('input[name="name"]');
+    
+    const clearCreateAccountError = () => {
+      const errorMessageElForClear = document.getElementById("create-account-error-message");
+      if (errorMessageElForClear && !errorMessageElForClear.hidden) {
+        errorMessageElForClear.hidden = true;
+        errorMessageElForClear.textContent = "";
+      }
+    };
+    
+    if (createAccountEmailInput) {
+      createAccountEmailInput.addEventListener("input", clearCreateAccountError);
+      createAccountEmailInput.addEventListener("focus", clearCreateAccountError);
+    }
+    if (createAccountPasswordInput) {
+      createAccountPasswordInput.addEventListener("input", clearCreateAccountError);
+      createAccountPasswordInput.addEventListener("focus", clearCreateAccountError);
+    }
+    if (createAccountConfirmPasswordInput) {
+      createAccountConfirmPasswordInput.addEventListener("input", clearCreateAccountError);
+      createAccountConfirmPasswordInput.addEventListener("focus", clearCreateAccountError);
+    }
+    if (createAccountNameInput) {
+      createAccountNameInput.addEventListener("input", clearCreateAccountError);
+      createAccountNameInput.addEventListener("focus", clearCreateAccountError);
+    }
+    
+    // Handle "Forgot Password?" button click in create account form
+    const forgotPasswordInCreateAccount = document.getElementById("create-account-forgot-password");
+    if (forgotPasswordInCreateAccount) {
+      forgotPasswordInCreateAccount.addEventListener("click", () => {
+        // Close create account dialog and open login dialog
+        createAccountDialog.close();
+        // Note: Forgot password functionality would go here in the future
+        // For now, just switch to login dialog
+        if (accountDialog) {
+          accountDialog.showModal();
+        }
+      });
+    }
   }
 
   // Password Toggle Handlers

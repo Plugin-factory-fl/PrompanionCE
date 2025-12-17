@@ -63,18 +63,7 @@ export function renderPrompts({ originalPrompt, optionA, optionB }) {
   const optionAField = document.getElementById("option-a");
   const optionBField = document.getElementById("option-b");
   
-  console.log("[Prompanion] renderPrompts called with:", {
-    originalPrompt: originalPrompt?.substring(0, 50) || "(empty)",
-    optionA: optionA?.substring(0, 50) || "(empty)",
-    optionB: optionB?.substring(0, 50) || "(empty)",
-    originalPromptLength: originalPrompt?.length || 0,
-    optionALength: optionA?.length || 0,
-    optionBLength: optionB?.length || 0,
-    hasOriginalField: !!originalField,
-    hasOptionAField: !!optionAField,
-    hasOptionBField: !!optionBField,
-    documentReadyState: document.readyState
-  });
+  // renderPrompts called - verbose logging removed
   
   // If fields don't exist, try again after a short delay
   if (!originalField || !optionAField || !optionBField) {
@@ -87,7 +76,6 @@ export function renderPrompts({ originalPrompt, optionA, optionB }) {
   if (originalField) {
     originalField.readOnly = false;
     originalField.value = originalPrompt || "";
-    console.log("[Prompanion] Set original-prompt, value length:", originalField.value.length);
   }
   
   if (optionAField) {
@@ -99,7 +87,6 @@ export function renderPrompts({ originalPrompt, optionA, optionB }) {
     if (optionAField.textContent !== undefined) {
       optionAField.textContent = valueToSet;
     }
-    console.log("[Prompanion] Set option-a, value length:", valueToSet.length, "field has:", optionAField.value.length);
     // Verify it stuck
     setTimeout(() => {
       if (optionAField.value !== valueToSet) {
@@ -118,7 +105,6 @@ export function renderPrompts({ originalPrompt, optionA, optionB }) {
     if (optionBField.textContent !== undefined) {
       optionBField.textContent = valueToSet;
     }
-    console.log("[Prompanion] Set option-b, value length:", valueToSet.length, "field has:", optionBField.value.length);
     // Verify it stuck
     setTimeout(() => {
       if (optionBField.value !== valueToSet) {
@@ -133,14 +119,7 @@ export function renderPrompts({ originalPrompt, optionA, optionB }) {
   if (optionAField) void optionAField.offsetHeight;
   if (optionBField) void optionBField.offsetHeight;
   
-  // Verify the values were actually set
-  setTimeout(() => {
-    console.log("[Prompanion] Verification - field values:", {
-      originalFieldValue: originalField?.value?.substring(0, 50),
-      optionAFieldValue: optionAField?.value?.substring(0, 50),
-      optionBFieldValue: optionBField?.value?.substring(0, 50)
-    });
-  }, 50);
+  // Verification removed - verbose logging reduced
 }
 
 /**

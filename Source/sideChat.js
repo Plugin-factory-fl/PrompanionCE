@@ -398,6 +398,19 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
     fullContent: activeConversation.history[activeConversation.history.length - 1]?.content
   });
   
+  // CRITICAL: Save state IMMEDIATELY after adding user message, before rendering
+  // This ensures the user message is persisted before any re-renders can occur
+  if (!saveState || typeof saveState !== 'function') {
+    console.error("[Prompanion] saveState is not a function in sendSideChatMessage!", typeof saveState);
+    console.error("[Prompanion] Dependencies:", dependencies);
+  } else {
+    // Save state synchronously to ensure user message is persisted
+    await saveState(stateRef);
+    console.log("[Prompanion] State saved with user message, history length:", activeConversation.history.length);
+  }
+  
+  // NOW render the chat with the user message included
+  // This ensures we're rendering the state that was just saved
   renderChat(activeConversation.history);
   renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
   
@@ -424,21 +437,13 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
         
         // Ensure the message is visible by scrolling it into view
         lastUserMessage.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  } else {
+      } else {
         console.warn("[Prompanion] WARNING: No user messages found in DOM after rendering!");
       }
     } else {
       console.error("[Prompanion] ERROR: Chat window not found in DOM!");
     }
   }, 100);
-  
-  if (!saveState || typeof saveState !== 'function') {
-    console.error("[Prompanion] saveState is not a function in sendSideChatMessage!", typeof saveState);
-    console.error("[Prompanion] Dependencies:", dependencies);
-    // Continue anyway - the message was added to history and rendered
-  } else {
-    await saveState(stateRef);
-  }
   
   console.log("[Prompanion] Added user message, new history length:", activeConversation.history.length);
 
@@ -739,7 +744,8 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
       stateRef.activeConversationId = newConversation.id;
     }
     
-    // Render the new conversation (should show welcome message only)
+    // DON'T render yet - wait until user message is added to avoid race conditions
+    // This prevents the user message from disappearing when state is reloaded
     const finalActiveConversation = getActiveConversation(stateRef);
     if (!finalActiveConversation) {
       console.error("[Prompanion] Failed to get active conversation after creating new one!");
@@ -752,16 +758,8 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
       return;
     }
     
-    renderChat(finalActiveConversation.history ?? []);
-    renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
-    
-    if (saveState && typeof saveState === 'function') {
-      await saveState(stateRef);
-      console.log("[Prompanion] State saved after creating new conversation");
-    } else {
-      console.error("[Prompanion] saveState is not a function!", typeof saveState);
-    }
-    
+    // Don't save state yet - wait until user message is added to save both together
+    // This prevents race conditions where state is saved with only welcome message
     console.log("[Prompanion] Created new conversation for Elaborate:", newConversation.id, "History length:", finalActiveConversation.history?.length || 0);
   } else {
     // For non-fresh conversations, check fromPending
@@ -1111,8 +1109,13 @@ export function registerChatHandlers(stateRef, dependencies = {}) {
     renderStatus(stateRef);
   }
   const active = getActiveConversation(stateRef);
-  renderChat(active?.history ?? []);
+  // Always render tabs (they're safe to update)
   renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
+  // Only render chat history if we're not in the middle of sending a message (to avoid race conditions)
+  // The sendSideChatMessage function will handle rendering after the user message is added and saved
+  if (!autoChatInFlight) {
+    renderChat(active?.history ?? []);
+  }
 
   // Create and store handler
   handlerStore.resetButton = async () => {

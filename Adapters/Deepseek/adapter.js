@@ -1058,12 +1058,12 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
   console.log("[Prompanion Deepseek] positionFloatingButton called");
   
   // Use XPath to find the target container
-  // XPath: //*[@id="root"]/div/div/div[2]/div[3]/div/div/div[2]/div[2]/div/div/div[2]/div
+  // XPath: //*[@id="root"]/div/div/div[2]/div[3]/div/div/div[2]/div[2]/div/div/div[2]/div[3]
   let targetContainer = null;
   
   try {
     const xpathResult = document.evaluate(
-      '//*[@id="root"]/div/div/div[2]/div[3]/div/div/div[2]/div[2]/div/div/div[2]/div',
+      '//*[@id="root"]/div/div/div[2]/div[3]/div/div/div[2]/div[2]/div/div/div[2]/div[3]',
       document,
       null,
       XPathResult.FIRST_ORDERED_NODE_TYPE,
@@ -1077,13 +1077,13 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     console.warn("[Prompanion Deepseek] Container XPath error:", error);
   }
   
-  // Find the reference element (8px to the left of this)
-  // XPath: //*[@id="root"]/div/div/div[2]/div[3]/div/div/div[2]/div[2]/div/div/div[2]/div/div[1]
+  // Find the reference element (10px to the left of this)
+  // XPath: //*[@id="root"]/div/div/div[2]/div[3]/div/div/div[2]/div[2]/div/div/div[2]/div[3]/div[1]
   let referenceElement = null;
   
   try {
     const xpathResult = document.evaluate(
-      '//*[@id="root"]/div/div/div[2]/div[3]/div/div/div[2]/div[2]/div/div/div[2]/div/div[1]',
+      '//*[@id="root"]/div/div/div[2]/div[3]/div/div/div[2]/div[2]/div/div/div[2]/div[3]/div[1]',
       document,
       null,
       XPathResult.FIRST_ORDERED_NODE_TYPE,
@@ -1126,7 +1126,7 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     targetContainer.style.position = "relative";
   }
   
-  // Calculate spacing - position next to the attach button (reference element)
+  // Calculate spacing - position 10px to the left of the reference element
   let spacing = 8; // Default 8px from right edge
   
   if (referenceElement && referenceElement.offsetParent) {
@@ -1135,15 +1135,11 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     
     // Calculate reference element's left edge relative to container's right edge
     const referenceLeftFromContainer = containerRect.right - referenceRect.left;
-    const ourButtonWidth = typeof BUTTON_SIZE.wrapper === 'string' 
-      ? parseInt(BUTTON_SIZE.wrapper.replace('px', ''), 10) || 40
-      : BUTTON_SIZE.wrapper || 40;
-    const spacingBetween = 8; // 8px spacing from reference element
-    const additionalLeftOffset = 60; // Move 60px further to the left (40px + 20px)
+    const spacingBetween = 10; // 10px spacing to the left of reference element
     
-    // Position: referenceLeft - ourButtonWidth - spacingBetween + additionalLeftOffset
-    // Adding to spacing moves button LEFT (further from right edge)
-    spacing = referenceLeftFromContainer - ourButtonWidth - spacingBetween + additionalLeftOffset;
+    // To place our button 10px to the left of reference element's left edge:
+    // Our button's RIGHT edge should be at: referenceLeftFromContainer + spacingBetween
+    spacing = referenceLeftFromContainer + spacingBetween;
     
     // Ensure spacing is at least 8px from right edge
     if (spacing < 8) {
@@ -1152,7 +1148,6 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     
     console.log("[Prompanion Deepseek] Reference element found, positioning relative to it:", {
       referenceLeftFromContainer: referenceLeftFromContainer,
-      ourButtonWidth: ourButtonWidth,
       spacingBetween: spacingBetween,
       calculatedSpacing: spacing,
       referenceElement: referenceElement
@@ -1305,7 +1300,7 @@ function locateComposer() {
   let container = null;
   try {
     const xpathResult = document.evaluate(
-      '//*[@id="root"]/div/div/div[2]/div[3]/div/div/div[2]/div[2]/div/div/div[2]/div',
+      '//*[@id="root"]/div/div/div[2]/div[3]/div/div/div[2]/div[2]/div/div/div[2]/div[3]',
       document,
       null,
       XPathResult.FIRST_ORDERED_NODE_TYPE,

@@ -5,9 +5,6 @@
 // This eliminates duplicate listener registrations and provides unified message handling.
 // ============================================================================
 
-console.log("[Prompanion Bolt] ========== BOLT ADAPTER LOADING ==========");
-console.log("[Prompanion Bolt] Timestamp:", new Date().toISOString());
-console.log("[Prompanion Bolt] Location:", window.location.href);
 
 // Import constants from AdapterBase
 if (typeof AdapterBase === "undefined") {
@@ -22,7 +19,6 @@ const SELECTION_TOOLBAR_VISIBLE_CLASS = AdapterBase.SELECTION_TOOLBAR_VISIBLE_CL
 const HIGHLIGHT_BUTTON_SELECTORS = AdapterBase.HIGHLIGHT_BUTTON_SELECTORS;
 const BUTTON_SIZE = AdapterBase.BUTTON_SIZE;
 
-console.log("[Prompanion] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
 let domObserverStarted = false;
 
 let enhanceTooltipElement = null;
@@ -109,11 +105,8 @@ function getHighlightButton() {
 
 function nodeInAssistantMessage(node) {
   const element = AdapterBase.getElementFromNode(node);
-  if (!element) {
-    console.log("[Prompanion Bolt] nodeInAssistantMessage - no element from node");
-    return false;
-  }
-  // Bolt-specific selectors - adjust based on actual DOM structure
+  if (!element) return false;
+  
   const selectors = [
     "[data-role='assistant']",
     "[class*='assistant']",
@@ -129,42 +122,18 @@ function nodeInAssistantMessage(node) {
   
   for (const selector of selectors) {
     const closest = element.closest(selector);
-    if (closest) {
-      console.log("[Prompanion Bolt] nodeInAssistantMessage - found assistant message via selector:", selector, {
-        tagName: closest.tagName,
-        className: closest.className,
-        id: closest.id
-      });
-      return true;
-    }
+    if (closest) return true;
   }
   
-  // Also check if the element or its parent contains text that looks like an assistant response
-  // (e.g., not in an input field, and in a message-like container)
   const text = element.textContent || element.innerText || "";
   const isInInput = element.closest("input, textarea, [contenteditable='true']");
   const isInMessageContainer = element.closest("div[class*='message'], article, section, [role='article']");
   
   if (!isInInput && isInMessageContainer && text.length > 10) {
-    // Check if it's likely an assistant message (not user input)
-    // User messages are typically in input fields or have specific patterns
     const isUserInput = element.closest("form, [role='textbox'], textarea");
-    if (!isUserInput) {
-      console.log("[Prompanion Bolt] nodeInAssistantMessage - likely assistant message (fallback detection)", {
-        tagName: element.tagName,
-        className: element.className,
-        textPreview: text.substring(0, 50)
-      });
-      return true;
-    }
+    if (!isUserInput) return true;
   }
   
-  console.log("[Prompanion Bolt] nodeInAssistantMessage - not an assistant message", {
-    tagName: element.tagName,
-    className: element.className,
-    isInInput: !!isInInput,
-    isInMessageContainer: !!isInMessageContainer
-  });
   return false;
 }
 
@@ -324,7 +293,6 @@ function captureBoltChatHistory(maxMessages = 20) {
       }
     }
     
-    console.log(`[Prompanion] Captured ${messages.length} messages from Bolt conversation`);
     return messages;
   } catch (error) {
     console.error("[Prompanion] Error capturing GPT chat history:", error);
@@ -348,20 +316,13 @@ async function submitSelectionToSideChat(text) {
   selectionAskInFlight = true;
   
   try {
-    // Capture chat history from Bolt conversation for context
     let chatHistory = [];
-    console.log("%c[Prompanion Bolt] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
     try {
       chatHistory = captureBoltChatHistory(20);
-      console.log(`%c[Prompanion Bolt] ✓ Captured ${chatHistory.length} messages`, 
-        chatHistory.length > 0 ? "color: green; font-size: 14px; font-weight: bold;" : "color: red; font-size: 14px; font-weight: bold;");
-      if (chatHistory.length === 0) {
-        console.warn("[Prompanion Bolt] ⚠️ No messages found in DOM");
-      }
     } catch (error) {
-      console.error("[Prompanion Bolt] ✗ Failed to capture chat history:", error);
+      console.error("[Prompanion Bolt] Failed to capture chat history:", error);
       chatHistory = [];
-    };
+    }
 
     AdapterBase.sendMessage({ 
       type: "PROMPANION_SIDECHAT_REQUEST", 
@@ -397,16 +358,6 @@ function initSelectionToolbar() {
       // Prefer assistant messages, but allow any selection for better UX
       const shouldShow = !!(notCollapsed && hasText && !inComposer);
       
-      console.log("[Prompanion Bolt] shouldShowToolbar check:", {
-        hasSelection: !!selection,
-        notCollapsed,
-        hasText,
-        textLength: text?.length || 0,
-        inComposer,
-        targetsAssistant,
-        shouldShow
-      });
-      
       return shouldShow;
     },
     onAction: (text) => {
@@ -416,7 +367,6 @@ function initSelectionToolbar() {
     toolbarId: SELECTION_TOOLBAR_ID,
     visibleClass: SELECTION_TOOLBAR_VISIBLE_CLASS
   });
-  console.log("[Prompanion Bolt] Selection toolbar initialized");
 }
 
 // Selection change is now handled by AdapterBase.initSelectionToolbar()
@@ -499,15 +449,9 @@ function buildButton() {
   AdapterBase.attachTooltip(button, "Open Prompanion to enhance your prompts for the best response.", BUTTON_ID);
   button.addEventListener("click", () => AdapterBase.togglePanel()
     .catch((e) => console.error("Prompanion: failed to open sidebar from Bolt adapter", e)));
-  // Custom tooltip handlers that check for edit mode
-  button.addEventListener("mouseenter", () => {
-    const isEditingMode = floatingButtonTargetInput && floatingButtonTargetInput.classList && floatingButtonTargetInput.classList.contains('cm-content');
-    AdapterBase.showTooltip(button, BUTTON_ID, { positionAbove: isEditingMode });
-  });
-  button.addEventListener("focus", () => {
-    const isEditingMode = floatingButtonTargetInput && floatingButtonTargetInput.classList && floatingButtonTargetInput.classList.contains('cm-content');
-    AdapterBase.showTooltip(button, BUTTON_ID, { positionAbove: isEditingMode });
-  });
+  // Use AdapterBase for generic hover tooltip
+  button.addEventListener("mouseenter", () => AdapterBase.showTooltip(button, BUTTON_ID));
+  button.addEventListener("focus", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("mouseleave", () => AdapterBase.hideTooltip(button));
   button.addEventListener("blur", () => AdapterBase.hideTooltip(button));
   return button;
@@ -538,44 +482,19 @@ function ensureFloatingButton() {
 }
 
 function placeButton(targetContainer, inputNode) {
-  console.log("[Prompanion Bolt] placeButton called", {
-    hasInputNode: !!inputNode,
-    inputNodeTag: inputNode?.tagName,
-    inputNodeClass: inputNode?.className,
-    hasContainer: !!targetContainer,
-    containerTag: targetContainer?.tagName
-  });
-  if (!inputNode) {
-    console.warn("[Prompanion Bolt] placeButton - no inputNode, returning");
-    return;
-  }
+  if (!inputNode) return;
   ensureFloatingButton();
   floatingButtonTargetContainer = targetContainer ?? inputNode;
   floatingButtonTargetInput = inputNode;
-  console.log("[Prompanion Bolt] placeButton - calling positionFloatingButton");
   positionFloatingButton(inputNode, floatingButtonTargetContainer);
 }
 
 function positionFloatingButton(inputNode, containerNode = floatingButtonTargetContainer) {
-  console.log("[Prompanion Bolt] positionFloatingButton called", {
-    hasWrapper: !!floatingButtonWrapper,
-    inputNode: inputNode?.tagName,
-    inputClass: inputNode?.className,
-    containerNode: containerNode?.tagName
-  });
+  if (!floatingButtonWrapper) return;
   
-  if (!floatingButtonWrapper) {
-    console.warn("[Prompanion Bolt] positionFloatingButton - no floatingButtonWrapper");
-    return;
-  }
-  
-  // Check if we're in editing mode (CodeMirror editor present)
   const isEditingMode = inputNode && inputNode.classList && inputNode.classList.contains('cm-content');
-  console.log("[Prompanion Bolt] positionFloatingButton - isEditingMode:", isEditingMode);
   
   if (isEditingMode) {
-    // In editing mode, position relative to the plan/submit button section
-    console.log("[Prompanion Bolt] positionFloatingButton - attempting XPath lookup for editing mode");
     try {
       const xpathResult = document.evaluate(
         '//*[@id="root"]/div[2]/div[2]/div/div[1]/div/div[2]/div/div[3]/div[2]/div[4]/div[3]',
@@ -586,60 +505,85 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
       );
       const editingContainer = xpathResult.singleNodeValue;
       
-      console.log("[Prompanion Bolt] positionFloatingButton - XPath result:", {
-        found: !!editingContainer,
-        isHTMLElement: editingContainer instanceof HTMLElement,
-        tagName: editingContainer?.tagName,
-        className: editingContainer?.className
-      });
-      
       if (editingContainer && editingContainer instanceof HTMLElement) {
-        console.log("[Prompanion Bolt] Found editing mode container via XPath, positioning button");
-        const containerStyle = getComputedStyle(editingContainer);
-        if (containerStyle.position === "static") {
-          editingContainer.style.position = "relative";
-        }
-        if (floatingButtonWrapper.parentElement !== editingContainer) {
+        if (floatingButtonWrapper.parentElement !== document.body) {
           if (floatingButtonWrapper.parentElement) {
             floatingButtonWrapper.remove();
           }
-          editingContainer.append(floatingButtonWrapper);
-          console.log("[Prompanion Bolt] Button appended to editing container");
+          document.body.append(floatingButtonWrapper);
         }
-        floatingButtonWrapper.style.position = "absolute";
-        floatingButtonWrapper.style.top = "50%";
-        floatingButtonWrapper.style.right = "112px"; // 12px + 100px total offset to the left
+        
+        // Calculate position: 5px to the left of the container
+        const containerRect = editingContainer.getBoundingClientRect();
+        const buttonWidth = parseInt(BUTTON_SIZE.wrapper) || 44;
+        const spacingFromTarget = 5; // 5px spacing to the left of target container
+        
+        // Calculate left position: container's left edge minus button width minus spacing
+        const leftPosition = containerRect.left - buttonWidth - spacingFromTarget;
+        const topPosition = containerRect.top + (containerRect.height / 2);
+        
+        // If left position would be negative, use right positioning as fallback
+        let useLeft = leftPosition >= 0;
+        
+        floatingButtonWrapper.style.position = "fixed";
+        floatingButtonWrapper.style.top = `${topPosition}px`;
         floatingButtonWrapper.style.transform = "translateY(-50%)";
-        floatingButtonWrapper.style.left = "auto";
+        if (useLeft) {
+          floatingButtonWrapper.style.left = `${leftPosition}px`;
+          floatingButtonWrapper.style.right = "auto";
+        } else {
+          floatingButtonWrapper.style.right = `${window.innerWidth - containerRect.right + spacingFromTarget}px`;
+          floatingButtonWrapper.style.left = "auto";
+        }
         floatingButtonWrapper.style.bottom = "auto";
         floatingButtonWrapper.style.display = "flex";
         floatingButtonWrapper.style.zIndex = "2147483000";
-        console.log("[Prompanion Bolt] Button positioned in editing mode", {
-          parent: floatingButtonWrapper.parentElement?.tagName,
-          parentClass: floatingButtonWrapper.parentElement?.className,
-          right: "112px (100px total offset from original 12px)",
-          rect: floatingButtonWrapper.getBoundingClientRect()
-        });
+        floatingButtonWrapper.style.margin = "0";
+        
+        // Store reference to container for observers
+        floatingButtonTargetContainer = editingContainer;
+        
+        // Set up observers to track container position changes
+        if (!floatingButtonWrapper._editingModeObservers) {
+          floatingButtonWrapper._editingModeObservers = [];
+          
+          // ResizeObserver to watch for container size/position changes
+          const resizeObserver = new ResizeObserver(() => {
+            positionFloatingButton(inputNode, editingContainer);
+          });
+          resizeObserver.observe(editingContainer);
+          floatingButtonWrapper._editingModeObservers.push(() => resizeObserver.disconnect());
+          
+          // MutationObserver to watch for style/class changes that might affect position
+          const mutationObserver = new MutationObserver(() => {
+            positionFloatingButton(inputNode, editingContainer);
+          });
+          mutationObserver.observe(editingContainer, {
+            attributes: true,
+            attributeFilter: ['style', 'class'],
+            childList: false,
+            subtree: false
+          });
+          floatingButtonWrapper._editingModeObservers.push(() => mutationObserver.disconnect());
+        }
+        
         return;
-      } else {
-        console.warn("[Prompanion Bolt] XPath found element but it's not an HTMLElement:", editingContainer);
       }
     } catch (error) {
-      console.warn("[Prompanion Bolt] XPath lookup failed for editing mode:", error);
+      // Fall through to default positioning
     }
-    console.log("[Prompanion Bolt] Falling back to default positioning for editing mode");
+  }
+  
+  // Clean up editing mode observers if switching to default mode
+  if (floatingButtonWrapper._editingModeObservers) {
+    floatingButtonWrapper._editingModeObservers.forEach(cleanup => cleanup());
+    floatingButtonWrapper._editingModeObservers = null;
   }
   
   // Default positioning for homepage/chat mode
   const target = containerNode ?? inputNode;
-  if (!target) {
-    console.warn("[Prompanion Bolt] positionFloatingButton - no target container");
-    return;
-  }
-  console.log("[Prompanion Bolt] Using default positioning", {
-    target: target.tagName,
-    targetClass: target.className
-  });
+  if (!target) return;
+  
   if (getComputedStyle(target).position === "static") {
     target.style.position = "relative";
   }
@@ -648,7 +592,6 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
       floatingButtonWrapper.remove();
     }
     target.append(floatingButtonWrapper);
-    console.log("[Prompanion Bolt] Button appended to default container");
   }
   floatingButtonWrapper.style.position = "absolute";
   floatingButtonWrapper.style.top = "50%";
@@ -658,11 +601,6 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
   floatingButtonWrapper.style.bottom = "auto";
   floatingButtonWrapper.style.display = "flex";
   floatingButtonWrapper.style.zIndex = "2147483000";
-  console.log("[Prompanion Bolt] Button positioned in default mode", {
-    parent: floatingButtonWrapper.parentElement?.tagName,
-    parentClass: floatingButtonWrapper.parentElement?.className,
-    rect: floatingButtonWrapper.getBoundingClientRect()
-  });
 }
 
 function refreshFloatingButtonPosition() {
@@ -686,16 +624,10 @@ function ensureDomObserver() {
     if (composer) {
       const inputChanged = lastComposerInput !== composer.input;
       if (inputChanged) {
-        console.log("[Prompanion Bolt] DOM changed - input element changed, re-positioning button and tooltip", {
-          oldInput: lastComposerInput?.tagName,
-          newInput: composer.input?.tagName,
-          newInputClass: composer.input?.className
-        });
         lastComposerInput = composer.input;
         placeButton(composer.container, composer.input);
         setupEnhanceTooltip(composer.input, composer.container);
       } else {
-        console.log("[Prompanion Bolt] DOM changed, re-positioning button");
         placeButton(composer.container, composer.input);
       }
     } else {
@@ -712,21 +644,16 @@ function ensureDomObserver() {
                     (target instanceof HTMLElement && target.classList?.contains('cm-content'));
     
     if (isInput) {
-      console.log("[Prompanion Bolt] Focus detected on input element:", target.tagName, target.className);
       const composer = locateComposer();
       if (composer) {
-        // Check if the focused element is the composer input or a child of it (for CodeMirror)
         const isComposerInput = composer.input === target || 
                                 composer.input.contains(target) ||
                                 target.closest('.cm-content') === composer.input;
         
         if (isComposerInput) {
-          console.log("[Prompanion Bolt] Setting up enhance tooltip for newly focused input");
-          // Always re-setup if the input has changed (e.g., switching from homepage to edit mode)
           if (enhanceTooltipActiveTextarea !== composer.input) {
             setupEnhanceTooltip(composer.input, composer.container);
           } else {
-            // Even if it's the same input, re-bind events in case they were lost
             bindInputEvents(composer.input);
           }
         }
@@ -738,7 +665,6 @@ function ensureDomObserver() {
 }
 
 function locateComposer() {
-  console.log("[Prompanion Bolt] locateComposer() called");
   // Bolt-specific composer selectors - adjust based on actual DOM structure
   const wrappers = [
     "textarea[placeholder*='message']",
@@ -748,14 +674,12 @@ function locateComposer() {
     "div[class*='composer']",
     "main form"
   ].map(sel => document.querySelector(sel)).filter(Boolean);
-  console.log("[Prompanion Bolt] locateComposer() - found wrappers:", wrappers.length);
   let input = null;
   for (const wrapper of wrappers) {
     const editable = wrapper.querySelector("textarea, input[type='text'], [contenteditable='true'][role='textbox']") ??
                      wrapper.querySelector("div[contenteditable='true']");
     if (editable instanceof HTMLElement) { 
       input = editable; 
-      console.log("[Prompanion Bolt] locateComposer() - found input in wrapper:", editable.tagName, editable.className);
       break; 
     }
   }
@@ -763,45 +687,27 @@ function locateComposer() {
     const textarea = document.querySelector("textarea[placeholder*='message'], textarea[placeholder*='Message']");
     if (textarea instanceof HTMLTextAreaElement) {
       input = textarea;
-      console.log("[Prompanion Bolt] locateComposer() - found textarea directly:", textarea.className);
     }
   }
   if (!input) {
-    console.log("[Prompanion Bolt] locateComposer() - no input found, trying broader search");
-    // Try more generic selectors for Bolt.new
     const allTextareas = document.querySelectorAll("textarea");
     const allContentEditable = document.querySelectorAll("[contenteditable='true']");
-    console.log("[Prompanion Bolt] locateComposer() - found textareas:", allTextareas.length, "contentEditable:", allContentEditable.length);
     
     // PRIORITIZE contentEditable elements - Bolt.new likely uses these for input
     for (const editable of allContentEditable) {
       if (editable instanceof HTMLElement) {
         const isVisible = editable.offsetParent !== null;
         const hasFocus = document.activeElement === editable;
-        const hasText = (editable.textContent || editable.innerText || "").trim().length > 0;
         const isLikelyInput = editable.getAttribute("role") === "textbox" || 
                              editable.tagName === "DIV" ||
                              editable.classList.toString().includes("input") ||
                              editable.classList.toString().includes("composer");
         
-        console.log("[Prompanion Bolt] locateComposer() - checking contentEditable:", {
-          tagName: editable.tagName,
-          className: editable.className,
-          isVisible,
-          hasFocus,
-          hasText,
-          isLikelyInput,
-          role: editable.getAttribute("role")
-        });
-        
-        // Prefer focused contentEditable, then visible ones that look like input fields
         if (hasFocus && isVisible) {
           input = editable;
-          console.log("[Prompanion Bolt] locateComposer() - using focused contentEditable");
           break;
         } else if (isVisible && isLikelyInput && !input) {
           input = editable;
-          console.log("[Prompanion Bolt] locateComposer() - using visible contentEditable input:", editable.className);
         }
       }
     }
@@ -813,23 +719,12 @@ function locateComposer() {
           const isVisible = textarea.offsetParent !== null;
           const isEnabled = !textarea.disabled && !textarea.readOnly;
           const hasFocus = document.activeElement === textarea;
-          console.log("[Prompanion Bolt] locateComposer() - checking textarea:", {
-            className: textarea.className,
-            isVisible,
-            isEnabled,
-            hasFocus,
-            disabled: textarea.disabled,
-            readOnly: textarea.readOnly
-          });
           
-          // Prefer focused textarea, then visible and enabled
           if (hasFocus && isEnabled) {
             input = textarea;
-            console.log("[Prompanion Bolt] locateComposer() - using focused textarea");
             break;
           } else if (isVisible && isEnabled && !input) {
             input = textarea;
-            console.log("[Prompanion Bolt] locateComposer() - using visible enabled textarea:", textarea.className);
           }
         }
       }
@@ -842,35 +737,18 @@ function locateComposer() {
   const container = input.closest("[data-testid='composer-footer']") ??
                     input.closest("[data-testid='composer-container']") ??
                     input.parentElement ?? document.body;
-  console.log("[Prompanion Bolt] locateComposer() - returning:", {
-    input: input.tagName,
-    container: container.tagName
-  });
   return { input, container };
 }
 
 function init() {
-  console.log("[Prompanion Bolt] init() called");
   const composer = locateComposer();
-  console.log("[Prompanion Bolt] locateComposer() returned:", composer ? "found" : "not found");
-  if (composer) {
-    console.log("[Prompanion Bolt] Composer found:", {
-      input: composer.input?.tagName,
-      inputClass: composer.input?.className,
-      container: composer.container?.tagName,
-      containerClass: composer.container?.className
-    });
-  }
   AdapterBase.requestSelectionToolbarUpdate();
   if (composer) {
     placeButton(composer.container, composer.input);
     setupEnhanceTooltip(composer.input, composer.container);
     ensureDomObserver();
     
-    // If this is a CodeMirror element (edit mode), ensure events are set up even if not focused yet
     if (composer.input?.classList?.contains('cm-content')) {
-      console.log("[Prompanion Bolt] init() - detected CodeMirror (edit mode), ensuring tooltip is ready");
-      // Force a check after a short delay to catch any initial text
       setTimeout(() => {
         if (enhanceTooltipActiveTextarea === composer.input) {
           handleInputChange();
@@ -880,7 +758,6 @@ function init() {
     
     return true;
   }
-  console.log("[Prompanion Bolt] Composer not found, setting up observer");
   ensureDomObserver();
   return false;
 }
@@ -1861,10 +1738,6 @@ function isBoltEditorMode() {
  * @returns {HTMLElement|null} The main container element or null
  */
 function findBoltMainContainer() {
-  const inEditorMode = isBoltEditorMode();
-  console.log('[Prompanion Bolt] Finding container, editor mode:', inEditorMode);
-  
-  // Same XPath works for both modes: //*[@id="root"]/div[2]
   try {
     const xpathResult = document.evaluate(
       '//*[@id="root"]/div[2]',
@@ -1875,23 +1748,13 @@ function findBoltMainContainer() {
     );
     const container = xpathResult.singleNodeValue;
     if (container instanceof HTMLElement) {
-      console.log('[Prompanion Bolt] Container found via XPath (mode:', inEditorMode ? 'editor' : 'homepage', '):', container);
       return container;
     }
   } catch (error) {
-    console.warn('[Prompanion Bolt] XPath evaluation error:', error);
+    // Fallback to querySelector
   }
   
-  // Fallback to querySelector
-  const container = document.querySelector('#root > div:nth-child(2)') ||
-                    document.querySelector('#root > div:last-child');
-  if (container) {
-    console.log('[Prompanion Bolt] Container found via fallback (mode:', inEditorMode ? 'editor' : 'homepage', '):', container);
-    return container;
-  }
-  
-  console.warn('[Prompanion Bolt] Container not found');
-  return null;
+  return document.querySelector('#root > div:nth-child(2)') || null;
 }
 
 /**
@@ -1900,10 +1763,7 @@ function findBoltMainContainer() {
  */
 function applyBoltContainerPush(shouldPush) {
   const container = findBoltMainContainer();
-  if (!container) {
-    console.warn('[Prompanion Bolt] Container not found, cannot apply push');
-    return;
-  }
+  if (!container) return;
   
   const panelWidthCalc = 'min(546px, 94vw)';
   
@@ -1927,38 +1787,11 @@ function applyBoltContainerPush(shouldPush) {
       container.dataset.prompanionOriginalBoxSizing = currentBoxSizing || 'border-box';
     }
     
-    // Use requestAnimationFrame to ensure our styles are applied after any other style changes
-    requestAnimationFrame(() => {
-      // Override width, max-width, and flex-basis to ensure it shrinks
-      container.style.setProperty('width', `calc(100% - ${panelWidthCalc})`, 'important');
-      container.style.setProperty('max-width', `calc(100% - ${panelWidthCalc})`, 'important');
-      container.style.setProperty('flex-basis', `calc(100% - ${panelWidthCalc})`, 'important');
-      container.style.setProperty('box-sizing', 'border-box', 'important');
-      container.style.setProperty('transition', 'width 160ms ease-in-out, max-width 160ms ease-in-out, flex-basis 160ms ease-in-out, box-sizing 160ms ease-in-out');
-      
-      // Double-check after a short delay to ensure styles stick
-      setTimeout(() => {
-        const currentWidth = window.getComputedStyle(container).width;
-        if (currentWidth && !currentWidth.includes('calc')) {
-          console.warn('[Prompanion Bolt] Width was overridden, re-applying...', { currentWidth });
-          container.style.setProperty('width', `calc(100% - ${panelWidthCalc})`, 'important');
-          container.style.setProperty('max-width', `calc(100% - ${panelWidthCalc})`, 'important');
-          container.style.setProperty('flex-basis', `calc(100% - ${panelWidthCalc})`, 'important');
-        }
-      }, 50);
-    });
-    
+    container.style.setProperty('width', `calc(100% - ${panelWidthCalc})`, 'important');
+    container.style.setProperty('max-width', `calc(100% - ${panelWidthCalc})`, 'important');
+    container.style.setProperty('flex-basis', `calc(100% - ${panelWidthCalc})`, 'important');
+    container.style.setProperty('box-sizing', 'border-box', 'important');
     container.dataset.prompanionPushed = 'true';
-    
-    console.log('[Prompanion Bolt] Applied push to container (overriding width + max-width + flex-basis):', {
-      container,
-      width: `calc(100% - ${panelWidthCalc})`,
-      maxWidth: `calc(100% - ${panelWidthCalc})`,
-      flexBasis: `calc(100% - ${panelWidthCalc})`,
-      originalWidth: currentWidth,
-      originalMaxWidth: currentMaxWidth,
-      boxSizing: 'border-box'
-    });
   } else {
     // Restore original styles
     if (container.dataset.prompanionPushed === 'true') {
@@ -1992,99 +1825,20 @@ function applyBoltContainerPush(shouldPush) {
       delete container.dataset.prompanionOriginalWidth;
       delete container.dataset.prompanionOriginalMaxWidth;
       delete container.dataset.prompanionOriginalBoxSizing;
-      
-      console.log('[Prompanion Bolt] Removed push from container');
     }
   }
 }
 
-/**
- * Checks if the side panel is currently visible
- * @returns {boolean} True if panel is visible
- */
-function isPanelVisible() {
-  const panelContainer = document.getElementById('prompanion-sidepanel-container');
-  return panelContainer && panelContainer.classList.contains('prompanion-sidepanel-visible');
-}
 
-/**
- * Updates the container push based on panel visibility
- */
-function updateBoltContainerPush() {
-  const visible = isPanelVisible();
-  const inEditorMode = isBoltEditorMode();
-  console.log('[Prompanion Bolt] Panel visibility changed:', {
-    visible,
-    editorMode: inEditorMode,
-    location: window.location.href
-  });
-  applyBoltContainerPush(visible);
-}
+// Expose push function globally so injector.js can call it
+window.__prompanionApplyBoltPush = applyBoltContainerPush;
 
-// Also observe the panel container directly for visibility changes
-function observePanelVisibility() {
-  const panelContainer = document.getElementById('prompanion-sidepanel-container');
-  if (!panelContainer) {
-    // Panel not created yet, try again later
-    setTimeout(observePanelVisibility, 500);
-    return;
-  }
-  
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-        console.log('[Prompanion Bolt] Panel class changed, updating container push');
-        updateBoltContainerPush();
-      }
-    });
-  });
-  
-  observer.observe(panelContainer, {
-    attributes: true,
-    attributeFilter: ['class']
-  });
-  
-  // Also observe the container for style changes to re-apply our styles if overridden
-  const container = findBoltMainContainer();
-  if (container) {
-    const styleObserver = new MutationObserver(() => {
-      if (container.dataset.prompanionPushed === 'true' && isPanelVisible()) {
-        // Re-apply styles if they were overridden
-        const computedWidth = window.getComputedStyle(container).width;
-        if (computedWidth && !computedWidth.includes('calc')) {
-          console.log('[Prompanion Bolt] Container width was overridden, re-applying push styles');
-          const panelWidthCalc = 'min(546px, 94vw)';
-          container.style.setProperty('width', `calc(100% - ${panelWidthCalc})`, 'important');
-          container.style.setProperty('max-width', `calc(100% - ${panelWidthCalc})`, 'important');
-          container.style.setProperty('flex-basis', `calc(100% - ${panelWidthCalc})`, 'important');
-        }
-      }
-    });
-    
-    styleObserver.observe(container, {
-      attributes: true,
-      attributeFilter: ['style']
-    });
-  }
-  
-  // Initial check
-  console.log('[Prompanion Bolt] Running initial container push check');
-  updateBoltContainerPush();
-  
-  console.log('[Prompanion Bolt] Panel visibility observer set up');
-}
-
-// Start observing when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', observePanelVisibility);
-} else {
-  observePanelVisibility();
-}
-
-// Listen for panel resize events (fired when panel opens/closes)
+// Listen for panel resize events
 window.addEventListener("prompanion-panel-resize", () => {
   refreshFloatingButtonPosition();
-  updateBoltContainerPush();
+  const panelContainer = document.getElementById('prompanion-sidepanel-container');
+  const isVisible = panelContainer && panelContainer.classList.contains('prompanion-sidepanel-visible');
+  applyBoltContainerPush(isVisible);
 });
 
 document.addEventListener("mousedown", (e) => {

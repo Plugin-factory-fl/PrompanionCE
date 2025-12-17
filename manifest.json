@@ -54,8 +54,16 @@
     },
       {
         "matches": [
+          "https://sora.chatgpt.com/*",
+          "https://*.sora.chatgpt.com/*"
+        ],
+        "js": ["Base/AdapterBase.js", "Adapters/Sora/adapter.js"],
+        "run_at": "document_idle"
+      },
+      {
+        "matches": [
           "https://chatgpt.com/*",
-          "https://*.chatgpt.com/*",
+          "https://www.chatgpt.com/*",
           "https://chat.openai.com/*",
           "https://*.chat.openai.com/*"
         ],
@@ -113,6 +121,14 @@
         "https://*.deepseek.com/*"
       ],
       "js": ["Base/AdapterBase.js", "Adapters/Deepseek/adapter.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://labs.google.com/*",
+        "https://*.labs.google.com/*"
+      ],
+      "js": ["Base/AdapterBase.js", "Adapters/LabsGoogle/adapter.js"],
       "run_at": "document_idle"
     }
   ],

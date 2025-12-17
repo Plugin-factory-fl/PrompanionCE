@@ -1064,217 +1064,114 @@ function ensureFloatingButton() {
 }
 
 function placeButton(targetContainer, inputNode) {
-  if (!inputNode) return;
+  // Removed the !inputNode gatekeeper that caused the 20s delay
+  console.log("[Prompanion Grok] placeButton called");
+  
   ensureFloatingButton();
-  floatingButtonTargetContainer = targetContainer ?? inputNode;
-  floatingButtonTargetInput = inputNode;
-  // CRITICAL: Always call positionFloatingButton which will find the correct container
-  // Ignore the targetContainer parameter - positionFloatingButton will find div.relative.z-10
-  positionFloatingButton(inputNode, null);
+  if (!floatingButtonWrapper) return;
+
+  if (inputNode) {
+    floatingButtonTargetInput = inputNode;
+    floatingButtonTargetContainer = targetContainer ?? inputNode;
+  }
+  
+  // Call positioning immediately
+  positionFloatingButton(inputNode, targetContainer);
 }
 
-// Track retry attempts to prevent infinite loops
-let positionRetryCount = 0;
-const MAX_POSITION_RETRIES = 10;
+let isPositioningLoopActive = false;
 
-function positionFloatingButton(inputNode, containerNode = floatingButtonTargetContainer) {
-  if (!floatingButtonWrapper) return;
-  
-  // Find the form container (input bar) - this is more reliable than model-select-trigger
-  const form = document.querySelector("form");
-  
-  // Also try to find the query-bar container
-  const queryBar = document.querySelector(".query-bar") || 
-                   document.querySelector('[class*="query-bar"]');
-  
-  // Use form as primary container, fallback to query-bar, then inputNode's parent
-  let inputBarContainer = form || queryBar;
-  
-  if (!inputBarContainer && inputNode) {
-    // Walk up from input node to find form or a suitable container
-    let current = inputNode;
-    let attempts = 0;
-    while (current && attempts < 10) {
-      if (current.tagName === "FORM" || current.classList.contains("query-bar") || 
-          current.classList.toString().includes("query-bar")) {
-        inputBarContainer = current;
-        break;
-      }
-      current = current.parentElement;
-      attempts++;
-    }
-  }
-  
-  // Log what we found
-  console.log("[Prompanion Grok] positionFloatingButton - input bar container search:", {
-    found: !!inputBarContainer,
-    containerElement: inputBarContainer,
-    containerTag: inputBarContainer ? inputBarContainer.tagName : null,
-    containerClasses: inputBarContainer ? inputBarContainer.className : null,
-    containerVisible: inputBarContainer ? (inputBarContainer.offsetParent !== null) : null,
-    retryCount: positionRetryCount
-  });
-  
-  // Position button on the RIGHT side of the input bar container
-  if (inputBarContainer) {
-    // Get bounding rect for the input bar container
-    const containerRect = inputBarContainer.getBoundingClientRect();
-    
-    // Find all buttons in the container to avoid overlapping
-    const buttons = inputBarContainer.querySelectorAll("button");
-    let rightmostButtonRight = 0;
-    
-    // Find the rightmost button's right edge
-    for (const btn of buttons) {
-      if (btn.offsetParent) { // Only count visible buttons
-        const btnRect = btn.getBoundingClientRect();
-        const btnRight = btnRect.right;
-        if (btnRight > rightmostButtonRight) {
-          rightmostButtonRight = btnRight;
-        }
-      }
-    }
-    
-    // Ensure container has relative positioning
-    const containerStyle = getComputedStyle(inputBarContainer);
-    if (containerStyle.position === "static") {
-      inputBarContainer.style.position = "relative";
-    }
-    
-    // Get container's bounding rect for relative positioning
-    const containerRect2 = inputBarContainer.getBoundingClientRect();
-    
-    // Calculate position: right side of container, but avoid overlapping buttons
-    const buttonWidth = BUTTON_SIZE.wrapper || 44;
-    const spacing = 10; // 10px spacing from right edge or buttons
-    
-    let rightPosition;
-    if (rightmostButtonRight > 0) {
-      // Position to the right of the rightmost button
-      const rightmostButtonRightRelative = rightmostButtonRight - containerRect2.left;
-      rightPosition = containerRect2.width - rightmostButtonRightRelative - buttonWidth - spacing;
-    } else {
-      // No buttons found, position from right edge of container
-      rightPosition = spacing;
-    }
-    
-    // CRITICAL: Force move button to input bar container
-    if (floatingButtonWrapper.parentElement !== inputBarContainer) {
-      inputBarContainer.append(floatingButtonWrapper);
-    }
-    
-    // Apply positioning styles immediately (force override any previous positioning)
-    floatingButtonWrapper.style.position = "absolute";
-    floatingButtonWrapper.style.top = "50%";
-    floatingButtonWrapper.style.right = `${rightPosition}px`;
-    floatingButtonWrapper.style.left = "auto";
-    floatingButtonWrapper.style.transform = "translateY(-50%)";
-    floatingButtonWrapper.style.bottom = "auto";
-    floatingButtonWrapper.style.margin = "0";
-    floatingButtonWrapper.style.display = "flex";
-    
-    // Also schedule for next frame to override any code that runs after this
-    requestAnimationFrame(() => {
-      if (!floatingButtonWrapper || !inputBarContainer) return;
-      
-      // Force move again in case something moved it
-      if (floatingButtonWrapper.parentElement !== inputBarContainer) {
-        inputBarContainer.append(floatingButtonWrapper);
-      }
-      
-      // Recalculate position in case layout changed
-      const newContainerRect = inputBarContainer.getBoundingClientRect();
-      const newButtons = inputBarContainer.querySelectorAll("button");
-      let newRightmostButtonRight = 0;
-      
-      for (const btn of newButtons) {
-        if (btn.offsetParent) {
-          const btnRect = btn.getBoundingClientRect();
-          const btnRight = btnRect.right;
-          if (btnRight > newRightmostButtonRight) {
-            newRightmostButtonRight = btnRight;
-          }
-        }
-      }
-      
-      let newRightPosition;
-      if (newRightmostButtonRight > 0) {
-        const newRightmostButtonRightRelative = newRightmostButtonRight - newContainerRect.left;
-        newRightPosition = newContainerRect.width - newRightmostButtonRightRelative - buttonWidth - spacing;
-      } else {
-        newRightPosition = spacing;
-      }
-      
-      // Force apply styles again to override anything that changed them
-      floatingButtonWrapper.style.position = "absolute";
-      floatingButtonWrapper.style.top = "50%";
-      floatingButtonWrapper.style.right = `${newRightPosition}px`;
-      floatingButtonWrapper.style.left = "auto";
-      floatingButtonWrapper.style.transform = "translateY(-50%)";
-      floatingButtonWrapper.style.bottom = "auto";
-      floatingButtonWrapper.style.margin = "0";
-    });
-    
-    // Reset retry count on success
-    positionRetryCount = 0;
-    
-    console.log("[Prompanion Grok] Button positioned on right side of input bar:", {
-      containerWidth: containerRect.width,
-      containerHeight: containerRect.height,
-      containerRight: containerRect.right,
-      rightmostButtonRight: rightmostButtonRight,
-      buttonRight: rightPosition,
-      buttonWidth: buttonWidth,
-      spacing: spacing,
-      containerElement: inputBarContainer,
-      containerTag: inputBarContainer.tagName,
-      containerClasses: inputBarContainer.className,
-      buttonsFound: buttons.length
-    });
-  } else {
-    // If we can't find the input bar container, check retry limit
-    positionRetryCount++;
-    
-    if (positionRetryCount >= MAX_POSITION_RETRIES) {
-      console.warn("[Prompanion Grok] Input bar container (form/query-bar) not found after", MAX_POSITION_RETRIES, "retries. Giving up.");
-      positionRetryCount = 0; // Reset for next attempt
+function positionFloatingButton(inputNode = null, containerNode = null) {
+  // Ensure only one positioning loop is ever running
+  if (isPositioningLoopActive && !inputNode && !containerNode) return;
+  if (!isPositioningLoopActive) isPositioningLoopActive = true;
+
+  if (!floatingButtonWrapper) {
+    ensureFloatingButton();
+    if (!floatingButtonWrapper) {
+      requestAnimationFrame(() => positionFloatingButton());
       return;
     }
-    
-    console.warn("[Prompanion Grok] Input bar container (form/query-bar) not found yet. Retry", positionRetryCount, "of", MAX_POSITION_RETRIES, {
-      inputNode: inputNode,
-      containerNode: containerNode
-    });
-    
-    // Retry positioning after a short delay (container might not be in DOM yet)
-    if (inputNode && floatingButtonWrapper) {
-      setTimeout(() => {
-        positionFloatingButton(inputNode, null);
-      }, 100);
-    }
   }
+  
+  // THE ONE AND ONLY TARGET: The Speak/Input Button
+  let target = null;
+  try {
+    const xpath = '//form//div/div/div[2]/div[2]/div[2]/div[2]/button';
+    const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+    const el = result.singleNodeValue;
+    
+    if (el && el.offsetParent !== null) {
+      target = el;
+    }
+  } catch (e) {}
+
+  if (!target) {
+    requestAnimationFrame(() => positionFloatingButton());
+    return;
+  }
+
+  const rect = target.getBoundingClientRect();
+  
+  // Ignore invalid/initial coordinates to prevent top-right placement
+  if (rect.width === 0 || rect.height === 0 || (rect.top === 0 && rect.left === 0)) {
+    requestAnimationFrame(() => positionFloatingButton());
+    return;
+  }
+
+  // --- POSITIONING: 10px to the RIGHT of the speak/input button ---
+  const leftPos = rect.right + 10;
+  const topPos = rect.top + (rect.height / 2);
+
+  if (floatingButtonWrapper.parentElement !== document.body) {
+    document.body.append(floatingButtonWrapper);
+  }
+
+  Object.assign(floatingButtonWrapper.style, {
+    position: "fixed",
+    left: `${leftPos}px`,
+    right: "auto",
+    top: `${topPos}px`,
+    bottom: "auto",
+    transform: "translateY(-50%)",
+    margin: "0",
+    display: "flex",
+    zIndex: "2147483000",
+    visibility: "visible",
+    opacity: "1"
+  });
+
+  // Zero-lag tracking
+  requestAnimationFrame(() => positionFloatingButton());
 }
 
 function refreshFloatingButtonPosition() {
-  if (floatingButtonTargetInput) {
-    // CRITICAL: Always ignore the stored container and find div.relative.z-10
-    positionFloatingButton(floatingButtonTargetInput, null);
-  }
+  // Always recalculate position based on whatever is visible
+  positionFloatingButton(floatingButtonTargetInput, null);
 }
+
+// Throttle MutationObserver callbacks
+let lastObserverCall = 0;
+const OBSERVER_THROTTLE_MS = 200; // Throttle observer to once per 200ms
 
 function ensureDomObserver() {
   if (domObserverStarted) return;
   const observer = new MutationObserver(() => {
+    // Throttle observer callbacks
+    const now = Date.now();
+    if (now - lastObserverCall < OBSERVER_THROTTLE_MS) {
+      return;
+    }
+    lastObserverCall = now;
+    
     requestSelectionToolbarUpdate();
     const composer = locateComposer();
     if (composer) {
       placeButton(composer.container, composer.input);
       setupEnhanceTooltip(composer.input, composer.container);
     }
-    // Recalculate button position when DOM changes (in case Auto button moves)
-    if (floatingButtonTargetInput) {
-      refreshFloatingButtonPosition();
-    }
+    // Always recalculate button position when DOM changes (removes the composer-lock)
+    refreshFloatingButtonPosition();
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
   domObserverStarted = true;
@@ -1401,6 +1298,11 @@ AdapterBase.registerMessageHandler("PROMPANION_INSERT_TEXT", handleInsertTextMes
 
 function bootstrap() {
   ensureHighlightObserver();
+  
+  // IMMEDIATELY place the button on startup (removes the 20s delay)
+  placeButton(null, null);
+  
+  // Separately watch for the editor/composer to appear for text injection
   if (!init()) {
     const observer = new MutationObserver(() => {
       if (init()) {

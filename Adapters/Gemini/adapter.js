@@ -38,10 +38,7 @@ let floatingButtonTargetInput = null;
 let enhanceActionInFlight = false;
 let selectionAskInFlight = false;
 let tooltipClickInProgress = false;
-let selectionToolbarElement = null;
-let selectionToolbarButton = null;
-let selectionToolbarText = "";
-let selectionUpdateRaf = null;
+// Selection toolbar variables removed - now handled by AdapterBase
 let highlightObserver = null;
 let initInProgress = false;
 let bootstrapObserver = null;
@@ -111,7 +108,7 @@ function selectionTargetsAssistant(selection) {
 function ensureHighlightObserver() {
   if (highlightObserver || !document.body) return;
   highlightObserver = new MutationObserver(() => {
-    if (getHighlightButton()) requestSelectionToolbarUpdate();
+    if (getHighlightButton()) AdapterBase.requestSelectionToolbarUpdate();
   });
   highlightObserver.observe(document.body, { childList: true, subtree: true });
 }
@@ -135,164 +132,27 @@ function selectionWithinComposer(selection) {
   return selection && (nodeInComposer(selection.anchorNode) || nodeInComposer(selection.focusNode));
 }
 
-function ensureSelectionToolbar() {
-  if (selectionToolbarElement) return selectionToolbarElement;
-  
-  // CRITICAL: Ensure styles are injected before creating the toolbar element
-  ensureStyle();
-  
-  const toolbar = document.createElement("div");
-  toolbar.id = SELECTION_TOOLBAR_ID;
-  
-  const dismiss = document.createElement("button");
-  dismiss.type = "button";
-  dismiss.className = "prompanion-selection-toolbar__dismiss";
-  dismiss.textContent = "×";
-  dismiss.setAttribute("aria-label", "Dismiss");
-  dismiss.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    hideSelectionToolbar();
-  });
-  
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "prompanion-selection-toolbar__button";
-  button.textContent = "Elaborate";
-  button.addEventListener("pointerdown", (e) => e.preventDefault());
-  button.addEventListener("mousedown", (e) => e.stopPropagation());
-  button.addEventListener("click", handleSelectionToolbarAction);
-  
-  toolbar.append(dismiss, button);
-  
-  // Verify document.body exists before appending
-  if (!document.body) {
-    console.error("[Prompanion] Cannot create selection toolbar: document.body not available");
-    return null;
-  }
-  
-  document.body.append(toolbar);
-  selectionToolbarElement = toolbar;
-  selectionToolbarButton = button;
-  return toolbar;
-}
-
-function hideSelectionToolbar() {
-  if (selectionToolbarElement) {
-    selectionToolbarElement.classList.remove(SELECTION_TOOLBAR_VISIBLE_CLASS);
-    // Clear inline styles that might interfere
-    selectionToolbarElement.style.opacity = "";
-    selectionToolbarElement.style.pointerEvents = "";
-  }
-  selectionToolbarText = "";
-}
-
-// Generic getSelectionRect removed - use AdapterBase.getSelectionRect()
-
-function requestSelectionToolbarUpdate() {
-  if (selectionUpdateRaf !== null) {
-    return;
-  }
-  selectionUpdateRaf = window.requestAnimationFrame(() => {
-    selectionUpdateRaf = null;
-    updateSelectionToolbar();
+// Selection Toolbar system moved to AdapterBase
+// Initialize it with Gemini-specific condition functions
+function initSelectionToolbar() {
+  AdapterBase.initSelectionToolbar({
+    shouldShowToolbar: (selection) => {
+      const text = selection?.toString().trim();
+      return !!(selection && !selection.isCollapsed && text && 
+                !selectionWithinComposer(selection) && 
+                selectionTargetsAssistant(selection));
+    },
+    onAction: (text) => {
+      submitSelectionToSideChat(text);
+    },
+    buttonText: "Elaborate",
+    toolbarId: SELECTION_TOOLBAR_ID,
+    visibleClass: SELECTION_TOOLBAR_VISIBLE_CLASS
   });
 }
 
-function updateSelectionToolbar() {
-  const selection = window.getSelection();
-  const text = selection?.toString().trim();
-  
-  console.log("[Prompanion] updateSelectionToolbar called", {
-    hasSelection: !!selection,
-    isCollapsed: selection?.isCollapsed,
-    textLength: text?.length,
-    textPreview: text?.substring(0, 30),
-    inComposer: selection ? selectionWithinComposer(selection) : false,
-    targetsAssistant: selection ? selectionTargetsAssistant(selection) : false
-  });
-  
-  if (!selection || selection.isCollapsed || !text || selectionWithinComposer(selection) || 
-      !selectionTargetsAssistant(selection)) {
-    console.log("[Prompanion] Hiding toolbar - conditions not met");
-    hideSelectionToolbar();
-    return;
-  }
-  
-  console.log("[Prompanion] Showing toolbar - all conditions met");
-  const rangeRect = AdapterBase.getSelectionRect(selection);
-  if (!rangeRect) {
-    hideSelectionToolbar();
-    return;
-  }
-
-  const toolbar = ensureSelectionToolbar();
-  if (!toolbar) {
-    console.error("[Prompanion] Failed to create selection toolbar");
-    return;
-  }
-  selectionToolbarText = text;
-  
-  // Position tooltip BELOW the selection to avoid conflict with native buttons
-  // Measure toolbar dimensions by temporarily positioning offscreen (but keep opacity 0 via class)
-  toolbar.classList.remove(SELECTION_TOOLBAR_VISIBLE_CLASS);
-  toolbar.style.position = "fixed";
-  toolbar.style.left = "-9999px";
-  toolbar.style.top = "0";
-  toolbar.style.transform = "translate(-50%, 0)";
-  toolbar.style.opacity = "0";
-  toolbar.style.pointerEvents = "none";
-  toolbar.style.display = "flex"; // Ensure display is set for accurate measurement
-  
-  // Force multiple reflows to ensure styles are fully applied before measuring
-  void toolbar.offsetWidth; // Force layout recalculation
-  void toolbar.offsetHeight; // Force another reflow to ensure styles applied
-  
-  let w = toolbar.offsetWidth;
-  let h = toolbar.offsetHeight;
-  
-  // Verify we got valid dimensions
-  if (!w || !h) {
-    console.warn("[Prompanion] Toolbar has invalid dimensions:", { w, h }, "retrying...");
-    // Force another reflow and remeasure
-    void toolbar.offsetWidth;
-    w = toolbar.offsetWidth;
-    h = toolbar.offsetHeight;
-    if (!w || !h) {
-      console.error("[Prompanion] Toolbar dimensions still invalid, cannot position tooltip");
-      return;
-    }
-  }
-  
-  const { clientWidth: vw, clientHeight: vh } = document.documentElement;
-  const selectionCenterX = rangeRect.left + rangeRect.width / 2;
-  const selectionBottom = rangeRect.bottom;
-  
-  // Calculate horizontal position (centered on selection, constrained to viewport)
-  let left = Math.max(w / 2 + 8, Math.min(vw - w / 2 - 8, selectionCenterX));
-  
-  // Calculate vertical position (BELOW selection with 8px gap)
-  let top = selectionBottom + 8;
-  
-  // Ensure tooltip doesn't go below viewport (with 8px margin)
-  const maxTop = vh - h - 8;
-  if (top > maxTop) {
-    // If it would go below viewport, position it above instead (but this should be rare)
-    top = Math.max(8, rangeRect.top - h - 8);
-    toolbar.style.transform = "translate(-50%, -100%)";
-  } else {
-    toolbar.style.transform = "translate(-50%, 0)";
-  }
-  
-  // Apply final positioning
-  toolbar.style.left = `${Math.round(left)}px`;
-  toolbar.style.top = `${Math.round(top)}px`;
-  
-  // Show the tooltip with opacity transition
-  toolbar.style.opacity = "";
-  toolbar.style.pointerEvents = "";
-  toolbar.classList.add(SELECTION_TOOLBAR_VISIBLE_CLASS);
-}
+// Selection toolbar update/positioning is now handled by AdapterBase.initSelectionToolbar()
+// Old manual functions removed - AdapterBase handles everything internally
 
 function captureGeminiChatHistory(maxMessages = 20) {
   console.log("%c[Prompanion Gemini] ========== captureGeminiChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
@@ -446,15 +306,7 @@ function submitSelectionToSideChat(text) {
   }
 }
 
-function handleSelectionToolbarAction(event) {
-  event.preventDefault();
-  event.stopPropagation();
-  const text = selectionToolbarText;
-  hideSelectionToolbar();
-  submitSelectionToSideChat(text);
-}
-
-// Selection change is now handled by AdapterBase.initSelectionToolbar()
+// Selection toolbar action is now handled by AdapterBase.initSelectionToolbar() onAction callback
 // No need for a separate handler - removed to avoid duplicate listeners
 
 // Generic setButtonTextContent removed - use AdapterBase.setButtonTextContent()
@@ -908,6 +760,7 @@ AdapterBase.registerMessageHandler("PROMPANION_INSERT_TEXT", handleInsertTextMes
 function bootstrap() {
   console.log("[Prompanion Gemini] bootstrap() called");
   ensureHighlightObserver();
+  initSelectionToolbar(); // Initialize the selection toolbar system
   const initResult = init();
   console.log("[Prompanion Gemini] bootstrap() - init() returned:", initResult);
   if (!initResult) {

@@ -417,19 +417,7 @@ async function loadState() {
     activeConversationId: null // Will be set to new conversation in init()
   };
   
-  console.log("[Prompanion Sidepanel] loadState merge result:", {
-    storedHasPrompts: hasPrompts(stored),
-    mergedHasPrompts: hasPrompts(mergedState),
-    storedOriginalPrompt: stored.originalPrompt?.substring(0, 50),
-    storedOptionA: stored.optionA?.substring(0, 50),
-    storedOptionB: stored.optionB?.substring(0, 50),
-    mergedOriginalPrompt: mergedState.originalPrompt?.substring(0, 50),
-    mergedOptionA: mergedState.optionA?.substring(0, 50),
-    mergedOptionB: mergedState.optionB?.substring(0, 50),
-    storedHasOriginalPrompt: stored.hasOwnProperty('originalPrompt'),
-    storedHasOptionA: stored.hasOwnProperty('optionA'),
-    storedHasOptionB: stored.hasOwnProperty('optionB')
-  });
+  // loadState merge result - verbose logging removed
 
   if (storedLibraryVersion !== LIBRARY_SCHEMA_VERSION) {
     mergedState.library = createDefaultLibrary();
@@ -764,12 +752,8 @@ async function updateUserStatus() {
       const data = await response.json();
       const user = data.user;
 
-      // Display name if available (check for null, undefined, or empty string), otherwise email
-      const userName = user.name?.trim();
-      
-      if (userName && userName.length > 0) {
-        userStatusEl.textContent = userName;
-      } else if (user.email) {
+      // Always display email so user knows which account they're logged in with
+      if (user.email) {
         userStatusEl.textContent = user.email;
       } else {
         userStatusEl.textContent = "Not Logged In";
@@ -824,7 +808,7 @@ function registerSectionActionGuards() {
  */
 async function init() {
   // SETUP ACCOUNT BUTTON IMMEDIATELY - before anything else
-  console.log("[Prompanion Sidepanel] ========== SETTING UP ACCOUNT BUTTON IMMEDIATELY ==========");
+  // Setting up account button immediately
   try {
     const accountButton = document.getElementById("open-account");
     const accountDialog = document.getElementById("account-dialog");
@@ -851,7 +835,7 @@ async function init() {
   // SIMPLIFIED: Read prompts directly from storage, bypass merge logic
   const storedState = await readStorageSafely();
   
-  console.log("[Prompanion Sidepanel] ========== INIT START ==========");
+  // Init start
   console.log("[Prompanion Sidepanel] Raw stored state:", {
     hasStored: !!storedState,
     hasOriginalPrompt: !!storedState?.originalPrompt,
@@ -864,7 +848,7 @@ async function init() {
 
   // DIRECT: If storage has prompts, use them directly - NO MERGE LOGIC
   if (storedState && hasPrompts(storedState)) {
-    console.log("[Prompanion Sidepanel] ========== FOUND PROMPTS IN STORAGE ==========");
+    // Found prompts in storage
     console.log("[Prompanion Sidepanel] Stored prompts:", {
       originalPrompt: storedState.originalPrompt?.substring(0, 100),
       optionA: storedState.optionA?.substring(0, 100),
@@ -886,7 +870,7 @@ async function init() {
     });
     
     // Render immediately and aggressively
-    console.log("[Prompanion Sidepanel] Calling renderPrompts NOW");
+    // Calling renderPrompts
     renderPrompts({
       originalPrompt: currentState.originalPrompt,
       optionA: currentState.optionA,
@@ -1014,7 +998,7 @@ async function init() {
   
   // Setup account button handler - do this FIRST and independently
   const setupAccountButtonDirectly = () => {
-    console.log("[Prompanion Sidepanel] ========== SETTING UP ACCOUNT BUTTON ==========");
+    // Setting up account button
     const accountButton = document.getElementById("open-account");
     const accountDialog = document.getElementById("account-dialog");
     
@@ -1152,7 +1136,7 @@ async function init() {
 
 // Setup account button as early as possible
 function setupAccountButtonEarly() {
-  console.log("[Prompanion Sidepanel] ========== EARLY ACCOUNT BUTTON SETUP ==========");
+  // Early account button setup
   const accountButton = document.getElementById("open-account");
   const accountDialog = document.getElementById("account-dialog");
   
@@ -1344,7 +1328,7 @@ if (chrome?.storage?.onChanged) {
           currentState.optionA = newState.optionA || currentState.optionA;
           currentState.optionB = newState.optionB || currentState.optionB;
           
-          console.log("[Prompanion Sidepanel] Calling renderPrompts after storage change");
+          // Calling renderPrompts after storage change
           renderPrompts(currentState);
           renderStatus(currentState);
           // Don't call processPendingSideChat here - it can trigger saveState and create a loop

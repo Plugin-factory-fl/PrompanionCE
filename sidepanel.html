@@ -285,6 +285,7 @@
               <button type="button" class="account__password-toggle" data-target="login-password" aria-label="Show password">Show</button>
             </div>
           </label>
+          <div class="account__error-message" id="login-error-message" hidden></div>
         </div>
         <footer class="modal__footer account__footer">
           <div class="account__footer-links">
@@ -364,10 +365,16 @@
               <button type="button" class="account__password-toggle" data-target="create-account-confirm-password" aria-label="Show password">Show</button>
             </div>
           </label>
+          <div class="account__error-message" id="create-account-error-message" hidden></div>
         </div>
         <footer class="modal__footer account__footer">
-          <button class="btn btn--ghost create-account__cancel" value="cancel">Cancel</button>
-          <button class="btn btn--primary create-account__submit" value="create">Create Account</button>
+          <div class="account__footer-links">
+            <button type="button" class="account__forgot-link" id="create-account-forgot-password">Forgot Password?</button>
+          </div>
+          <div class="account__footer-buttons">
+            <button class="btn btn--ghost create-account__cancel" value="cancel">Cancel</button>
+            <button class="btn btn--primary create-account__submit" value="create">Create Account</button>
+          </div>
         </footer>
       </form>
     </dialog>

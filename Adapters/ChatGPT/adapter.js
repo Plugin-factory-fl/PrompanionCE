@@ -5,9 +5,7 @@
 // This eliminates duplicate listener registrations and provides unified message handling.
 // ============================================================================
 
-console.log("[Prompanion] ========== ADAPTER.JS LOADING ==========");
-console.log("[Prompanion] Timestamp:", new Date().toISOString());
-console.log("[Prompanion] Location:", window.location.href);
+// Adapter loading - logs removed for production
 
 // Import constants from AdapterBase
 if (typeof AdapterBase === "undefined") {
@@ -22,8 +20,12 @@ const SELECTION_TOOLBAR_VISIBLE_CLASS = AdapterBase.SELECTION_TOOLBAR_VISIBLE_CL
 const HIGHLIGHT_BUTTON_SELECTORS = AdapterBase.HIGHLIGHT_BUTTON_SELECTORS;
 const BUTTON_SIZE = AdapterBase.BUTTON_SIZE;
 
-console.log("[Prompanion] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
+// Constants loaded from AdapterBase
 let domObserverStarted = false;
+let buttonPositionObserver = null;
+let buttonPositionMutationObserver = null;
+let buttonPositionInputHandler = null;
+let buttonPositionAnimationFrame = null;
 
 let enhanceTooltipElement = null;
 let enhanceTooltipTimer = null;
@@ -627,118 +629,284 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     return;
   }
   
-  // Find the microphone/dictate button to position relative to it
-  let targetButton = null;
+  // Find the target container with [grid-area:trailing]
+  // The container has class "flex items-center gap-2 [grid-area:trailing]"
+  // Note: [grid-area:trailing] is a Tailwind arbitrary value class name
+  let targetContainer = null;
   
-  // Look for button with microphone/voice/dictate attributes
-  const micButton = form.querySelector('button[aria-label*="voice"], button[aria-label*="dictate"], button[aria-label*="microphone"], button[aria-label*="Voice"], button svg[class*="mic"], button svg[class*="voice"]');
-  if (micButton && micButton.offsetParent) {
-    targetButton = micButton;
-  } else {
-    // Try to find the last button in the form (often the microphone button is last)
-    const allButtons = form.querySelectorAll('button');
-    const visibleButtons = Array.from(allButtons).filter(btn => btn.offsetParent);
-    if (visibleButtons.length > 0) {
-      // Prefer buttons that look like microphone buttons
-      const micLikeButtons = visibleButtons.filter(btn => {
-        const label = (btn.getAttribute('aria-label') || "").toLowerCase();
-        return label.includes('voice') || label.includes('dictate') || 
-               btn.querySelector('svg[class*="mic"], svg[class*="voice"]');
-      });
-      if (micLikeButtons.length > 0) {
-        targetButton = micLikeButtons[micLikeButtons.length - 1]; // Last microphone-like button
-      } else {
-        targetButton = visibleButtons[visibleButtons.length - 1]; // Last visible button
-      }
+  // Strategy: Find elements with "flex items-center gap-2" classes and check for grid-area:trailing
+  const flexContainers = form.querySelectorAll('.flex.items-center.gap-2');
+  
+  for (const el of flexContainers) {
+    // Check if class list includes the arbitrary value [grid-area:trailing]
+    // The className might be a string or DOMTokenList, so check both
+    const classList = el.classList || [];
+    const classNameStr = typeof el.className === 'string' ? el.className : Array.from(classList).join(' ');
+    
+    if (classNameStr.includes('[grid-area:trailing]') || classNameStr.includes('grid-area:trailing')) {
+      targetContainer = el;
+      break;
+    }
+    
+    // Also check computed style for grid-area
+    const computedStyle = window.getComputedStyle(el);
+    if (computedStyle.gridArea === 'trailing') {
+      targetContainer = el;
+      break;
     }
   }
   
-  // Find the container that holds the buttons (form or a specific div within form)
-  let buttonContainer = form;
-  if (targetButton) {
-    // Try to find a container div that holds the buttons
-    let current = targetButton.parentElement;
-    while (current && current !== form) {
-      if (current.tagName === 'DIV' && current.querySelectorAll('button').length > 1) {
-        buttonContainer = current;
+  // Fallback: look for container that matches the structure (contains ms-auto div with parent that has flex items-center gap-2)
+  if (!targetContainer) {
+    const msAutoContainers = form.querySelectorAll('.ms-auto');
+    for (const msAuto of msAutoContainers) {
+      const parent = msAuto.parentElement;
+      if (parent && 
+          parent.classList.contains('flex') && 
+          parent.classList.contains('items-center') && 
+          parent.classList.contains('gap-2')) {
+        targetContainer = parent;
         break;
       }
-      current = current.parentElement;
     }
   }
   
-  // Ensure container has relative positioning
-  const containerStyle = getComputedStyle(buttonContainer);
-  if (containerStyle.position === "static") {
-    buttonContainer.style.position = "relative";
+  if (!targetContainer) {
+    // Fallback to original behavior
+    const micButton = form.querySelector('button[aria-label*="voice"], button[aria-label*="dictate"]');
+    if (micButton && micButton.offsetParent) {
+      const parent = micButton.closest('.flex.items-center');
+      if (parent) {
+        targetContainer = parent;
+      }
+    }
   }
   
-  // Calculate spacing
-  let spacing = 10; // Default spacing from right edge
+  // Use fixed positioning with viewport coordinates - DON'T modify any container's position property
+  // This ensures we don't interfere with the push mechanism at all
+  // We'll append to body and use fixed positioning that recalculates when push happens
   
-  if (targetButton) {
-    const targetRect = targetButton.getBoundingClientRect();
-    const containerRect = buttonContainer.getBoundingClientRect();
+  // Calculate positioning: 10px to the left of the target container (using viewport coordinates)
+  let leftPosition = null;
+  let rightPosition = null;
+  let topPosition = null;
+  
+  if (targetContainer) {
+    const targetRect = targetContainer.getBoundingClientRect();
+    const ourButtonWidth = parseInt(BUTTON_SIZE.wrapper) || 44;
+    const spacingFromTarget = 10; // 10px spacing to the left of target container
     
-    // Calculate target button's right edge relative to container's right edge
-    const targetRightFromContainer = containerRect.right - targetRect.right;
-    const targetButtonWidth = targetRect.width;
-    const ourButtonWidth = BUTTON_SIZE.wrapper || 40;
-    const spacingBetween = 10; // 10px spacing between buttons
+    // Calculate position using viewport coordinates (for fixed positioning)
+    // Position button so its right edge is 10px to the left of target's left edge
+    leftPosition = targetRect.left - ourButtonWidth - spacingFromTarget;
+    topPosition = targetRect.top + (targetRect.height / 2);
     
-    spacing = targetRightFromContainer + targetButtonWidth + spacingBetween;
-    
-    console.log("[Prompanion ChatGPT] Target button found, positioning relative to it:", {
-      targetButtonWidth: targetButtonWidth,
-      ourButtonWidth: ourButtonWidth,
-      targetRightFromContainer: targetRightFromContainer,
-      calculatedSpacing: spacing,
-      targetButtonAriaLabel: targetButton.getAttribute('aria-label')
-    });
+    // If left position would be negative, use right positioning instead
+    if (leftPosition < 0) {
+      rightPosition = window.innerWidth - targetRect.right + spacingFromTarget;
+      leftPosition = null;
+    }
   } else {
-    console.warn("[Prompanion ChatGPT] Target button not found, using default spacing");
+    // Fallback: use default spacing from right edge
+    rightPosition = 10;
+    // Try to find form to get vertical position
+    const formRect = form.getBoundingClientRect();
+    topPosition = formRect.top + (formRect.height / 2);
   }
   
-  // Move button to container
-  if (floatingButtonWrapper.parentElement !== buttonContainer) {
-    buttonContainer.append(floatingButtonWrapper);
+  // Move button to body to avoid interfering with any container positioning
+  // Using fixed positioning so it doesn't depend on any container's position property
+  if (floatingButtonWrapper.parentElement !== document.body) {
+    document.body.append(floatingButtonWrapper);
   }
   
-  // Apply positioning styles
-  floatingButtonWrapper.style.position = "absolute";
-  floatingButtonWrapper.style.top = "50%";
-  floatingButtonWrapper.style.right = `${spacing}px`;
+  // Apply fixed positioning styles (relative to viewport, not any container)
+  floatingButtonWrapper.style.position = "fixed";
   floatingButtonWrapper.style.transform = "translateY(-50%)";
-  floatingButtonWrapper.style.left = "auto";
-  floatingButtonWrapper.style.bottom = "auto";
   floatingButtonWrapper.style.margin = "0";
   floatingButtonWrapper.style.display = "flex";
+  floatingButtonWrapper.style.zIndex = "2147483000";
   
-  // Also schedule for next frame to override any code that runs after this
+  if (leftPosition !== null) {
+    floatingButtonWrapper.style.left = `${leftPosition}px`;
+    floatingButtonWrapper.style.right = "auto";
+  } else {
+    floatingButtonWrapper.style.right = `${rightPosition}px`;
+    floatingButtonWrapper.style.left = "auto";
+  }
+  
+  if (topPosition !== null) {
+    floatingButtonWrapper.style.top = `${topPosition}px`;
+    floatingButtonWrapper.style.bottom = "auto";
+  }
+  
+  // Also schedule for next frame to recalculate position (in case page shifted due to push)
   requestAnimationFrame(() => {
-    if (!floatingButtonWrapper || !buttonContainer) return;
+    if (!floatingButtonWrapper || !targetContainer) return;
     
-    // Force move again in case something moved it
-    if (floatingButtonWrapper.parentElement !== buttonContainer) {
-      buttonContainer.append(floatingButtonWrapper);
+    // Recalculate position in case the page shifted (e.g., due to push mechanism)
+    const targetRect = targetContainer.getBoundingClientRect();
+    const ourButtonWidth = parseInt(BUTTON_SIZE.wrapper) || 44;
+    const spacingFromTarget = 10;
+    
+    let recalcLeft = targetRect.left - ourButtonWidth - spacingFromTarget;
+    let recalcTop = targetRect.top + (targetRect.height / 2);
+    let recalcRight = null;
+    
+    if (recalcLeft < 0) {
+      recalcRight = window.innerWidth - targetRect.right + spacingFromTarget;
+      recalcLeft = null;
     }
     
-    // Force apply styles again to override anything that changed them
-    floatingButtonWrapper.style.position = "absolute";
-    floatingButtonWrapper.style.top = "50%";
-    floatingButtonWrapper.style.right = `${spacing}px`;
+    // Force move to body if needed
+    if (floatingButtonWrapper.parentElement !== document.body) {
+      document.body.append(floatingButtonWrapper);
+    }
+    
+    // Force apply styles again with recalculated positions
+    floatingButtonWrapper.style.position = "fixed";
     floatingButtonWrapper.style.transform = "translateY(-50%)";
-    floatingButtonWrapper.style.left = "auto";
-    floatingButtonWrapper.style.bottom = "auto";
     floatingButtonWrapper.style.margin = "0";
+    floatingButtonWrapper.style.zIndex = "2147483000";
+    
+    if (recalcLeft !== null) {
+      floatingButtonWrapper.style.left = `${recalcLeft}px`;
+      floatingButtonWrapper.style.right = "auto";
+    } else {
+      floatingButtonWrapper.style.right = `${recalcRight}px`;
+    floatingButtonWrapper.style.left = "auto";
+    }
+    
+    floatingButtonWrapper.style.top = `${recalcTop}px`;
+    floatingButtonWrapper.style.bottom = "auto";
   });
   
-  console.log("[Prompanion ChatGPT] Button positioned in container:", {
-    containerWidth: buttonContainer.getBoundingClientRect().width,
-    containerHeight: buttonContainer.getBoundingClientRect().height,
-    buttonRight: spacing,
-    containerElement: buttonContainer
-  });
+  // Set up comprehensive observers to watch for any changes that affect button position
+  // This ensures the button stays correctly positioned when the composer grows/shrinks
+  if (targetContainer) {
+    // Disconnect any existing observers
+    if (buttonPositionObserver) {
+      buttonPositionObserver.disconnect();
+      buttonPositionObserver = null;
+    }
+    if (buttonPositionMutationObserver) {
+      buttonPositionMutationObserver.disconnect();
+      buttonPositionMutationObserver = null;
+    }
+    
+    // Helper function to recalculate and update button position
+    const updateButtonPosition = () => {
+      requestAnimationFrame(() => {
+        if (!targetContainer || !floatingButtonWrapper) return;
+        
+        const targetRect = targetContainer.getBoundingClientRect();
+        const ourButtonWidth = parseInt(BUTTON_SIZE.wrapper) || 44;
+        const spacingFromTarget = 10;
+        
+        let newLeft = targetRect.left - ourButtonWidth - spacingFromTarget;
+        let newTop = targetRect.top + (targetRect.height / 2);
+        let newRight = null;
+        
+        if (newLeft < 0) {
+          newRight = window.innerWidth - targetRect.right + spacingFromTarget;
+          newLeft = null;
+        }
+        
+        // Update button position
+        if (newLeft !== null) {
+          floatingButtonWrapper.style.left = `${newLeft}px`;
+          floatingButtonWrapper.style.right = "auto";
+        } else {
+          floatingButtonWrapper.style.right = `${newRight}px`;
+          floatingButtonWrapper.style.left = "auto";
+        }
+        
+        floatingButtonWrapper.style.top = `${newTop}px`;
+        floatingButtonWrapper.style.bottom = "auto";
+      });
+    };
+    
+    // Set up ResizeObserver to watch for size changes
+    if (typeof ResizeObserver !== 'undefined') {
+      buttonPositionObserver = new ResizeObserver(updateButtonPosition);
+      
+      // Observe the target container (the [grid-area:trailing] element)
+      buttonPositionObserver.observe(targetContainer);
+      
+      // Observe the form (entire composer area)
+      if (form && form !== targetContainer) {
+        buttonPositionObserver.observe(form);
+      }
+      
+      // Also observe the composer container if we can find it
+      const composer = locateComposer();
+      if (composer?.container && composer.container !== targetContainer && composer.container !== form) {
+        buttonPositionObserver.observe(composer.container);
+      }
+      
+      // Observe the input element itself (it grows when text is added)
+      if (inputNode && inputNode !== targetContainer && inputNode !== form) {
+        buttonPositionObserver.observe(inputNode);
+      }
+    }
+    
+    // Set up MutationObserver to watch for style/class changes that might affect position
+    // This catches cases where ResizeObserver might miss (e.g., transform, position changes)
+    buttonPositionMutationObserver = new MutationObserver(() => {
+      updateButtonPosition();
+    });
+    
+    // Observe the target container for attribute changes (style, class, etc.)
+    buttonPositionMutationObserver.observe(targetContainer, {
+      attributes: true,
+      attributeFilter: ['style', 'class'],
+      childList: false,
+      subtree: false
+    });
+    
+    // Also observe the form for style changes
+    if (form && form !== targetContainer) {
+      buttonPositionMutationObserver.observe(form, {
+        attributes: true,
+        attributeFilter: ['style', 'class'],
+        childList: false,
+        subtree: false
+      });
+    }
+    
+    // Set up input event listener on the composer to recalculate position when text changes
+    // This ensures immediate repositioning when the input grows
+    if (inputNode) {
+      // Remove old handler if it exists
+      if (buttonPositionInputHandler) {
+        inputNode.removeEventListener('input', buttonPositionInputHandler);
+        inputNode.removeEventListener('keyup', buttonPositionInputHandler);
+      }
+      
+      // Create new handler that updates position
+      buttonPositionInputHandler = () => {
+        // Cancel any pending animation frame
+        if (buttonPositionAnimationFrame) {
+          cancelAnimationFrame(buttonPositionAnimationFrame);
+        }
+        
+        // Use requestAnimationFrame for immediate, smooth updates
+        buttonPositionAnimationFrame = requestAnimationFrame(() => {
+          updateButtonPosition();
+          buttonPositionAnimationFrame = null;
+        });
+      };
+      
+      // Listen to input events for immediate updates when text changes
+      inputNode.addEventListener('input', buttonPositionInputHandler, { passive: true });
+      
+      // Also listen to keyup for cases where input event might not fire
+      inputNode.addEventListener('keyup', buttonPositionInputHandler, { passive: true });
+      
+      // Listen to focus to ensure position is correct when user starts typing
+      inputNode.addEventListener('focus', buttonPositionInputHandler, { passive: true });
+    }
+  }
 }
 
 function refreshFloatingButtonPosition() {
@@ -859,7 +1027,6 @@ function handleSelectionToolbarAction(event) {
 }
 
 function handleSelectionChange() {
-  console.log("[Prompanion] handleSelectionChange fired");
   AdapterBase.requestSelectionToolbarUpdate();
 }
 
@@ -998,18 +1165,36 @@ function ensureDomObserver() {
   domObserverStarted = true;
 }
 
+function cleanupButtonPositionObserver() {
+  if (buttonPositionObserver) {
+    buttonPositionObserver.disconnect();
+    buttonPositionObserver = null;
+  }
+  if (buttonPositionMutationObserver) {
+    buttonPositionMutationObserver.disconnect();
+    buttonPositionMutationObserver = null;
+  }
+  if (buttonPositionInputHandler && floatingButtonTargetInput) {
+    floatingButtonTargetInput.removeEventListener('input', buttonPositionInputHandler);
+    floatingButtonTargetInput.removeEventListener('keyup', buttonPositionInputHandler);
+    floatingButtonTargetInput.removeEventListener('focus', buttonPositionInputHandler);
+    if (buttonPositionAnimationFrame) {
+      cancelAnimationFrame(buttonPositionAnimationFrame);
+      buttonPositionAnimationFrame = null;
+    }
+    buttonPositionInputHandler = null;
+  }
+}
+
 function locateComposer() {
-  console.log("[Prompanion ChatGPT] locateComposer called");
   const wrappers = ["[data-testid='conversation-turn-textbox']", "[data-testid='composer-container']", "main form"]
     .map(sel => document.querySelector(sel)).filter(Boolean);
-  console.log("[Prompanion ChatGPT] Found wrappers:", wrappers.length);
   let input = null;
   for (const wrapper of wrappers) {
     const editable = wrapper.querySelector("[data-testid='textbox'][contenteditable='true']") ??
                      wrapper.querySelector("div[contenteditable='true']");
     if (editable instanceof HTMLElement) { 
       input = editable; 
-      console.log("[Prompanion ChatGPT] Found input in wrapper:", input);
       break; 
     }
   }
@@ -1017,32 +1202,26 @@ function locateComposer() {
     const textarea = document.querySelector("[data-testid='conversation-turn-textbox'] textarea:not([readonly])");
     if (textarea instanceof HTMLTextAreaElement && !textarea.className.includes("_fallbackTextarea")) {
       input = textarea;
-      console.log("[Prompanion ChatGPT] Found textarea input:", textarea);
     }
   }
   if (!input) {
-    console.warn("[Prompanion ChatGPT] No input found in locateComposer");
     return null;
   }
   const container = input.closest("[data-testid='composer-footer']") ??
                     input.closest("[data-testid='composer-container']") ??
                     input.parentElement ?? document.body;
-  console.log("[Prompanion ChatGPT] Composer located:", { input, container });
   return { input, container };
 }
 
 function init() {
-  console.log("[Prompanion ChatGPT] init() called");
   const composer = locateComposer();
   AdapterBase.requestSelectionToolbarUpdate();
   if (composer) {
-    console.log("[Prompanion ChatGPT] Composer found, calling placeButton");
     placeButton(composer.container, composer.input);
     setupEnhanceTooltip(composer.input, composer.container);
     ensureDomObserver();
     return true;
   }
-  console.warn("[Prompanion ChatGPT] Composer not found in init()");
   ensureDomObserver();
   return false;
 }
@@ -1146,7 +1325,7 @@ function handleInsertTextMessage(message, sender, sendResponse) {
 }
 
 // Register message handler using AdapterBase (must be after handleInsertTextMessage is defined)
-console.log("[Prompanion] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
+// Registering PROMPANION_INSERT_TEXT handler with AdapterBase
 AdapterBase.registerMessageHandler("PROMPANION_INSERT_TEXT", handleInsertTextMessage);
 
 function bootstrap() {
@@ -1191,7 +1370,6 @@ function teardownEnhanceTooltip() {
 
 function ensureEnhanceTooltipElement() {
   if (!enhanceTooltipElement) {
-    console.log("[Prompanion] Creating enhance tooltip element");
     enhanceTooltipElement = document.createElement("div");
     enhanceTooltipElement.className = "prompanion-enhance-tooltip";
     const dismiss = document.createElement("button");
@@ -1207,15 +1385,11 @@ function ensureEnhanceTooltipElement() {
     action.type = "button";
     action.className = "prompanion-enhance-tooltip__action";
     AdapterBase.setButtonTextContent(action, "Refine");
-    console.log("[Prompanion] Attaching click handler to Refine button");
     console.log("[Prompanion] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
     action.addEventListener("click", handleRefineButtonClick);
-    console.log("[Prompanion] Click handler attached, button:", action);
     enhanceTooltipElement.append(dismiss, action);
-    console.log("[Prompanion] Enhance tooltip element created");
   }
   if (!enhanceTooltipElement.isConnected) {
-    console.log("[Prompanion] Appending enhance tooltip to body");
     document.body.append(enhanceTooltipElement);
   }
   hideEnhanceTooltip();
@@ -1231,19 +1405,16 @@ function handleRefineButtonClick(e) {
     return;
   }
   const composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
-  console.log("[Prompanion] Composer node:", composerNode);
   if (!composerNode) {
     console.error("[Prompanion] No composer node found!");
     return;
   }
   const promptText = extractInputText().trim();
-  console.log("[Prompanion] Prompt text:", promptText);
   if (!promptText) {
     return;
   }
   enhanceActionInFlight = true;
   // Don't hide tooltip yet - wait to see if there's a limit error
-  console.log("[Prompanion] Requesting prompt enhancement...");
   requestPromptEnhancement(promptText)
     .then((result) => {
       if (!result || !result.ok) {
@@ -1452,23 +1623,13 @@ function detachTooltipResizeHandler() {
 
 // Backup message listener registration (IIFE to ensure it runs immediately)
 (function registerInsertTextListener() {
-  console.log("[Prompanion] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
-  console.log("[Prompanion] Current time:", new Date().toISOString());
-  
-  if (typeof chrome === "undefined") {
-    console.error("[Prompanion] chrome is undefined in backup registration");
-    return;
-  }
-  
-  if (!chrome.runtime || !chrome.runtime.onMessage) {
-    console.error("[Prompanion] chrome.runtime.onMessage not available in backup registration");
+  if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.onMessage) {
     return;
   }
   
   try {
     chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       if (message && message.type === "PROMPANION_INSERT_TEXT") {
-        console.log("[Prompanion] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
         if (typeof handleInsertTextMessage === "function") {
           handleInsertTextMessage(message, sender, sendResponse);
         } else {
@@ -1479,9 +1640,8 @@ function detachTooltipResizeHandler() {
       }
       return false;
     });
-    console.log("[Prompanion] ✓ Backup listener registered successfully");
   } catch (error) {
-    console.error("[Prompanion] ✗ Backup listener registration failed:", error);
+    console.error("[Prompanion] Backup listener registration failed:", error);
   }
 })();
 
@@ -1517,6 +1677,11 @@ window.addEventListener("resize", () => {
   if (floatingButtonTargetInput) {
     refreshFloatingButtonPosition();
   }
+});
+
+// Cleanup observer when page unloads
+window.addEventListener("beforeunload", () => {
+  cleanupButtonPositionObserver();
 });
 
 document.addEventListener("mousedown", (e) => {
