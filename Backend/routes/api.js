@@ -802,10 +802,32 @@ async function callGrokChat(messages) {
     throw new Error('Grok API key not configured');
   }
 
-  // Log messages being sent (same as OpenAI would receive)
-  console.log(`[API Chat] Grok - Sending ${messages.length} messages`);
-  console.log(`[API Chat] Grok - Message roles:`, messages.map(m => m.role));
-  console.log(`[API Chat] Grok - Last message preview:`, messages[messages.length - 1]?.content?.substring(0, 100));
+  // Convert system messages to user messages for Grok (similar to Gemini)
+  // Grok may handle system messages differently, so we'll combine system + first user message
+  const systemMessage = messages.find(msg => msg.role === 'system');
+  const nonSystemMessages = messages.filter(msg => msg.role !== 'system');
+  
+  let grokMessages = [];
+  if (systemMessage && nonSystemMessages.length > 0) {
+    // Combine system message with first user message
+    const firstUser = nonSystemMessages[0];
+    grokMessages.push({
+      role: 'user',
+      content: `${systemMessage.content}\n\n${firstUser.content}`
+    });
+    // Add remaining messages
+    for (let i = 1; i < nonSystemMessages.length; i++) {
+      grokMessages.push(nonSystemMessages[i]);
+    }
+  } else {
+    // No system message, use messages as-is
+    grokMessages = nonSystemMessages;
+  }
+
+  // Log messages being sent
+  console.log(`[API Chat] Grok - Original messages: ${messages.length}, Converted to: ${grokMessages.length}`);
+  console.log(`[API Chat] Grok - Message roles:`, grokMessages.map(m => m.role));
+  console.log(`[API Chat] Grok - Last message preview:`, grokMessages[grokMessages.length - 1]?.content?.substring(0, 100));
 
   const response = await fetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
@@ -814,10 +836,10 @@ async function callGrokChat(messages) {
       'Authorization': `Bearer ${GROK_API_KEY}`
     },
     body: JSON.stringify({
-      model: 'grok-4-1-fast-reasoning',
+      model: 'grok-4-1-fast-non-reasoning', // Try non-reasoning model for more direct responses
       temperature: 0.7,
       max_tokens: 2000,
-      messages: messages
+      messages: grokMessages
     })
   });
 
