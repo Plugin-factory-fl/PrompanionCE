@@ -413,7 +413,10 @@ async function loadState() {
     originalPrompt: stored.hasOwnProperty('originalPrompt') ? stored.originalPrompt : defaultState.originalPrompt,
     optionA: stored.hasOwnProperty('optionA') ? stored.optionA : defaultState.optionA,
     optionB: stored.hasOwnProperty('optionB') ? stored.optionB : defaultState.optionB,
-    settings: { ...defaultState.settings, ...stored.settings },
+    // CRITICAL: Preserve model setting - if stored.settings has a model, use it (don't overwrite with default)
+    settings: stored.settings && stored.settings.model 
+      ? { ...defaultState.settings, ...stored.settings }
+      : { ...defaultState.settings, ...(stored.settings || {}) },
     conversations: validConversations,
     activeConversationId: null // Will be set to new conversation in init()
   };

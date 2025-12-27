@@ -476,7 +476,10 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
     
     let apiResult;
     try {
-      apiResult = await callOpenAI(apiMessages, llmChatHistory);
+      // Pass the model from stateRef to ensure we use the current selection, not a stale value from storage
+      const model = stateRef.settings?.model || "chatgpt";
+      console.log("[Prompanion] Using model from stateRef:", model);
+      apiResult = await callOpenAI(apiMessages, llmChatHistory, model);
     } catch (error) {
       console.error("[Prompanion] Side chat API call failed:", error);
       const errorMessage = error.message || "Failed to get response";

@@ -38,18 +38,19 @@ async function getModelSetting() {
  * Calls the backend chat API
  * @param {Array} messages - Array of message objects with role and content (already includes system message with context if applicable)
  * @param {Array} chatHistory - Optional LLM chat history for context (deprecated - messages already includes context)
+ * @param {string} modelOverride - Optional model to use (takes precedence over storage)
  * @returns {Promise<string>} The assistant's reply content
  * @throws {Error} If the API call fails
  */
-export async function callOpenAI(messages, chatHistory = []) {
+export async function callOpenAI(messages, chatHistory = [], modelOverride = null) {
   const token = await getAuthToken();
   if (!token) {
     throw new Error("No authentication token. Please log in.");
   }
 
-  // Get the selected model from settings
-  const model = await getModelSetting();
-  console.log("[Prompanion OpenAI Client] Using model for chat:", model);
+  // Get the selected model - use override if provided, otherwise read from storage
+  const model = modelOverride || await getModelSetting();
+  console.log("[Prompanion OpenAI Client] Using model for chat:", model, modelOverride ? "(from stateRef)" : "(from storage)");
 
   // messages array already includes the system message with chat history context from buildChatApiMessages
   // We should use it directly, not mix it with raw chatHistory
