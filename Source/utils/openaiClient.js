@@ -145,6 +145,13 @@ export async function callOpenAI(messages, chatHistory = []) {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+    console.error("[Prompanion OpenAI Client] API error response:", {
+      status: response.status,
+      statusText: response.statusText,
+      error: errorData.error,
+      details: errorData.details
+    });
+    
     if (response.status === 401) {
       throw new Error("Authentication failed. Please log in again.");
     }
@@ -154,7 +161,11 @@ export async function callOpenAI(messages, chatHistory = []) {
     if (response.status === 413 || (errorData.error && (errorData.error.toLowerCase().includes("entity too large") || errorData.error.toLowerCase().includes("request entity too large")))) {
       throw new Error("Request too large. Please try with a shorter conversation history.");
     }
-    throw new Error(errorData.error || "Failed to get chat response");
+    
+    // Include details if available for better error messages
+    const errorMessage = errorData.error || "Failed to get chat response";
+    const errorDetails = errorData.details ? `: ${errorData.details}` : "";
+    throw new Error(`${errorMessage}${errorDetails}`);
   }
 
   const data = await response.json();

@@ -767,35 +767,55 @@ async function callClaudeChat(messages) {
 async function callGrokChat(messages) {
   const GROK_API_KEY = process.env.GROK_API_KEY;
   if (!GROK_API_KEY) {
+    console.error('[API Chat] Grok API key not found in environment variables');
     throw new Error('Grok API key not configured');
   }
 
-  const response = await fetch('https://api.x.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${GROK_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: 'grok-beta',
-      temperature: 0.7,
-      messages: messages
-    })
-  });
+  console.log(`[API Chat] Calling Grok API with ${messages.length} messages`);
+  console.log(`[API Chat] Grok API key present: ${GROK_API_KEY ? 'Yes' : 'No'}`);
+  
+  try {
+    const response = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROK_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'grok-beta',
+        temperature: 0.7,
+        messages: messages
+      })
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Grok API error: ${errorText}`);
+    console.log(`[API Chat] Grok API response status: ${response.status} ${response.statusText}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[API Chat] Grok API error response:`, errorText);
+      throw new Error(`Grok API error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log(`[API Chat] Grok API response data keys:`, Object.keys(data));
+    console.log(`[API Chat] Grok API choices length:`, data.choices?.length);
+    
+    const content = data.choices?.[0]?.message?.content?.trim();
+
+    if (!content) {
+      console.error(`[API Chat] Grok API returned empty content. Full response:`, JSON.stringify(data, null, 2));
+      throw new Error('Empty response from Grok');
+    }
+
+    console.log(`[API Chat] Grok API returned content (${content.length} chars)`);
+    return content;
+  } catch (error) {
+    console.error(`[API Chat] Grok API fetch error:`, error);
+    if (error.message.includes('Grok API error')) {
+      throw error; // Re-throw API errors as-is
+    }
+    throw new Error(`Grok API request failed: ${error.message}`);
   }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content?.trim();
-
-  if (!content) {
-    throw new Error('Empty response from Grok');
-  }
-
-  return content;
 }
 
 /**
@@ -883,10 +903,13 @@ router.post('/chat', async (req, res) => {
     // Route to appropriate API based on model selection
     let content;
     try {
+      console.log(`[API Chat] Attempting to call ${selectedModel} API...`);
       content = await callChatAPI(selectedModel, messages);
-      console.log(`[API Chat] ✓ Successfully received response from ${selectedModel}`);
+      console.log(`[API Chat] ✓ Successfully received response from ${selectedModel} (${content.length} chars)`);
     } catch (apiError) {
       console.error(`[API Chat] ✗ ${selectedModel} API error:`, apiError);
+      console.error(`[API Chat] Error stack:`, apiError.stack);
+      console.error(`[API Chat] Error message:`, apiError.message);
       return res.status(500).json({ 
         error: `Failed to get chat response from ${selectedModel}`,
         details: apiError.message
