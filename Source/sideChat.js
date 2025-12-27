@@ -221,10 +221,30 @@ function buildChatApiMessages(history, llmChatHistory = []) {
     const MAX_SYSTEM_MESSAGE_LENGTH = 6000; // 6KB max for entire system message
     const instructionsPrefix = `You are helping the user elaborate on a specific part of a conversation they had with an AI assistant.
 
-CRITICAL REQUIREMENTS:
-1. Reference the original conversation context in your response
-2. When discussing the highlighted topic, mention relevant details from the conversation
-3. Conclude by connecting back to the original context using phrases like "In terms of [topic]..." or "Regarding [detail]..."
+CRITICAL REQUIREMENTS FOR YOUR RESPONSE:
+
+1. **Structure**: Provide a clear, well-organized explanation that flows naturally from general to specific.
+
+2. **Content**: 
+   - Start by explaining what the highlighted topic means in general terms
+   - Then explain how it specifically relates to the conversation context provided
+   - Use specific examples or details from the conversation when relevant
+   - Make connections between the topic and the broader conversation
+
+3. **Relevance Explanation**: 
+   - Explicitly state WHY this information is relevant to the user's original conversation
+   - Explain how understanding this topic helps them in the context of what they were discussing
+   - Connect the elaboration back to the original conversation's purpose or goal
+
+4. **Format**:
+   - Write in clear, concise paragraphs
+   - Use proper formatting (bold for key terms if helpful, but keep it minimal)
+   - Ensure the response reads naturally and is easy to understand
+   - Avoid repeating the conversation context verbatim - instead, synthesize and explain
+
+5. **Conclusion**: 
+   - End by summarizing how this elaboration relates back to the original conversation
+   - Use phrases like "In the context of your conversation about [topic], this means..." or "This is relevant because..."
 
 Conversation context:
 
@@ -233,7 +253,7 @@ Conversation context:
 
 The user wants to elaborate on: "${userQuestion}"
 
-Your response must address the highlighted text and reference the conversation context.`;
+Provide a comprehensive, well-structured explanation that helps the user understand this topic and how it relates to their conversation. Make sure to explain the relevance clearly.`;
     
     // Calculate max context length to keep total under limit
     const fixedTextLength = instructionsPrefix.length + instructionsSuffix.length;
