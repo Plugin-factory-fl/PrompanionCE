@@ -436,36 +436,68 @@ async function callGrok(systemPrompt, userPrompt, maxTokens) {
     throw new Error('Grok API key not configured');
   }
 
-  const response = await fetch('https://api.x.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${GROK_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: 'grok-2',
-      temperature: 0.7,
-      max_tokens: maxTokens,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Enhance this prompt:\n\n${userPrompt}` }
-      ]
-    })
-  });
+  // Try different model names in order of likelihood
+  const modelNames = ['grok-2-1212', 'grok-2-latest', 'grok-2', 'grok-beta-2', 'grok-1.5'];
+  
+  let lastError = null;
+  for (const modelName of modelNames) {
+    try {
+      console.log(`[API Enhance] Attempting Grok API call with model: ${modelName}`);
+      const response = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROK_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: modelName,
+          temperature: 0.7,
+          max_tokens: maxTokens,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Enhance this prompt:\n\n${userPrompt}` }
+          ]
+        })
+      });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Grok API error: ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[API Enhance] Grok API error response for model ${modelName}:`, errorText);
+        
+        // If it's a 404 (model not found), try next model
+        if (response.status === 404 && modelNames.indexOf(modelName) < modelNames.length - 1) {
+          lastError = new Error(`Grok API error: ${errorText}`);
+          console.log(`[API Enhance] Model ${modelName} not found, trying next model...`);
+          continue; // Try next model
+        }
+        
+        // For other errors or last model, throw immediately
+        throw new Error(`Grok API error: ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log(`[API Enhance] ✓ Successfully used model: ${modelName}`);
+      const content = data.choices?.[0]?.message?.content?.trim();
+
+      if (!content) {
+        throw new Error('Empty response from Grok');
+      }
+
+      return JSON.parse(content); // Success - return the parsed content
+    } catch (error) {
+      // If this is the last model or not a 404, throw the error
+      if (modelNames.indexOf(modelName) === modelNames.length - 1 || !error.message.includes('404')) {
+        console.error(`[API Enhance] Grok API fetch error for model ${modelName}:`, error);
+        throw error;
+      }
+      // Otherwise, save error and try next model
+      lastError = error;
+      console.log(`[API Enhance] Error with model ${modelName}, trying next model...`);
+    }
   }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content?.trim();
-
-  if (!content) {
-    throw new Error('Empty response from Grok');
-  }
-
-  return JSON.parse(content);
+  
+  // If we get here, all models failed
+  throw lastError || new Error('All Grok model names failed');
 }
 
 /**
@@ -773,49 +805,73 @@ async function callGrokChat(messages) {
 
   console.log(`[API Chat] Calling Grok API with ${messages.length} messages`);
   console.log(`[API Chat] Grok API key present: ${GROK_API_KEY ? 'Yes' : 'No'}`);
+  console.log(`[API Chat] Grok API key prefix: ${GROK_API_KEY.substring(0, 10)}...`);
   
-  try {
-    const response = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GROK_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'grok-2',
-        temperature: 0.7,
-        messages: messages
-      })
-    });
+  // Try different model names in order of likelihood
+  const modelNames = ['grok-2-1212', 'grok-2-latest', 'grok-2', 'grok-beta-2', 'grok-1.5'];
+  
+  let lastError = null;
+  for (const modelName of modelNames) {
+    try {
+      console.log(`[API Chat] Attempting Grok API call with model: ${modelName}`);
+      const response = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROK_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: modelName,
+          temperature: 0.7,
+          messages: messages
+        })
+      });
 
-    console.log(`[API Chat] Grok API response status: ${response.status} ${response.statusText}`);
+      console.log(`[API Chat] Grok API response status: ${response.status} ${response.statusText}`);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[API Chat] Grok API error response:`, errorText);
-      throw new Error(`Grok API error (${response.status}): ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[API Chat] Grok API error response for model ${modelName}:`, errorText);
+        
+        // If it's a 404 (model not found), try next model
+        if (response.status === 404 && modelNames.indexOf(modelName) < modelNames.length - 1) {
+          lastError = new Error(`Grok API error (${response.status}): ${errorText}`);
+          console.log(`[API Chat] Model ${modelName} not found, trying next model...`);
+          continue; // Try next model
+        }
+        
+        // For other errors or last model, throw immediately
+        throw new Error(`Grok API error (${response.status}): ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log(`[API Chat] ✓ Successfully used model: ${modelName}`);
+      console.log(`[API Chat] Grok API response data keys:`, Object.keys(data));
+      console.log(`[API Chat] Grok API choices length:`, data.choices?.length);
+      
+      const content = data.choices?.[0]?.message?.content?.trim();
+
+      if (!content) {
+        console.error(`[API Chat] Grok API returned empty content. Full response:`, JSON.stringify(data, null, 2));
+        throw new Error('Empty response from Grok');
+      }
+
+      console.log(`[API Chat] Grok API returned content (${content.length} chars)`);
+      return content; // Success - return the content
+    } catch (error) {
+      // If this is the last model or not a 404, throw the error
+      if (modelNames.indexOf(modelName) === modelNames.length - 1 || !error.message.includes('404')) {
+        console.error(`[API Chat] Grok API fetch error for model ${modelName}:`, error);
+        throw error;
+      }
+      // Otherwise, save error and try next model
+      lastError = error;
+      console.log(`[API Chat] Error with model ${modelName}, trying next model...`);
     }
-
-    const data = await response.json();
-    console.log(`[API Chat] Grok API response data keys:`, Object.keys(data));
-    console.log(`[API Chat] Grok API choices length:`, data.choices?.length);
-    
-    const content = data.choices?.[0]?.message?.content?.trim();
-
-    if (!content) {
-      console.error(`[API Chat] Grok API returned empty content. Full response:`, JSON.stringify(data, null, 2));
-      throw new Error('Empty response from Grok');
-    }
-
-    console.log(`[API Chat] Grok API returned content (${content.length} chars)`);
-    return content;
-  } catch (error) {
-    console.error(`[API Chat] Grok API fetch error:`, error);
-    if (error.message.includes('Grok API error')) {
-      throw error; // Re-throw API errors as-is
-    }
-    throw new Error(`Grok API request failed: ${error.message}`);
   }
+  
+  // If we get here, all models failed
+  throw lastError || new Error('All Grok model names failed');
 }
 
 /**
