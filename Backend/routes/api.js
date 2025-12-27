@@ -436,8 +436,8 @@ async function callGrok(systemPrompt, userPrompt, maxTokens) {
     throw new Error('Grok API key not configured');
   }
 
-  // Try different model names in order of likelihood
-  const modelNames = ['grok-2-1212', 'grok-2-latest', 'grok-2', 'grok-beta-2', 'grok-1.5'];
+  // Try different model names in order: cheapest first, then fallbacks
+  const modelNames = ['grok-4-1-fast-reasoning', 'grok-3-mini', 'grok-4-1-fast-non-reasoning', 'grok-4-fast-reasoning', 'grok-4-fast-non-reasoning'];
   
   let lastError = null;
   for (const modelName of modelNames) {
@@ -807,8 +807,8 @@ async function callGrokChat(messages) {
   console.log(`[API Chat] Grok API key present: ${GROK_API_KEY ? 'Yes' : 'No'}`);
   console.log(`[API Chat] Grok API key prefix: ${GROK_API_KEY.substring(0, 10)}...`);
   
-  // Try different model names in order of likelihood
-  const modelNames = ['grok-2-1212', 'grok-2-latest', 'grok-2', 'grok-beta-2', 'grok-1.5'];
+  // Try different model names in order: cheapest first, then fallbacks
+  const modelNames = ['grok-4-1-fast-reasoning', 'grok-3-mini', 'grok-4-1-fast-non-reasoning', 'grok-4-fast-reasoning', 'grok-4-fast-non-reasoning'];
   
   let lastError = null;
   for (const modelName of modelNames) {
