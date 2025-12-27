@@ -51,6 +51,9 @@ In your Web Service settings, go to **"Environment"** tab and add:
 | `DATABASE_URL` | `[Internal Database URL]` | From PostgreSQL service |
 | `JWT_SECRET` | `[Random string]` | Generate with: `openssl rand -base64 32` |
 | `OPENAI_API_KEY` | `sk-...` | Your OpenAI API key |
+| `GEMINI_API_KEY` | `...` | Your Google Gemini API key |
+| `CLAUDE_API_KEY` | `sk-ant-...` | Your Anthropic Claude API key |
+| `GROK_API_KEY` | `xai-...` | Your xAI Grok API key |
 | `ALLOWED_ORIGINS` | `chrome-extension://*` | Or specific extension IDs |
 
 **Important**: 
