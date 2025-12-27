@@ -827,15 +827,26 @@ async function callGrokChat(messages) {
   }
 
   const data = await response.json();
+  
+  // Log full response structure for debugging
+  console.log(`[API Chat] Grok - Full response structure:`, {
+    hasChoices: Array.isArray(data.choices),
+    choicesLength: data.choices?.length,
+    firstChoiceFinishReason: data.choices?.[0]?.finish_reason,
+    usage: data.usage
+  });
+  
   const content = data.choices?.[0]?.message?.content?.trim();
 
   if (!content) {
+    console.error(`[API Chat] Grok - Empty response! Full data:`, JSON.stringify(data, null, 2));
     throw new Error('Empty response from Grok');
   }
 
   // Log response preview to compare with OpenAI
   console.log(`[API Chat] Grok - Response length: ${content.length} chars`);
-  console.log(`[API Chat] Grok - Response preview (first 300 chars):`, content.substring(0, 300));
+  console.log(`[API Chat] Grok - Response preview (first 500 chars):`, content.substring(0, 500));
+  console.log(`[API Chat] Grok - Response preview (last 200 chars):`, content.substring(Math.max(0, content.length - 200)));
 
   return content;
 }
