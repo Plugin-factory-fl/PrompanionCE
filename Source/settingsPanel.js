@@ -183,7 +183,7 @@ export function registerSettingsHandlers(stateRef, dependencies = {}) {
   detailSlider.addEventListener("input", updateRangeOutputs);
 
   modelButtons.forEach((button) => {
-    button.addEventListener("click", async () => {
+    button.addEventListener("click", () => {
       const value = button.dataset.model;
       if (!value || !modelOptions.includes(value)) {
         return;
@@ -193,8 +193,12 @@ export function registerSettingsHandlers(stateRef, dependencies = {}) {
       stateRef.activePlatform = getModelDisplayName(value);
       renderSettings(stateRef.settings);
       
-      // Save state immediately so API calls use the correct model
-      await saveState(stateRef);
+      // Save state immediately (non-blocking) so API calls use the correct model
+      // If save fails, it's OK - the dialog close will save anyway
+      saveState(stateRef).catch((error) => {
+        // Silently handle save errors - dialog close will save anyway
+        console.warn("[Prompanion Settings] Failed to save model selection immediately:", error.message);
+      });
       
       // Update status card to reflect model change immediately
       if (typeof window.renderStatus === 'function') {
