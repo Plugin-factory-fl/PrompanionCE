@@ -280,8 +280,224 @@ function processMediumLevelPrompt(promptText) {
 }
 
 /**
+ * Calls OpenAI API for prompt enhancement
+ * @param {string} systemPrompt - System prompt with instructions
+ * @param {string} userPrompt - User's original prompt
+ * @param {number} maxTokens - Maximum tokens for response
+ * @returns {Promise<Object>} Parsed JSON response with optionA and optionB
+ */
+async function callOpenAI(systemPrompt, userPrompt, maxTokens) {
+  const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+  if (!OPENAI_API_KEY) {
+    throw new Error('OpenAI API key not configured');
+  }
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${OPENAI_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-3.5-turbo',
+      temperature: 0.7,
+      max_tokens: maxTokens,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Enhance this prompt:\n\n${userPrompt}` }
+      ]
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenAI API error: ${errorText}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content?.trim();
+
+  if (!content) {
+    throw new Error('Empty response from OpenAI');
+  }
+
+  return JSON.parse(content);
+}
+
+/**
+ * Calls Google Gemini API for prompt enhancement
+ * @param {string} systemPrompt - System prompt with instructions
+ * @param {string} userPrompt - User's original prompt
+ * @param {number} maxTokens - Maximum tokens for response
+ * @returns {Promise<Object>} Parsed JSON response with optionA and optionB
+ */
+async function callGemini(systemPrompt, userPrompt, maxTokens) {
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) {
+    throw new Error('Gemini API key not configured');
+  }
+
+  // Combine system prompt and user prompt for Gemini
+  const fullPrompt = `${systemPrompt}\n\nEnhance this prompt:\n\n${userPrompt}`;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: fullPrompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: maxTokens
+        }
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API error: ${errorText}`);
+  }
+
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+  if (!content) {
+    throw new Error('Empty response from Gemini');
+  }
+
+  return JSON.parse(content);
+}
+
+/**
+ * Calls Anthropic Claude API for prompt enhancement
+ * @param {string} systemPrompt - System prompt with instructions
+ * @param {string} userPrompt - User's original prompt
+ * @param {number} maxTokens - Maximum tokens for response
+ * @returns {Promise<Object>} Parsed JSON response with optionA and optionB
+ */
+async function callClaude(systemPrompt, userPrompt, maxTokens) {
+  const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
+  if (!CLAUDE_API_KEY) {
+    throw new Error('Claude API key not configured');
+  }
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': CLAUDE_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-3-sonnet-20240229',
+      max_tokens: maxTokens,
+      temperature: 0.7,
+      system: systemPrompt,
+      messages: [{
+        role: 'user',
+        content: `Enhance this prompt:\n\n${userPrompt}`
+      }]
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Claude API error: ${errorText}`);
+  }
+
+  const data = await response.json();
+  const content = data.content?.[0]?.text?.trim();
+
+  if (!content) {
+    throw new Error('Empty response from Claude');
+  }
+
+  return JSON.parse(content);
+}
+
+/**
+ * Calls xAI Grok API for prompt enhancement
+ * @param {string} systemPrompt - System prompt with instructions
+ * @param {string} userPrompt - User's original prompt
+ * @param {number} maxTokens - Maximum tokens for response
+ * @returns {Promise<Object>} Parsed JSON response with optionA and optionB
+ */
+async function callGrok(systemPrompt, userPrompt, maxTokens) {
+  const GROK_API_KEY = process.env.GROK_API_KEY;
+  if (!GROK_API_KEY) {
+    throw new Error('Grok API key not configured');
+  }
+
+  const response = await fetch('https://api.x.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${GROK_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: 'grok-beta',
+      temperature: 0.7,
+      max_tokens: maxTokens,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Enhance this prompt:\n\n${userPrompt}` }
+      ]
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Grok API error: ${errorText}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content?.trim();
+
+  if (!content) {
+    throw new Error('Empty response from Grok');
+  }
+
+  return JSON.parse(content);
+}
+
+/**
+ * Routes enhancement request to the appropriate API based on model selection
+ * @param {string} model - Model identifier (chatgpt, gemini, claude, grok)
+ * @param {string} systemPrompt - System prompt with instructions
+ * @param {string} userPrompt - User's original prompt
+ * @param {number} maxTokens - Maximum tokens for response
+ * @returns {Promise<Object>} Parsed JSON response with optionA and optionB
+ */
+async function callEnhancementAPI(model, systemPrompt, userPrompt, maxTokens) {
+  const normalizedModel = (model || 'chatgpt').toLowerCase();
+
+  switch (normalizedModel) {
+    case 'chatgpt':
+      return await callOpenAI(systemPrompt, userPrompt, maxTokens);
+    case 'gemini':
+      return await callGemini(systemPrompt, userPrompt, maxTokens);
+    case 'claude':
+      return await callClaude(systemPrompt, userPrompt, maxTokens);
+    case 'grok':
+      return await callGrok(systemPrompt, userPrompt, maxTokens);
+    default:
+      // Fallback to OpenAI if unknown model
+      console.warn(`[API] Unknown model "${model}", falling back to OpenAI`);
+      return await callOpenAI(systemPrompt, userPrompt, maxTokens);
+  }
+}
+
+/**
  * POST /api/enhance
- * Enhance a prompt using OpenAI API (proxy request)
+ * Enhance a prompt using the selected AI model API
  */
 router.post('/enhance', async (req, res) => {
   try {
@@ -320,12 +536,6 @@ router.post('/enhance', async (req, res) => {
       });
     }
 
-    // Call OpenAI API
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    if (!OPENAI_API_KEY) {
-      return res.status(500).json({ error: 'OpenAI API key not configured' });
-    }
-
     // Build the full system prompt with level of detail
     const systemPrompt = buildSystemPrompt(
       model || 'chatgpt',
@@ -343,47 +553,19 @@ router.post('/enhance', async (req, res) => {
       maxTokens = 2000; // High detail - allow 2-3x expansion
     }
 
-    console.log(`[API] Enhancement request - Level: ${levelOfDetail}, Max tokens: ${maxTokens}, Model: ${model || 'chatgpt'}`);
+    const selectedModel = model || 'chatgpt';
+    console.log(`[API] Enhancement request - Model: ${selectedModel}, Level: ${levelOfDetail}, Max tokens: ${maxTokens}`);
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo', // Use GPT-3.5 Turbo for cost efficiency
-        temperature: 0.7,
-        max_tokens: maxTokens,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Enhance this prompt:\n\n${prompt}` }
-        ]
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OpenAI API error:', errorText);
-      return res.status(response.status).json({ 
-        error: 'Failed to enhance prompt',
-        details: errorText
-      });
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content?.trim();
-
-    if (!content) {
-      return res.status(500).json({ error: 'Empty response from OpenAI' });
-    }
-
-    // Parse JSON response
+    // Route to appropriate API based on model selection
     let parsed;
     try {
-      parsed = JSON.parse(content);
-    } catch (error) {
-      return res.status(500).json({ error: 'Failed to parse OpenAI response' });
+      parsed = await callEnhancementAPI(selectedModel, systemPrompt, prompt, maxTokens);
+    } catch (apiError) {
+      console.error(`[API] ${selectedModel} API error:`, apiError);
+      return res.status(500).json({ 
+        error: `Failed to enhance prompt using ${selectedModel}`,
+        details: apiError.message
+      });
     }
 
     // Post-process Medium level responses to enforce 5-7 sentences and remove numbered lists
