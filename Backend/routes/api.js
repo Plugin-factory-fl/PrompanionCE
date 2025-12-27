@@ -443,7 +443,7 @@ async function callGrok(systemPrompt, userPrompt, maxTokens) {
       'Authorization': `Bearer ${GROK_API_KEY}`
     },
     body: JSON.stringify({
-      model: 'grok-beta',
+      model: 'grok-2',
       temperature: 0.7,
       max_tokens: maxTokens,
       messages: [
@@ -782,7 +782,7 @@ async function callGrokChat(messages) {
         'Authorization': `Bearer ${GROK_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'grok-beta',
+        model: 'grok-2',
         temperature: 0.7,
         messages: messages
       })
