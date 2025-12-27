@@ -802,6 +802,11 @@ async function callGrokChat(messages) {
     throw new Error('Grok API key not configured');
   }
 
+  // Log messages being sent (same as OpenAI would receive)
+  console.log(`[API Chat] Grok - Sending ${messages.length} messages`);
+  console.log(`[API Chat] Grok - Message roles:`, messages.map(m => m.role));
+  console.log(`[API Chat] Grok - Last message preview:`, messages[messages.length - 1]?.content?.substring(0, 100));
+
   const response = await fetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -826,6 +831,10 @@ async function callGrokChat(messages) {
   if (!content) {
     throw new Error('Empty response from Grok');
   }
+
+  // Log response preview to compare with OpenAI
+  console.log(`[API Chat] Grok - Response length: ${content.length} chars`);
+  console.log(`[API Chat] Grok - Response preview (first 300 chars):`, content.substring(0, 300));
 
   return content;
 }
