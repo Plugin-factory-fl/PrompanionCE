@@ -816,6 +816,7 @@ async function callGrokChat(messages) {
     body: JSON.stringify({
       model: 'grok-4-1-fast-reasoning',
       temperature: 0.7,
+      max_tokens: 2000,
       messages: messages
     })
   });
