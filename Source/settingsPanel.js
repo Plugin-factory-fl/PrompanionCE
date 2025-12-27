@@ -183,13 +183,29 @@ export function registerSettingsHandlers(stateRef, dependencies = {}) {
   detailSlider.addEventListener("input", updateRangeOutputs);
 
   modelButtons.forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const value = button.dataset.model;
       if (!value || !modelOptions.includes(value)) {
         return;
       }
       stateRef.settings.model = value;
+      // Update activePlatform to match the selected model
+      stateRef.activePlatform = getModelDisplayName(value);
       renderSettings(stateRef.settings);
+      
+      // Save state immediately so API calls use the correct model
+      await saveState(stateRef);
+      
+      // Update status card to reflect model change immediately
+      if (typeof window.renderStatus === 'function') {
+        window.renderStatus({
+          plan: stateRef.plan,
+          enhancementsUsed: stateRef.enhancementsUsed,
+          enhancementsLimit: stateRef.enhancementsLimit,
+          activePlatform: stateRef.activePlatform,
+          settings: stateRef.settings
+        });
+      }
     });
   });
 
