@@ -807,6 +807,13 @@ async function callGrokChat(messages) {
   console.log(`[API Chat] Grok API key present: ${GROK_API_KEY ? 'Yes' : 'No'}`);
   console.log(`[API Chat] Grok API key prefix: ${GROK_API_KEY.substring(0, 10)}...`);
   
+  // Log message structure for debugging
+  console.log(`[API Chat] Messages being sent to Grok:`, messages.map(msg => ({
+    role: msg.role,
+    contentLength: msg.content?.length,
+    contentPreview: msg.content?.substring(0, 100)
+  })));
+  
   // Try different model names in order: cheapest first, then fallbacks
   const modelNames = ['grok-4-1-fast-reasoning', 'grok-3-mini', 'grok-4-1-fast-non-reasoning', 'grok-4-fast-reasoning', 'grok-4-fast-non-reasoning'];
   
@@ -849,6 +856,13 @@ async function callGrokChat(messages) {
       console.log(`[API Chat] Grok API response data keys:`, Object.keys(data));
       console.log(`[API Chat] Grok API choices length:`, data.choices?.length);
       
+      // Log the full response structure for debugging
+      if (data.choices && data.choices[0]) {
+        console.log(`[API Chat] First choice keys:`, Object.keys(data.choices[0]));
+        console.log(`[API Chat] First choice message keys:`, Object.keys(data.choices[0].message || {}));
+        console.log(`[API Chat] First choice message content preview:`, data.choices[0].message?.content?.substring(0, 200));
+      }
+      
       const content = data.choices?.[0]?.message?.content?.trim();
 
       if (!content) {
@@ -856,7 +870,22 @@ async function callGrokChat(messages) {
         throw new Error('Empty response from Grok');
       }
 
+      // Log content preview to verify it's not chat history
       console.log(`[API Chat] Grok API returned content (${content.length} chars)`);
+      console.log(`[API Chat] Content preview (first 500 chars):`, content.substring(0, 500));
+      
+      // Check if content looks like it might be chat history (contains system message patterns)
+      if (content.includes('You are helping the user elaborate') || 
+          (content.includes('User:') && content.includes('Assistant:')) ||
+          content.includes('Client(api_key=') ||
+          content.includes('Commercial Terms')) {
+        console.warn(`[API Chat] WARNING: Response content appears to contain chat history or system message!`);
+        console.warn(`[API Chat] This might indicate the API is returning the wrong content.`);
+        console.warn(`[API Chat] Full problematic content:`, content);
+        // Don't return chat history - this is likely a model issue
+        throw new Error('Grok API returned chat history instead of a new response. This may indicate a model configuration issue.');
+      }
+      
       return content; // Success - return the content
     } catch (error) {
       // If this is the last model or not a 404, throw the error
