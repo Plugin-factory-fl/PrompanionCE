@@ -554,7 +554,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           output: currentState.settings?.output || "text",
           complexity: currentState.settings?.complexity || 2
         };
-        console.log("[Prompanion Background] Using settings:", settings);
+        console.log("[Prompanion Background] ========== ENHANCEMENT REQUEST ==========");
+        console.log("[Prompanion Background] Current state settings:", currentState.settings);
+        console.log("[Prompanion Background] Using settings for API call:", settings);
+        console.log("[Prompanion Background] Model selected:", settings.model);
         const result = await generateEnhancements(promptText, settings);
         const { optionA, optionB, error, enhancementsUsed, enhancementsLimit } = result;
         console.log("[Prompanion Background] Enhancement result - optionA:", optionA, "optionB:", optionB, "error:", error, "usage:", { enhancementsUsed, enhancementsLimit });

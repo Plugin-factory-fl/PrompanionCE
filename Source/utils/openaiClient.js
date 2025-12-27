@@ -20,6 +20,21 @@ async function getAuthToken() {
 }
 
 /**
+ * Gets the current model setting from storage
+ * @returns {Promise<string>} Model identifier (chatgpt, gemini, claude, grok)
+ */
+async function getModelSetting() {
+  try {
+    const result = await chrome.storage.sync.get("prompanion-sidepanel-state");
+    const state = result["prompanion-sidepanel-state"] || {};
+    return state.settings?.model || "chatgpt";
+  } catch (error) {
+    console.error("[Prompanion OpenAI Client] Failed to get model setting:", error);
+    return "chatgpt";
+  }
+}
+
+/**
  * Calls the backend chat API
  * @param {Array} messages - Array of message objects with role and content (already includes system message with context if applicable)
  * @param {Array} chatHistory - Optional LLM chat history for context (deprecated - messages already includes context)
@@ -31,6 +46,10 @@ export async function callOpenAI(messages, chatHistory = []) {
   if (!token) {
     throw new Error("No authentication token. Please log in.");
   }
+
+  // Get the selected model from settings
+  const model = await getModelSetting();
+  console.log("[Prompanion OpenAI Client] Using model for chat:", model);
 
   // messages array already includes the system message with chat history context from buildChatApiMessages
   // We should use it directly, not mix it with raw chatHistory
@@ -52,7 +71,8 @@ export async function callOpenAI(messages, chatHistory = []) {
   // Build request body and check size
   let requestBody = {
     message: lastMessage.content,
-    chatHistory: chatHistoryForRequest
+    chatHistory: chatHistoryForRequest,
+    model: model // Include model parameter
   };
   
   let requestBodySize = JSON.stringify(requestBody).length;

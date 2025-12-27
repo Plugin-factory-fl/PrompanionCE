@@ -81,7 +81,8 @@ import { cleanupStorage, getStorageInfo } from "./storageCleanup.js";
 import {
   detailLevelLabels,
   renderSettings,
-  registerSettingsHandlers
+  registerSettingsHandlers,
+  getModelDisplayName
 } from "../Source/settingsPanel.js";
 
 /**
@@ -417,6 +418,14 @@ async function loadState() {
     activeConversationId: null // Will be set to new conversation in init()
   };
   
+  // Set activePlatform based on the model in settings (always ensure it's set correctly)
+  mergedState.activePlatform = getModelDisplayName(mergedState.settings?.model);
+  
+  // Ensure settings object exists with defaults
+  if (!mergedState.settings) {
+    mergedState.settings = { ...defaultState.settings };
+  }
+  
   // loadState merge result - verbose logging removed
 
   if (storedLibraryVersion !== LIBRARY_SCHEMA_VERSION) {
@@ -645,9 +654,24 @@ async function updateEnhancementsDisplay() {
 
 /**
  * Renders status information in the UI
- * @param {Object} status - Status object with plan, enhancementsUsed, enhancementsLimit, activePlatform
+ * @param {Object} status - Status object with plan, enhancementsUsed, enhancementsLimit, activePlatform, and optionally settings
  */
-function renderStatus({ plan, enhancementsUsed, enhancementsLimit, activePlatform }) {
+function renderStatus(status) {
+  // Handle both direct status object and full state object
+  const plan = status.plan || status?.plan || "Freemium";
+  const enhancementsUsed = status.enhancementsUsed ?? status?.enhancementsUsed ?? 0;
+  const enhancementsLimit = status.enhancementsLimit ?? status?.enhancementsLimit ?? 10;
+  
+  // Always derive activePlatform from settings.model if available, otherwise use activePlatform from status
+  let activePlatform = status.activePlatform;
+  if (status.settings?.model) {
+    activePlatform = getModelDisplayName(status.settings.model);
+  } else if (!activePlatform && status?.settings?.model) {
+    activePlatform = getModelDisplayName(status.settings.model);
+  } else if (!activePlatform) {
+    activePlatform = "ChatGPT"; // Fallback
+  }
+  
   document.getElementById("user-plan").textContent = plan;
   document.getElementById("enhancements-count").textContent = enhancementsUsed;
   document.getElementById("enhancements-limit").textContent = enhancementsLimit;
@@ -947,6 +971,13 @@ async function init() {
 
   // Fetch and display real usage data from server
   await updateEnhancementsDisplay();
+
+  // Ensure activePlatform is always set from settings.model before rendering
+  if (currentState.settings?.model) {
+    currentState.activePlatform = getModelDisplayName(currentState.settings.model);
+  } else if (!currentState.activePlatform) {
+    currentState.activePlatform = "ChatGPT";
+  }
 
   renderStatus(currentState);
   // Update user login status - try immediately and also after delays

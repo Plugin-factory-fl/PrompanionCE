@@ -604,12 +604,231 @@ router.post('/enhance', async (req, res) => {
 });
 
 /**
+ * Calls OpenAI API for side chat
+ * @param {Array} messages - Array of message objects with role and content
+ * @returns {Promise<string>} Assistant's reply content
+ */
+async function callOpenAIChat(messages) {
+  const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+  if (!OPENAI_API_KEY) {
+    throw new Error('OpenAI API key not configured');
+  }
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${OPENAI_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-3.5-turbo',
+      temperature: 0.7,
+      messages: messages
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenAI API error: ${errorText}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content?.trim();
+
+  if (!content) {
+    throw new Error('Empty response from OpenAI');
+  }
+
+  return content;
+}
+
+/**
+ * Calls Google Gemini API for side chat
+ * @param {Array} messages - Array of message objects with role and content
+ * @returns {Promise<string>} Assistant's reply content
+ */
+async function callGeminiChat(messages) {
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) {
+    throw new Error('Gemini API key not configured');
+  }
+
+  // Convert messages to Gemini format
+  // Gemini doesn't support system messages, so we'll combine system + first user message
+  const systemMessage = messages.find(msg => msg.role === 'system');
+  const nonSystemMessages = messages.filter(msg => msg.role !== 'system');
+  
+  let geminiMessages = [];
+  if (systemMessage && nonSystemMessages.length > 0) {
+    // Combine system message with first user message
+    const firstUser = nonSystemMessages[0];
+    geminiMessages.push({
+      role: 'user',
+      parts: [{ text: `${systemMessage.content}\n\n${firstUser.content}` }]
+    });
+    // Add remaining messages
+    for (let i = 1; i < nonSystemMessages.length; i++) {
+      const msg = nonSystemMessages[i];
+      geminiMessages.push({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }]
+      });
+    }
+  } else {
+    // No system message, convert directly
+    geminiMessages = nonSystemMessages.map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    }));
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: geminiMessages
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API error: ${errorText}`);
+  }
+
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+  if (!content) {
+    throw new Error('Empty response from Gemini');
+  }
+
+  return content;
+}
+
+/**
+ * Calls Anthropic Claude API for side chat
+ * @param {Array} messages - Array of message objects with role and content
+ * @returns {Promise<string>} Assistant's reply content
+ */
+async function callClaudeChat(messages) {
+  const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
+  if (!CLAUDE_API_KEY) {
+    throw new Error('Claude API key not configured');
+  }
+
+  // Separate system message from other messages
+  const systemMessage = messages.find(msg => msg.role === 'system');
+  const nonSystemMessages = messages.filter(msg => msg.role !== 'system');
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': CLAUDE_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-3-sonnet-20240229',
+      max_tokens: 2000,
+      temperature: 0.7,
+      system: systemMessage?.content || '',
+      messages: nonSystemMessages.map(msg => ({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: msg.content
+      }))
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Claude API error: ${errorText}`);
+  }
+
+  const data = await response.json();
+  const content = data.content?.[0]?.text?.trim();
+
+  if (!content) {
+    throw new Error('Empty response from Claude');
+  }
+
+  return content;
+}
+
+/**
+ * Calls xAI Grok API for side chat
+ * @param {Array} messages - Array of message objects with role and content
+ * @returns {Promise<string>} Assistant's reply content
+ */
+async function callGrokChat(messages) {
+  const GROK_API_KEY = process.env.GROK_API_KEY;
+  if (!GROK_API_KEY) {
+    throw new Error('Grok API key not configured');
+  }
+
+  const response = await fetch('https://api.x.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${GROK_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: 'grok-beta',
+      temperature: 0.7,
+      messages: messages
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Grok API error: ${errorText}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content?.trim();
+
+  if (!content) {
+    throw new Error('Empty response from Grok');
+  }
+
+  return content;
+}
+
+/**
+ * Routes chat request to the appropriate API based on model selection
+ * @param {string} model - Model identifier (chatgpt, gemini, claude, grok)
+ * @param {Array} messages - Array of message objects with role and content
+ * @returns {Promise<string>} Assistant's reply content
+ */
+async function callChatAPI(model, messages) {
+  const normalizedModel = (model || 'chatgpt').toLowerCase();
+
+  switch (normalizedModel) {
+    case 'chatgpt':
+      return await callOpenAIChat(messages);
+    case 'gemini':
+      return await callGeminiChat(messages);
+    case 'claude':
+      return await callClaudeChat(messages);
+    case 'grok':
+      return await callGrokChat(messages);
+    default:
+      // No fallback - throw error for unknown model
+      throw new Error(`Unknown model "${model}". Supported models: chatgpt, gemini, claude, grok`);
+  }
+}
+
+/**
  * POST /api/chat
- * Handle side chat requests (proxy to OpenAI)
+ * Handle side chat requests (proxy to selected AI model API)
  */
 router.post('/chat', async (req, res) => {
   try {
-    const { message, chatHistory } = req.body;
+    const { message, chatHistory, model } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
@@ -643,18 +862,15 @@ router.post('/chat', async (req, res) => {
       });
     }
 
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    if (!OPENAI_API_KEY) {
-      return res.status(500).json({ error: 'OpenAI API key not configured' });
-    }
-
     // Build messages array
     // chatHistory already includes the system message with context (if provided)
     // and any previous conversation messages
     const messages = Array.isArray(chatHistory) ? [...chatHistory] : [];
     messages.push({ role: 'user', content: message });
 
-    // Log for debugging
+    const selectedModel = model || 'chatgpt';
+    console.log(`[API Chat] ========== CHAT REQUEST ==========`);
+    console.log(`[API Chat] Model selected: ${selectedModel}`);
     console.log(`[API Chat] Received request with ${messages.length} messages in history`);
     const systemMsg = messages.find(msg => msg.role === 'system');
     if (systemMsg) {
@@ -664,29 +880,18 @@ router.post('/chat', async (req, res) => {
       console.log(`[API Chat] No system message found in chatHistory`);
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        temperature: 0.7,
-        messages: messages
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return res.status(response.status).json({ 
-        error: 'Failed to get chat response',
-        details: errorText
+    // Route to appropriate API based on model selection
+    let content;
+    try {
+      content = await callChatAPI(selectedModel, messages);
+      console.log(`[API Chat] ✓ Successfully received response from ${selectedModel}`);
+    } catch (apiError) {
+      console.error(`[API Chat] ✗ ${selectedModel} API error:`, apiError);
+      return res.status(500).json({ 
+        error: `Failed to get chat response from ${selectedModel}`,
+        details: apiError.message
       });
     }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content?.trim();
 
     // Increment user's enhancement count (Side Chat counts as an enhancement)
     const incrementResult = await query(

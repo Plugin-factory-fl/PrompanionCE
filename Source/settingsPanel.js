@@ -10,6 +10,21 @@
 export const modelOptions = ["chatgpt", "gemini", "claude", "grok"];
 
 /**
+ * Converts model identifier to display name
+ * @param {string} model - Model identifier (chatgpt, gemini, claude, grok)
+ * @returns {string} Display name (ChatGPT, Gemini, Claude, Grok)
+ */
+export function getModelDisplayName(model) {
+  const modelMap = {
+    chatgpt: "ChatGPT",
+    gemini: "Gemini",
+    claude: "Claude",
+    grok: "Grok"
+  };
+  return modelMap[model?.toLowerCase()] || "ChatGPT";
+}
+
+/**
  * Detail level labels for complexity slider
  */
 export const detailLevelLabels = {
@@ -132,11 +147,24 @@ export function registerSettingsHandlers(stateRef, dependencies = {}) {
       renderSettings(stateRef.settings);
       return;
     }
+    
+    // Read the active model button's value directly from the DOM
+    const activeModelButton = document.querySelector(".model-pill.is-active");
+    const selectedModel = activeModelButton?.dataset.model || stateRef.settings.model || "chatgpt";
+    
+    // Read the active output tab's value directly from the DOM
+    const activeOutputTab = document.querySelector(".form-tab[data-setting='output'].is-active");
+    const selectedOutput = activeOutputTab?.dataset.value || stateRef.settings.output || "text";
+    
     stateRef.settings = {
       complexity: Number(document.getElementById("setting-complexity").value),
-      model: stateRef.settings.model ?? "chatgpt",
-      output: stateRef.settings.output ?? "text"
+      model: selectedModel,
+      output: selectedOutput
     };
+    
+    // Update activePlatform in state to match the selected model BEFORE saving
+    stateRef.activePlatform = getModelDisplayName(selectedModel);
+    
     renderSettings(stateRef.settings);
     await saveState(stateRef);
     
@@ -146,6 +174,7 @@ export function registerSettingsHandlers(stateRef, dependencies = {}) {
         plan: stateRef.plan,
         enhancementsUsed: stateRef.enhancementsUsed,
         enhancementsLimit: stateRef.enhancementsLimit,
+        activePlatform: stateRef.activePlatform,
         settings: stateRef.settings
       });
     }

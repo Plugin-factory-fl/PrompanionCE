@@ -28,6 +28,9 @@ Backend server for the Prompanion Chrome extension, handling authentication, API
    - `DATABASE_URL` - Your local PostgreSQL connection string
    - `JWT_SECRET` - A random secret string for JWT signing
    - `OPENAI_API_KEY` - Your OpenAI API key
+   - `GEMINI_API_KEY` - Your Google Gemini API key
+   - `CLAUDE_API_KEY` - Your Anthropic Claude API key
+   - `GROK_API_KEY` - Your xAI Grok API key
    - `ALLOWED_ORIGINS` - CORS allowed origins
 
 3. **Set Up Local PostgreSQL Database**
@@ -83,6 +86,9 @@ In your Render Web Service settings, add these environment variables:
 - `DATABASE_URL` = (Use the Internal Database URL from your PostgreSQL service)
 - `JWT_SECRET` = (Generate a strong random string)
 - `OPENAI_API_KEY` = (Your OpenAI API key)
+- `GEMINI_API_KEY` = (Your Google Gemini API key)
+- `CLAUDE_API_KEY` = (Your Anthropic Claude API key)
+- `GROK_API_KEY` = (Your xAI Grok API key)
 - `ALLOWED_ORIGINS` = `chrome-extension://*` (or specific extension IDs)
 
 #### Step 4: Deploy

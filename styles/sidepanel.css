@@ -200,6 +200,7 @@ body {
 
 .status-card {
   flex: 1;
+  min-width: 0; /* Allow flex item to shrink below content size */
   background: var(--color-surface-alt);
   border-radius: var(--radius-sm);
   padding: 12px;
@@ -224,6 +225,10 @@ body {
 .status-card__value {
   font-weight: 600;
   font-size: 14px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  min-height: 1.5em; /* Ensure minimum height for consistent card size */
 }
 
 /* prompt-preview, prompt-tabs, prompt-tabpanel, prompt-textarea moved to styles/promptEnhancer.css */
