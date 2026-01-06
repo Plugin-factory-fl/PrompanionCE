@@ -65,9 +65,6 @@ export async function cleanupStorage() {
     if (state.optionA && state.optionA.length > 1000) {
       state.optionA = state.optionA.substring(0, 1000);
     }
-    if (state.optionB && state.optionB.length > 1000) {
-      state.optionB = state.optionB.substring(0, 1000);
-    }
 
     // Clean up library - remove very large items more aggressively
     if (state.library && Array.isArray(state.library)) {
@@ -103,9 +100,6 @@ export async function cleanupStorage() {
       }
       if (state.optionA && state.optionA.length > 500) {
         state.optionA = state.optionA.substring(0, 500);
-      }
-      if (state.optionB && state.optionB.length > 500) {
-        state.optionB = state.optionB.substring(0, 500);
       }
       
       // Keep only the most recent 5 conversations
@@ -156,7 +150,6 @@ export async function cleanupStorage() {
         state.conversations = [];
         state.originalPrompt = "";
         state.optionA = "";
-        state.optionB = "";
         await chrome.storage.sync.set({ [STATE_KEY]: state });
         return { cleaned: true, sizeBefore, sizeAfter: JSON.stringify(state).length, saved: sizeBefore - JSON.stringify(state).length, aggressive: true };
       }
@@ -182,7 +175,6 @@ export async function getStorageInfo() {
     const breakdown = {
       originalPrompt: state?.originalPrompt?.length || 0,
       optionA: state?.optionA?.length || 0,
-      optionB: state?.optionB?.length || 0,
       conversations: 0,
       conversationsSize: 0,
       library: 0,
@@ -205,7 +197,6 @@ export async function getStorageInfo() {
     const otherFields = { ...state };
     delete otherFields.originalPrompt;
     delete otherFields.optionA;
-    delete otherFields.optionB;
     delete otherFields.conversations;
     delete otherFields.library;
     delete otherFields.settings;

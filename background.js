@@ -294,18 +294,17 @@ async function getAuthToken() {
 }
 
 /**
- * Generates two enhanced versions of a prompt using backend API
+ * Generates an enhanced version of a prompt using backend API
  * @param {string} promptText - Original prompt text
  * @param {Object} settings - User settings (model, output, complexity)
- * @returns {Promise<Object>} Object with optionA and optionB enhanced prompts
+ * @returns {Promise<Object>} Object with optionA enhanced prompt
  */
 async function generateEnhancements(promptText, settings = {}) {
   const fallbackA = `${promptText}\n\nRefined focus: clarify intent and add a persuasive closing.`;
-  const fallbackB = `${promptText}\n\nRefined focus: provide more context and outline clear next steps.`;
 
   const token = await getAuthToken();
   if (!token) {
-    return { optionA: fallbackA, optionB: fallbackB, error: "NO_AUTH_TOKEN" };
+    return { optionA: fallbackA, error: "NO_AUTH_TOKEN" };
   }
 
   try {
@@ -327,11 +326,11 @@ async function generateEnhancements(promptText, settings = {}) {
       const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
       
       if (response.status === 401) {
-        return { optionA: fallbackA, optionB: fallbackB, error: "UNAUTHORIZED" };
+        return { optionA: fallbackA, error: "UNAUTHORIZED" };
       }
       
       if (response.status === 403) {
-        return { optionA: fallbackA, optionB: fallbackB, error: "LIMIT_REACHED" };
+        return { optionA: fallbackA, error: "LIMIT_REACHED" };
       }
       
       throw new Error(errorData.error || "Failed to enhance prompt");
@@ -339,18 +338,16 @@ async function generateEnhancements(promptText, settings = {}) {
 
     const data = await response.json();
     const optionA = typeof data.optionA === "string" ? data.optionA.trim() : fallbackA;
-    const optionB = typeof data.optionB === "string" ? data.optionB.trim() : fallbackB;
     // Include usage data if available from API response
     return { 
-      optionA, 
-      optionB,
+      optionA,
       enhancementsUsed: data.enhancementsUsed,
       enhancementsLimit: data.enhancementsLimit
     };
   } catch (error) {
     console.error("Prompanion: enhancement generation failed", error);
     const errorMessage = error.message || String(error);
-    return { optionA: promptText, optionB: promptText, error: "API_ERROR" };
+    return { optionA: promptText, error: "API_ERROR" };
   }
 }
 
@@ -392,14 +389,14 @@ function buildRegenerateSystemPrompt(model, outputType, levelOfDetail) {
 }
 
 /**
- * Regenerates a single enhanced prompt option by re-wording it for better clarity
- * @param {string} currentPrompt - The current enhanced prompt to regenerate
- * @param {string} option - The option to regenerate ("a" or "b")
+ * Regenerates a single enhanced prompt by taking a markedly different approach
+ * @param {string} originalPrompt - The original user prompt
+ * @param {string} currentEnhanced - The current enhanced prompt to regenerate
  * @param {Object} settings - User settings (model, output, complexity)
- * @returns {Promise<string>} Regenerated prompt text
+ * @returns {Promise<string>} Regenerated prompt text with different approach
  */
-async function regenerateEnhancement(currentPrompt, option, settings = {}) {
-  const fallback = `${currentPrompt}\n\n(Re-worded for improved clarity and precision.)`;
+async function regenerateEnhancement(originalPrompt, currentEnhanced, settings = {}) {
+  const fallback = `${currentEnhanced}\n\n(Regenerated with a different approach.)`;
 
   const token = await getAuthToken();
   if (!token) {
@@ -414,10 +411,12 @@ async function regenerateEnhancement(currentPrompt, option, settings = {}) {
         "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
-        prompt: currentPrompt,
+        prompt: originalPrompt, // Use original prompt, not the enhanced one
         model: settings.model || "chatgpt",
         outputType: settings.output || "text",
-        levelOfDetail: settings.complexity || 2
+        levelOfDetail: settings.complexity || 2,
+        regenerate: true, // Flag to indicate regeneration
+        currentEnhanced: currentEnhanced // Pass current enhanced version for comparison
       })
     });
 
@@ -426,9 +425,8 @@ async function regenerateEnhancement(currentPrompt, option, settings = {}) {
     }
 
     const data = await response.json();
-    // Return the appropriate option (A or B)
-    const regenerated = option === "a" ? data.optionA : data.optionB;
-    return typeof regenerated === "string" ? regenerated.trim() : fallback;
+    // Return optionA (only option now)
+    return typeof data.optionA === "string" ? data.optionA.trim() : fallback;
   } catch (error) {
     console.error("Prompanion: regeneration failed", error);
     return fallback;
@@ -559,21 +557,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.log("[Prompanion Background] Using settings for API call:", settings);
         console.log("[Prompanion Background] Model selected:", settings.model);
         const result = await generateEnhancements(promptText, settings);
-        const { optionA, optionB, error, enhancementsUsed, enhancementsLimit } = result;
-        console.log("[Prompanion Background] Enhancement result - optionA:", optionA, "optionB:", optionB, "error:", error, "usage:", { enhancementsUsed, enhancementsLimit });
+        const { optionA, error, enhancementsUsed, enhancementsLimit } = result;
+        console.log("[Prompanion Background] Enhancement result - optionA:", optionA, "error:", error, "usage:", { enhancementsUsed, enhancementsLimit });
         
         // Only update state and open panel if there's no error
         if (!error) {
           const nextState = {
             ...currentState,
             originalPrompt: promptText,
-            optionA,
-            optionB
+            optionA
           };
           console.log("[Prompanion Background] Next state prepared:", { 
             originalPrompt: nextState.originalPrompt?.substring(0, 50), 
-            optionA: nextState.optionA?.substring(0, 50), 
-            optionB: nextState.optionB?.substring(0, 50) 
+            optionA: nextState.optionA?.substring(0, 50)
           });
           
           // CRITICAL: Save state BEFORE sending response to ensure prompts are persisted
@@ -633,8 +629,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Send response AFTER state is saved and messages are sent
         sendResponse?.({ 
           ok: !error, 
-          optionA, 
-          optionB, 
+          optionA,
           error,
           enhancementsUsed, // Pass through usage data
           enhancementsLimit
@@ -650,8 +645,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "PROMPANION_REGENERATE_ENHANCEMENT") {
     (async () => {
       try {
-        const currentPrompt = typeof message.prompt === "string" ? message.prompt.trim() : "";
-        if (!currentPrompt) {
+        const currentEnhanced = typeof message.prompt === "string" ? message.prompt.trim() : "";
+        if (!currentEnhanced) {
           if (sendResponse) {
             sendResponse({ ok: false, reason: "EMPTY_PROMPT" });
           }
@@ -659,23 +654,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         const currentState = await readState();
+        const originalPrompt = currentState.originalPrompt || "";
+        if (!originalPrompt) {
+          if (sendResponse) {
+            sendResponse({ ok: false, reason: "NO_ORIGINAL_PROMPT" });
+          }
+          return;
+        }
+
         const settings = {
           model: currentState.settings?.model || "chatgpt",
           output: currentState.settings?.output || "text",
           complexity: currentState.settings?.complexity || 2
         };
-        const option = message.option === "a" ? "a" : message.option === "b" ? "b" : "a";
-        const regenerated = await regenerateEnhancement(currentPrompt, option, settings);
         
-        const optionKey = message.option === "a" ? "optionA" : message.option === "b" ? "optionB" : null;
-        if (optionKey) {
-          const nextState = {
-            ...currentState,
-            [optionKey]: regenerated
-          };
-          await writeState(nextState);
-          chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState });
-        }
+        // Regenerate with different approach - pass original prompt and current enhanced version
+        const regenerated = await regenerateEnhancement(originalPrompt, currentEnhanced, settings);
+        
+        // Update optionA (only option now)
+        const nextState = {
+          ...currentState,
+          optionA: regenerated
+        };
+        await writeState(nextState);
+        chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState });
         
         if (sendResponse) {
           sendResponse({ ok: true, regenerated });

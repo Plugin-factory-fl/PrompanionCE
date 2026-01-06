@@ -72,7 +72,7 @@ body {
 .panel__actions {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .brand__mark {

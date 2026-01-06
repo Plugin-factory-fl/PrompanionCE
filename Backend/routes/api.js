@@ -46,7 +46,7 @@ function buildSystemPrompt(model, outputType, levelOfDetail) {
   const detail = detailInstructions[levelOfDetail] || detailInstructions[2];
   
   // Base prompt structure for all models
-  let basePrompt = `You are an expert at refining and enhancing prompts for AI language models. Your task is to take a user's original prompt and create two distinct, improved versions that are more effective, clear, and likely to produce better results.\n\n`;
+  let basePrompt = `You are an expert at refining and enhancing prompts for AI language models. Your task is to take a user's original prompt and create an improved version that is more effective, clear, and likely to produce better results.\n\n`;
 
   // Model-specific guidelines based on published best practices with explicit, detailed instructions
   const modelGuidelines = {
@@ -149,10 +149,6 @@ function buildSystemPrompt(model, outputType, levelOfDetail) {
     `${detail.text}\n\n` +
     `EXAMPLES OF WHAT THIS MEANS:\n` +
     `${detail.examples}\n\n` : ''}` +
-    `CRITICAL REQUIREMENT: Both Option A and Option B MUST be at the EXACT SAME level of detail. ` +
-    `${levelOfDetail === 1 ? 'If the level is LOW, BOTH prompts must be extremely brief and minimal - like a Twitter post (typically 10-30 words).' : ''}` +
-    `${levelOfDetail === 2 ? 'If the level is MEDIUM, BOTH prompts must be EXACTLY 5-7 sentences total in plain paragraph form with NO numbered lists.' : ''}` +
-    `${levelOfDetail === 3 ? 'If the level is HIGH, BOTH prompts must be explained like to a high school student with light elaboration, and MUST be significantly longer than the original (aim for 2-3x the original word count). Numbered lists or structured sections are acceptable for HIGH level.' : ''}\n\n` +
     `═══════════════════════════════════════════════════════════════\n` +
     `CRITICAL: DO NOT JUST REWORD - YOU MUST ADD CONTENT\n` +
     `═══════════════════════════════════════════════════════════════\n\n` +
@@ -165,32 +161,27 @@ function buildSystemPrompt(model, outputType, levelOfDetail) {
     '- Add light elaboration on the main ideas\n' +
     '- The result should be 2-3x LONGER than the original, not just reworded\n' +
     'EXAMPLE: If original is "write a blog post", expand to something like "Write a blog post that explains [topic] in an accessible way. The post should be informative and engaging, using clear language that helps readers understand the key concepts. Include relevant examples or analogies to illustrate the main points, and structure it with a clear introduction, body paragraphs that develop the ideas, and a conclusion that summarizes the key takeaways."\n\n' : ''}` +
-    `The enhanced prompts MUST match this level of detail exactly. ` +
+    `The enhanced prompt MUST match this level of detail exactly. ` +
     `For MEDIUM level: Write EXACTLY 5-7 sentences total. The entire enhanced prompt must be 5-7 clear, concise sentences. ` +
     `For HIGH level: Actively EXPAND the prompt by ADDING new content to reach 2-3x the original word count. ` +
     `Do NOT just reword the original - you MUST add new information, explanations, context, and details. ` +
     `Do NOT create prompts that are longer or more detailed than the selected level. ` +
     `Do NOT create prompts that are shorter or less detailed than the selected level.\n\n` +
-    `Option A should focus on: clarity, specificity, and structure. Make it more precise and easier for the AI to understand exactly what is needed. ` +
+    `The enhanced prompt should focus on: clarity, specificity, and structure. Make it more precise and easier for the AI to understand exactly what is needed. ` +
     `The prompt must be ${detail.style} and ${detail.length} - matching the level of detail setting EXACTLY. ` +
     `${levelOfDetail === 3 ? 'CRITICAL: Do NOT just reword - you MUST ADD new content (explanations, context, examples) to expand it to 2-3x the original word count.' : ''}\n\n` +
-    `Option B should focus on: a different enhancement approach (alternative framing, perspective, or methodology) while maintaining the EXACT SAME level of detail as Option A. ` +
-    `This version must also be ${detail.style} and ${detail.length} - the same as Option A. ` +
-    `Both prompts should be approximately the same length and depth. ` +
-    `${levelOfDetail === 2 ? 'Both Option A and Option B must be exactly 5-7 sentences each in plain paragraph form with NO numbered lists.' : ''}` +
-    `${levelOfDetail === 3 ? 'Both must be 2-3x the original word count with light elaboration - ADD content, don\'t just reword.' : ''}\n\n` +
     `${outputInfo.considerations}\n\n` +
-    `Both versions should be complete, standalone prompts that improve upon the original. ` +
-    `Both must match the selected level of detail - they should be approximately the same length and depth. ` +
+    `The enhanced prompt should be a complete, standalone prompt that improves upon the original. ` +
+    `It must match the selected level of detail exactly. ` +
     `Follow ${modelGuideline.approach} ` +
-    `The enhanced prompts should both be ${detail.style} and ${detail.length}.\n\n` +
-    `CRITICAL: The enhanced prompts you create should be clean, natural prompts that users can copy and paste directly. ` +
-    `Do NOT include structural markers like "###Instructions:", "###Task:", "###", XML tags like <instructions>, or any delimiters in the final prompts. ` +
-    `The delimiters and structural markers mentioned above are for YOUR understanding of how to structure prompts - they should NOT appear in the user's final enhanced prompts. ` +
-    `The enhanced prompts should read naturally without any formatting markers or section headers. ` +
-    `Do not add explanations or meta-commentary - just provide the enhanced prompts.\n\n` +
-    `${levelOfDetail === 2 ? 'FINAL CHECK FOR MEDIUM: Count sentences in both options - must be 5-7 each with NO numbered lists.\n\n' : ''}` +
-    `Reply ONLY with valid JSON in this exact format: {"optionA":"enhanced prompt A here","optionB":"enhanced prompt B here"}`;
+    `The enhanced prompt should be ${detail.style} and ${detail.length}.\n\n` +
+    `CRITICAL: The enhanced prompt you create should be clean and natural, ready for users to copy and paste directly. ` +
+    `Do NOT include structural markers like "###Instructions:", "###Task:", "###", XML tags like <instructions>, or any delimiters in the final prompt. ` +
+    `The delimiters and structural markers mentioned above are for YOUR understanding of how to structure prompts - they should NOT appear in the user's final enhanced prompt. ` +
+    `The enhanced prompt should read naturally without any formatting markers or section headers. ` +
+    `Do not add explanations or meta-commentary - just provide the enhanced prompt.\n\n` +
+    `${levelOfDetail === 2 ? 'FINAL CHECK FOR MEDIUM: Count sentences - must be 5-7 with NO numbered lists.\n\n' : ''}` +
+    `Reply ONLY with valid JSON in this exact format: {"optionA":"enhanced prompt here"}`;
 
   return systemPrompt;
 }
@@ -284,7 +275,7 @@ function processMediumLevelPrompt(promptText) {
  * @param {string} systemPrompt - System prompt with instructions
  * @param {string} userPrompt - User's original prompt
  * @param {number} maxTokens - Maximum tokens for response
- * @returns {Promise<Object>} Parsed JSON response with optionA and optionB
+ * @returns {Promise<Object>} Parsed JSON response with optionA
  */
 async function callOpenAI(systemPrompt, userPrompt, maxTokens) {
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -329,7 +320,7 @@ async function callOpenAI(systemPrompt, userPrompt, maxTokens) {
  * @param {string} systemPrompt - System prompt with instructions
  * @param {string} userPrompt - User's original prompt
  * @param {number} maxTokens - Maximum tokens for response
- * @returns {Promise<Object>} Parsed JSON response with optionA and optionB
+ * @returns {Promise<Object>} Parsed JSON response with optionA
  */
 async function callGemini(systemPrompt, userPrompt, maxTokens) {
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -381,7 +372,7 @@ async function callGemini(systemPrompt, userPrompt, maxTokens) {
  * @param {string} systemPrompt - System prompt with instructions
  * @param {string} userPrompt - User's original prompt
  * @param {number} maxTokens - Maximum tokens for response
- * @returns {Promise<Object>} Parsed JSON response with optionA and optionB
+ * @returns {Promise<Object>} Parsed JSON response with optionA
  */
 async function callClaude(systemPrompt, userPrompt, maxTokens) {
   const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
@@ -428,7 +419,7 @@ async function callClaude(systemPrompt, userPrompt, maxTokens) {
  * @param {string} systemPrompt - System prompt with instructions
  * @param {string} userPrompt - User's original prompt
  * @param {number} maxTokens - Maximum tokens for response
- * @returns {Promise<Object>} Parsed JSON response with optionA and optionB
+ * @returns {Promise<Object>} Parsed JSON response with optionA
  */
 async function callGrok(systemPrompt, userPrompt, maxTokens) {
   const GROK_API_KEY = process.env.GROK_API_KEY;
@@ -506,7 +497,7 @@ async function callGrok(systemPrompt, userPrompt, maxTokens) {
  * @param {string} systemPrompt - System prompt with instructions
  * @param {string} userPrompt - User's original prompt
  * @param {number} maxTokens - Maximum tokens for response
- * @returns {Promise<Object>} Parsed JSON response with optionA and optionB
+ * @returns {Promise<Object>} Parsed JSON response with optionA
  */
 async function callEnhancementAPI(model, systemPrompt, userPrompt, maxTokens) {
   const normalizedModel = (model || 'chatgpt').toLowerCase();
@@ -533,7 +524,7 @@ async function callEnhancementAPI(model, systemPrompt, userPrompt, maxTokens) {
  */
 router.post('/enhance', async (req, res) => {
   try {
-    const { prompt, model, outputType, levelOfDetail } = req.body;
+    const { prompt, model, outputType, levelOfDetail, regenerate, currentEnhanced } = req.body;
 
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt is required' });
@@ -569,11 +560,31 @@ router.post('/enhance', async (req, res) => {
     }
 
     // Build the full system prompt with level of detail
-    const systemPrompt = buildSystemPrompt(
-      model || 'chatgpt',
+    // Always use ChatGPT - model selection removed
+    // If regenerate is true, add instruction to take a markedly different approach
+    let systemPrompt = buildSystemPrompt(
+      'chatgpt',
       outputType || 'text',
       levelOfDetail || 2
     );
+    
+    // If regenerating, add instruction to take a different approach
+    if (regenerate && currentEnhanced) {
+      systemPrompt += `\n\n═══════════════════════════════════════════════════════════════\n` +
+        `REGENERATION MODE: TAKE A MARKEDLY DIFFERENT APPROACH\n` +
+        `═══════════════════════════════════════════════════════════════\n\n` +
+        `IMPORTANT: You are regenerating an existing enhanced prompt. The current enhanced version is:\n\n` +
+        `"${currentEnhanced.substring(0, 500)}${currentEnhanced.length > 500 ? '...' : ''}"\n\n` +
+        `You MUST create a NEW enhanced prompt that takes a MARKEDLY DIFFERENT APPROACH. Do NOT just paraphrase or reword the current version.\n\n` +
+        `Instead, you should:\n` +
+        `- Use a different framing or perspective\n` +
+        `- Try an alternative methodology or structure\n` +
+        `- Approach the task from a different angle\n` +
+        `- Use different language patterns or style\n` +
+        `- Focus on different aspects or priorities\n\n` +
+        `The goal is to produce something genuinely different, not just a rephrasing. Think of it as creating an alternative version that solves the same problem but in a distinctly different way.\n\n` +
+        `Maintain the same level of detail (${levelOfDetail || 2}) and output type (${outputType || 'text'}), but make the approach and framing noticeably different.\n\n`;
+    }
 
     // Calculate max_tokens based on level of detail to allow longer responses
     let maxTokens = 1000; // Default
@@ -585,33 +596,30 @@ router.post('/enhance', async (req, res) => {
       maxTokens = 2000; // High detail - allow 2-3x expansion
     }
 
-    const selectedModel = model || 'chatgpt';
-    console.log(`[API] Enhancement request - Model: ${selectedModel}, Level: ${levelOfDetail}, Max tokens: ${maxTokens}`);
+    console.log(`[API] Enhancement request - Model: chatgpt, Level: ${levelOfDetail}, Max tokens: ${maxTokens}`);
 
-    // Route to appropriate API based on model selection
+    // Always use OpenAI - model selection removed
     let parsed;
     try {
-      parsed = await callEnhancementAPI(selectedModel, systemPrompt, prompt, maxTokens);
+      parsed = await callOpenAI(systemPrompt, prompt, maxTokens);
     } catch (apiError) {
-      console.error(`[API] ${selectedModel} API error:`, apiError);
+      console.error(`[API] OpenAI API error:`, apiError);
       return res.status(500).json({ 
-        error: `Failed to enhance prompt using ${selectedModel}`,
+        error: 'Failed to enhance prompt using ChatGPT',
         details: apiError.message
       });
     }
 
     // Post-process Medium level responses to enforce 5-7 sentences and remove numbered lists
     let finalOptionA = parsed.optionA || prompt;
-    let finalOptionB = parsed.optionB || prompt;
     
     if (levelOfDetail === 2) {
       console.log(`[API] BEFORE post-processing - Option A: "${finalOptionA.substring(0, 100)}..."`);
       console.log(`[API] BEFORE post-processing - Option A has numbered lists: ${/\d+[.)]\s+/.test(finalOptionA)}`);
       finalOptionA = processMediumLevelPrompt(finalOptionA);
-      finalOptionB = processMediumLevelPrompt(finalOptionB);
       console.log(`[API] AFTER post-processing - Option A: "${finalOptionA.substring(0, 100)}..."`);
       console.log(`[API] AFTER post-processing - Option A has numbered lists: ${/\d+[.)]\s+/.test(finalOptionA)}`);
-      console.log(`[API] Post-processed Medium level prompts - Option A: ${countSentences(finalOptionA)} sentences, Option B: ${countSentences(finalOptionB)} sentences`);
+      console.log(`[API] Post-processed Medium level prompt - Option A: ${countSentences(finalOptionA)} sentences`);
     }
 
     // Increment user's enhancement count
@@ -625,7 +633,6 @@ router.post('/enhance', async (req, res) => {
 
     res.json({
       optionA: finalOptionA,
-      optionB: finalOptionB,
       enhancementsUsed: newCount, // Include updated count in response
       enhancementsLimit: user.enhancements_limit
     });
@@ -874,27 +881,13 @@ async function callGrokChat(messages) {
 }
 
 /**
- * Routes chat request to the appropriate API based on model selection
- * @param {string} model - Model identifier (chatgpt, gemini, claude, grok)
+ * Routes chat request to OpenAI (model selection removed)
  * @param {Array} messages - Array of message objects with role and content
  * @returns {Promise<string>} Assistant's reply content
  */
-async function callChatAPI(model, messages) {
-  const normalizedModel = (model || 'chatgpt').toLowerCase();
-
-  switch (normalizedModel) {
-    case 'chatgpt':
-      return await callOpenAIChat(messages);
-    case 'gemini':
-      return await callGeminiChat(messages);
-    case 'claude':
-      return await callClaudeChat(messages);
-    case 'grok':
-      return await callGrokChat(messages);
-    default:
-      // No fallback - throw error for unknown model
-      throw new Error(`Unknown model "${model}". Supported models: chatgpt, gemini, claude, grok`);
-  }
+async function callChatAPI(messages) {
+  // Always use OpenAI - model selection removed
+  return await callOpenAIChat(messages);
 }
 
 /**
@@ -943,9 +936,9 @@ router.post('/chat', async (req, res) => {
     const messages = Array.isArray(chatHistory) ? [...chatHistory] : [];
     messages.push({ role: 'user', content: message });
 
-    const selectedModel = model || 'chatgpt';
+    // Always use ChatGPT - model selection removed
     console.log(`[API Chat] ========== CHAT REQUEST ==========`);
-    console.log(`[API Chat] Model selected: ${selectedModel}`);
+    console.log(`[API Chat] Model: chatgpt (model selection removed)`);
     console.log(`[API Chat] Received request with ${messages.length} messages in history`);
     const systemMsg = messages.find(msg => msg.role === 'system');
     if (systemMsg) {
@@ -955,18 +948,18 @@ router.post('/chat', async (req, res) => {
       console.log(`[API Chat] No system message found in chatHistory`);
     }
 
-    // Route to appropriate API based on model selection
+    // Always use OpenAI - model selection removed
     let content;
     try {
-      console.log(`[API Chat] Attempting to call ${selectedModel} API...`);
-      content = await callChatAPI(selectedModel, messages);
-      console.log(`[API Chat] ✓ Successfully received response from ${selectedModel} (${content.length} chars)`);
+      console.log(`[API Chat] Attempting to call OpenAI API...`);
+      content = await callChatAPI(messages);
+      console.log(`[API Chat] ✓ Successfully received response from OpenAI (${content.length} chars)`);
     } catch (apiError) {
-      console.error(`[API Chat] ✗ ${selectedModel} API error:`, apiError);
+      console.error(`[API Chat] ✗ OpenAI API error:`, apiError);
       console.error(`[API Chat] Error stack:`, apiError.stack);
       console.error(`[API Chat] Error message:`, apiError.message);
       return res.status(500).json({ 
-        error: `Failed to get chat response from ${selectedModel}`,
+        error: 'Failed to get chat response from ChatGPT',
         details: apiError.message
       });
     }

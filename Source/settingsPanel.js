@@ -5,23 +5,13 @@
 
 
 /**
- * Available model options
- */
-export const modelOptions = ["chatgpt", "gemini", "claude", "grok"];
-
-/**
  * Converts model identifier to display name
- * @param {string} model - Model identifier (chatgpt, gemini, claude, grok)
- * @returns {string} Display name (ChatGPT, Gemini, Claude, Grok)
+ * Always returns "ChatGPT" since we only support ChatGPT
+ * @param {string} model - Model identifier (deprecated, always returns ChatGPT)
+ * @returns {string} Display name (always "ChatGPT")
  */
 export function getModelDisplayName(model) {
-  const modelMap = {
-    chatgpt: "ChatGPT",
-    gemini: "Gemini",
-    claude: "Claude",
-    grok: "Grok"
-  };
-  return modelMap[model?.toLowerCase()] || "ChatGPT";
+  return "ChatGPT";
 }
 
 /**
@@ -98,17 +88,11 @@ export function renderSettings(settings) {
   }
   
   const complexityField = document.getElementById("setting-complexity");
-  const modelButtons = document.querySelectorAll(".model-pill");
   const outputTabs = document.querySelectorAll(".form-tab[data-setting='output']");
 
   if (complexityField) {
     complexityField.value = settings.complexity;
   }
-
-  modelButtons.forEach((button) => {
-    const value = button.dataset.model;
-    button.classList.toggle("is-active", value === settings.model);
-  });
 
   outputTabs.forEach((tab) => {
     const value = tab.dataset.value;
@@ -131,7 +115,6 @@ export function registerSettingsHandlers(stateRef, dependencies = {}) {
   const settingsTrigger = document.getElementById("open-settings");
   const outputTabs = document.querySelectorAll(".form-tab[data-setting='output']");
   const detailSlider = document.getElementById("setting-complexity");
-  const modelButtons = document.querySelectorAll(".model-pill");
 
   if (!settingsDialog || !settingsTrigger || !saveState) {
     return;
@@ -148,70 +131,34 @@ export function registerSettingsHandlers(stateRef, dependencies = {}) {
       return;
     }
     
-    // Read the active model button's value directly from the DOM
-    const activeModelButton = document.querySelector(".model-pill.is-active");
-    const selectedModel = activeModelButton?.dataset.model || stateRef.settings.model || "chatgpt";
-    
     // Read the active output tab's value directly from the DOM
     const activeOutputTab = document.querySelector(".form-tab[data-setting='output'].is-active");
     const selectedOutput = activeOutputTab?.dataset.value || stateRef.settings.output || "text";
     
+    // Always use ChatGPT - model selection removed
     stateRef.settings = {
       complexity: Number(document.getElementById("setting-complexity").value),
-      model: selectedModel,
+      model: "chatgpt", // Always ChatGPT
       output: selectedOutput
     };
     
-    // Update activePlatform in state to match the selected model BEFORE saving
-    stateRef.activePlatform = getModelDisplayName(selectedModel);
+    // Update activePlatform to always be ChatGPT
+    stateRef.activePlatform = "ChatGPT";
     
     renderSettings(stateRef.settings);
     await saveState(stateRef);
     
-    // Update status card to reflect model change
+    // Update status card
     if (typeof window.renderStatus === 'function') {
       window.renderStatus({
         plan: stateRef.plan,
         enhancementsUsed: stateRef.enhancementsUsed,
-        enhancementsLimit: stateRef.enhancementsLimit,
-        activePlatform: stateRef.activePlatform,
-        settings: stateRef.settings
+        enhancementsLimit: stateRef.enhancementsLimit
       });
     }
   });
 
   detailSlider.addEventListener("input", updateRangeOutputs);
-
-  modelButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      const value = button.dataset.model;
-      if (!value || !modelOptions.includes(value)) {
-        return;
-      }
-      stateRef.settings.model = value;
-      // Update activePlatform to match the selected model
-      stateRef.activePlatform = getModelDisplayName(value);
-      renderSettings(stateRef.settings);
-      
-      // Save state immediately (non-blocking) so API calls use the correct model
-      // If save fails, it's OK - the dialog close will save anyway
-      saveState(stateRef).catch((error) => {
-        // Silently handle save errors - dialog close will save anyway
-        console.warn("[Prompanion Settings] Failed to save model selection immediately:", error.message);
-      });
-      
-      // Update status card to reflect model change immediately
-      if (typeof window.renderStatus === 'function') {
-        window.renderStatus({
-          plan: stateRef.plan,
-          enhancementsUsed: stateRef.enhancementsUsed,
-          enhancementsLimit: stateRef.enhancementsLimit,
-          activePlatform: stateRef.activePlatform,
-          settings: stateRef.settings
-        });
-      }
-    });
-  });
 
   outputTabs.forEach((tab) => {
     tab.addEventListener("click", () => {

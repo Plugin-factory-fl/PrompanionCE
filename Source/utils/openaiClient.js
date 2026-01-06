@@ -20,18 +20,12 @@ async function getAuthToken() {
 }
 
 /**
- * Gets the current model setting from storage
- * @returns {Promise<string>} Model identifier (chatgpt, gemini, claude, grok)
+ * Gets the current model setting - always returns "chatgpt"
+ * @returns {Promise<string>} Model identifier (always "chatgpt")
  */
 async function getModelSetting() {
-  try {
-    const result = await chrome.storage.sync.get("prompanion-sidepanel-state");
-    const state = result["prompanion-sidepanel-state"] || {};
-    return state.settings?.model || "chatgpt";
-  } catch (error) {
-    console.error("[Prompanion OpenAI Client] Failed to get model setting:", error);
-    return "chatgpt";
-  }
+  // Always use ChatGPT - model selection removed
+  return "chatgpt";
 }
 
 /**
@@ -48,9 +42,9 @@ export async function callOpenAI(messages, chatHistory = [], modelOverride = nul
     throw new Error("No authentication token. Please log in.");
   }
 
-  // Get the selected model - use override if provided, otherwise read from storage
-  const model = modelOverride || await getModelSetting();
-  console.log("[Prompanion OpenAI Client] Using model for chat:", model, modelOverride ? "(from stateRef)" : "(from storage)");
+  // Always use ChatGPT - model selection removed
+  const model = "chatgpt";
+  console.log("[Prompanion OpenAI Client] Using model for chat: chatgpt");
 
   // messages array already includes the system message with chat history context from buildChatApiMessages
   // We should use it directly, not mix it with raw chatHistory

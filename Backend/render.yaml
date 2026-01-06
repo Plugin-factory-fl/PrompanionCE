@@ -17,12 +17,6 @@ services:
         generateValue: true
       - key: OPENAI_API_KEY
         sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: CLAUDE_API_KEY
-        sync: false
-      - key: GROK_API_KEY
-        sync: false
       - key: ALLOWED_ORIGINS
         value: chrome-extension://*
 

@@ -95,7 +95,6 @@ const defaultState = {
   activePlatform: "ChatGPT",
   originalPrompt: "",
   optionA: "",
-  optionB: "",
   library: createDefaultLibrary(),
   settings: {
     complexity: 2,
@@ -251,7 +250,7 @@ const pendingStorageChanges = [];
  * @returns {boolean} True if state has any prompts
  */
 function hasPrompts(state) {
-  return !!(state?.originalPrompt || state?.optionA || state?.optionB);
+  return !!(state?.originalPrompt || state?.optionA);
 }
 
 /**
@@ -263,11 +262,9 @@ function hasPrompts(state) {
 function promptsNeedUpdate(currentState, latestState) {
   return (
     !currentState.originalPrompt || 
-    !currentState.optionA || 
-    !currentState.optionB ||
+    !currentState.optionA ||
     currentState.originalPrompt !== latestState.originalPrompt ||
-    currentState.optionA !== latestState.optionA ||
-    currentState.optionB !== latestState.optionB
+    currentState.optionA !== latestState.optionA
   );
 }
 
@@ -412,17 +409,18 @@ async function loadState() {
     // Only use default if stored value is truly undefined
     originalPrompt: stored.hasOwnProperty('originalPrompt') ? stored.originalPrompt : defaultState.originalPrompt,
     optionA: stored.hasOwnProperty('optionA') ? stored.optionA : defaultState.optionA,
-    optionB: stored.hasOwnProperty('optionB') ? stored.optionB : defaultState.optionB,
-    // CRITICAL: Preserve model setting - if stored.settings has a model, use it (don't overwrite with default)
-    settings: stored.settings && stored.settings.model 
-      ? { ...defaultState.settings, ...stored.settings }
-      : { ...defaultState.settings, ...(stored.settings || {}) },
+    // Always use ChatGPT - model selection removed
+    settings: { 
+      ...defaultState.settings, 
+      ...(stored.settings || {}),
+      model: "chatgpt" // Always ChatGPT, ignore stored model
+    },
     conversations: validConversations,
     activeConversationId: null // Will be set to new conversation in init()
   };
   
-  // Set activePlatform based on the model in settings (always ensure it's set correctly)
-  mergedState.activePlatform = getModelDisplayName(mergedState.settings?.model);
+  // Always set activePlatform to ChatGPT - model selection removed
+  mergedState.activePlatform = "ChatGPT";
   
   // Ensure settings object exists with defaults
   if (!mergedState.settings) {
@@ -444,7 +442,6 @@ async function loadState() {
     // Preserve prompts from stored state
     mergedState.originalPrompt = stored.originalPrompt || mergedState.originalPrompt;
     mergedState.optionA = stored.optionA || mergedState.optionA;
-    mergedState.optionB = stored.optionB || mergedState.optionB;
   }
   
   // Only save if library changed, not on every load (to avoid overwriting prompts)
@@ -665,20 +662,10 @@ function renderStatus(status) {
   const enhancementsUsed = status.enhancementsUsed ?? status?.enhancementsUsed ?? 0;
   const enhancementsLimit = status.enhancementsLimit ?? status?.enhancementsLimit ?? 10;
   
-  // Always derive activePlatform from settings.model if available, otherwise use activePlatform from status
-  let activePlatform = status.activePlatform;
-  if (status.settings?.model) {
-    activePlatform = getModelDisplayName(status.settings.model);
-  } else if (!activePlatform && status?.settings?.model) {
-    activePlatform = getModelDisplayName(status.settings.model);
-  } else if (!activePlatform) {
-    activePlatform = "ChatGPT"; // Fallback
-  }
-  
   document.getElementById("user-plan").textContent = plan;
   document.getElementById("enhancements-count").textContent = enhancementsUsed;
   document.getElementById("enhancements-limit").textContent = enhancementsLimit;
-  document.getElementById("active-platform").textContent = activePlatform;
+  // Model Being Used card removed - always uses ChatGPT
 }
 
 // Expose renderStatus globally so Side Chat can use it
@@ -867,10 +854,8 @@ async function init() {
     hasStored: !!storedState,
     hasOriginalPrompt: !!storedState?.originalPrompt,
     hasOptionA: !!storedState?.optionA,
-    hasOptionB: !!storedState?.optionB,
     originalPrompt: storedState?.originalPrompt?.substring(0, 50),
-    optionA: storedState?.optionA?.substring(0, 50),
-    optionB: storedState?.optionB?.substring(0, 50)
+    optionA: storedState?.optionA?.substring(0, 50)
   });
 
   // DIRECT: If storage has prompts, use them directly - NO MERGE LOGIC
@@ -879,29 +864,24 @@ async function init() {
     console.log("[Prompanion Sidepanel] Stored prompts:", {
       originalPrompt: storedState.originalPrompt?.substring(0, 100),
       optionA: storedState.optionA?.substring(0, 100),
-      optionB: storedState.optionB?.substring(0, 100),
       originalPromptLength: storedState.originalPrompt?.length,
-      optionALength: storedState.optionA?.length,
-      optionBLength: storedState.optionB?.length
+      optionALength: storedState.optionA?.length
     });
     
     // DIRECT ASSIGNMENT - no merge, no checks, just assign
     currentState.originalPrompt = storedState.originalPrompt || "";
     currentState.optionA = storedState.optionA || "";
-    currentState.optionB = storedState.optionB || "";
     
     console.log("[Prompanion Sidepanel] Assigned to currentState:", {
       originalPrompt: currentState.originalPrompt?.substring(0, 50),
-      optionA: currentState.optionA?.substring(0, 50),
-      optionB: currentState.optionB?.substring(0, 50)
+      optionA: currentState.optionA?.substring(0, 50)
     });
     
     // Render immediately and aggressively
     // Calling renderPrompts
     renderPrompts({
       originalPrompt: currentState.originalPrompt,
-      optionA: currentState.optionA,
-      optionB: currentState.optionB
+      optionA: currentState.optionA
     });
     
     // Also render multiple times to ensure it sticks
@@ -909,8 +889,7 @@ async function init() {
     setTimeout(() => {
         renderPrompts({
           originalPrompt: currentState.originalPrompt,
-          optionA: currentState.optionA,
-          optionB: currentState.optionB
+          optionA: currentState.optionA
         });
       }, delay);
     });
@@ -960,11 +939,10 @@ async function init() {
   // This prevents us from overwriting prompts that were just saved by the background script
   const latestStorage = await storage.get(STATE_KEY);
   if (latestStorage && hasPrompts(latestStorage)) {
-    if (!currentState.originalPrompt && !currentState.optionA && !currentState.optionB) {
+    if (!currentState.originalPrompt && !currentState.optionA) {
       console.log("[Prompanion Sidepanel] Storage has prompts we don't have, preserving them before save");
       currentState.originalPrompt = latestStorage.originalPrompt || "";
       currentState.optionA = latestStorage.optionA || "";
-      currentState.optionB = latestStorage.optionB || "";
     }
   }
   
@@ -1138,10 +1116,8 @@ async function init() {
   console.log("[Prompanion Sidepanel] Final state check:", {
     hasOriginalPrompt: !!finalState?.originalPrompt,
     hasOptionA: !!finalState?.optionA,
-    hasOptionB: !!finalState?.optionB,
     originalPrompt: finalState?.originalPrompt?.substring(0, 50),
-    optionA: finalState?.optionA?.substring(0, 50),
-    optionB: finalState?.optionB?.substring(0, 50)
+    optionA: finalState?.optionA?.substring(0, 50)
   });
   if (finalState && hasPrompts(finalState)) {
     // Always update prompts if they exist in storage, even if they match
@@ -1283,12 +1259,10 @@ window.refreshPrompts = async function() {
   if (storedState && hasPrompts(storedState)) {
     currentState.originalPrompt = storedState.originalPrompt || "";
     currentState.optionA = storedState.optionA || "";
-    currentState.optionB = storedState.optionB || "";
     console.log("[Prompanion Sidepanel] Updated currentState, calling renderPrompts");
     renderPrompts({
       originalPrompt: currentState.originalPrompt,
-      optionA: currentState.optionA,
-      optionB: currentState.optionB
+      optionA: currentState.optionA
     });
     console.log("[Prompanion Sidepanel] Manual refresh complete");
   } else {
@@ -1300,19 +1274,13 @@ window.testPrompts = function() {
   console.log("[Prompanion Sidepanel] ========== TEST PROMPTS ==========");
   const originalField = document.getElementById("original-prompt");
   const optionAField = document.getElementById("option-a");
-  const optionBField = document.getElementById("option-b");
   console.log("[Prompanion Sidepanel] DOM elements:", {
     hasOriginal: !!originalField,
-    hasOptionA: !!optionAField,
-    hasOptionB: !!optionBField
+    hasOptionA: !!optionAField
   });
   if (optionAField) {
     optionAField.value = "TEST VALUE FOR OPTION A";
     console.log("[Prompanion Sidepanel] Set test value, field now has:", optionAField.value);
-  }
-  if (optionBField) {
-    optionBField.value = "TEST VALUE FOR OPTION B";
-    console.log("[Prompanion Sidepanel] Set test value, field now has:", optionBField.value);
   }
 };
 
@@ -1344,13 +1312,10 @@ if (chrome?.storage?.onChanged) {
       console.log("[Prompanion Sidepanel] Storage change - new state:", {
         hasOriginalPrompt: !!newState.originalPrompt,
         hasOptionA: !!newState.optionA,
-        hasOptionB: !!newState.optionB,
         originalPrompt: newState.originalPrompt?.substring(0, 50),
         optionA: newState.optionA?.substring(0, 50),
-        optionB: newState.optionB?.substring(0, 50),
         originalPromptLength: newState.originalPrompt?.length,
-        optionALength: newState.optionA?.length,
-        optionBLength: newState.optionB?.length
+        optionALength: newState.optionA?.length
       });
       
       if (hasPrompts(newState)) {
@@ -1360,7 +1325,6 @@ if (chrome?.storage?.onChanged) {
           // DIRECT UPDATE - don't use handleStatePush, just update directly
           currentState.originalPrompt = newState.originalPrompt || currentState.originalPrompt;
           currentState.optionA = newState.optionA || currentState.optionA;
-          currentState.optionB = newState.optionB || currentState.optionB;
           
           // Calling renderPrompts after storage change
           renderPrompts(currentState);
@@ -1390,7 +1354,6 @@ setInterval(async () => {
       console.log("[Prompanion Sidepanel] Poll detected prompts update, rendering...");
       currentState.originalPrompt = latestState.originalPrompt || currentState.originalPrompt;
       currentState.optionA = latestState.optionA || currentState.optionA;
-      currentState.optionB = latestState.optionB || currentState.optionB;
       renderPrompts(currentState);
     }
   }
@@ -1445,10 +1408,8 @@ if (chrome?.runtime?.onMessage) {
         console.log("[Prompanion Sidepanel] PROMPANION_STATE_PUSH received:", {
           hasOriginalPrompt: !!message.state.originalPrompt,
           hasOptionA: !!message.state.optionA,
-          hasOptionB: !!message.state.optionB,
           originalPrompt: message.state.originalPrompt?.substring(0, 50),
-          optionA: message.state.optionA?.substring(0, 50),
-          optionB: message.state.optionB?.substring(0, 50)
+          optionA: message.state.optionA?.substring(0, 50)
         });
         const otherState = handleStatePush(currentState, message.state);
         Object.assign(currentState, otherState);
