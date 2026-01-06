@@ -1,7 +1,7 @@
 {
   "name": "prompanion-backend",
   "version": "1.0.0",
-  "description": "Backend server for Prompanion extension",
+  "description": "Backend server for PromptProfile™ extension",
   "main": "server.js",
   "type": "module",
   "scripts": {

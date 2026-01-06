@@ -2,17 +2,17 @@
 // LabsGoogle Adapter for labs.google.com
 // ============================================================================
 
-console.log("[Prompanion LabsGoogle] ========== ADAPTER.JS LOADING ==========");
-console.log("[Prompanion LabsGoogle] Timestamp:", new Date().toISOString());
-console.log("[Prompanion LabsGoogle] Location:", window.location.href);
+console.log("[PromptProfile™ LabsGoogle] ========== ADAPTER.JS LOADING ==========");
+console.log("[PromptProfile™ LabsGoogle] Timestamp:", new Date().toISOString());
+console.log("[PromptProfile™ LabsGoogle] Location:", window.location.href);
 
 // Import constants from AdapterBase
 if (typeof AdapterBase === "undefined") {
-  console.error("[Prompanion LabsGoogle] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
+  console.error("[PromptProfile™ LabsGoogle] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
   throw new Error("AdapterBase must be loaded before adapter.js");
 }
 
-const BUTTON_ID = "prompanion-labs-google-trigger";
+const BUTTON_ID = "promptprofile-labs-google-trigger";
 const BUTTON_CLASS = AdapterBase.BUTTON_CLASS;
 const SELECTION_TOOLBAR_ID = AdapterBase.SELECTION_TOOLBAR_ID;
 const SELECTION_TOOLBAR_VISIBLE_CLASS = AdapterBase.SELECTION_TOOLBAR_VISIBLE_CLASS;
@@ -75,13 +75,13 @@ async function submitSelectionToSideChat(text) {
       chatHistory: []
     }, (response) => {
       if (!response?.ok) {
-        console.warn("Prompanion: sidechat request rejected", response?.reason);
+        console.warn("PromptProfile™: sidechat request rejected", response?.reason);
       }
     }).catch((error) => {
-      console.warn("Prompanion: failed to request sidechat from selection", error);
+      console.warn("PromptProfile™: failed to request sidechat from selection", error);
     });
   } catch (error) {
-    console.error("Prompanion: sidechat request threw synchronously", error);
+    console.error("PromptProfile™: sidechat request threw synchronously", error);
   }
 }
 
@@ -102,7 +102,7 @@ function createIcon() {
 function requestPromptEnhancement(promptText) {
   return AdapterBase.sendMessage({ type: "PROMPANION_PREPARE_ENHANCEMENT", prompt: promptText, openPanel: false })
     .catch((error) => {
-      console.warn("[Prompanion LabsGoogle] Enhancement request failed:", error);
+      console.warn("[PromptProfile™ LabsGoogle] Enhancement request failed:", error);
       return { ok: false, reason: "UNKNOWN_ERROR" };
     });
 }
@@ -125,18 +125,18 @@ function showLabsTooltip(button) {
   const container = document.getElementById(`${BUTTON_ID}-tooltip-layer`);
   if (!data || !container) return;
   
-  let tooltip = button._prompanionTooltip;
+  let tooltip = button._promptprofileTooltip;
   if (!tooltip) {
     tooltip = document.createElement("div");
-    tooltip.className = "prompanion-tooltip";
+    tooltip.className = "promptprofile-tooltip";
     tooltip.setAttribute("role", "tooltip");
     const text = document.createElement("span");
     text.textContent = data.text;
     const hidden = document.createElement("span");
-    hidden.className = "prompanion-visually-hidden";
+    hidden.className = "promptprofile-visually-hidden";
     hidden.textContent = data.text;
     tooltip.append(text, hidden);
-    button._prompanionTooltip = tooltip;
+    button._promptprofileTooltip = tooltip;
     container.append(tooltip);
   }
   
@@ -168,9 +168,9 @@ function buildButton() {
   button.style.cursor = "pointer";
   
   button.append(createIcon());
-  AdapterBase.attachTooltip(button, "Open Prompanion to enhance your prompts.", BUTTON_ID);
+  AdapterBase.attachTooltip(button, "Open PromptProfile™ to enhance your prompts.", BUTTON_ID);
   button.addEventListener("click", () => AdapterBase.togglePanel()
-    .catch((e) => console.error("Prompanion: failed to open sidebar", e)));
+    .catch((e) => console.error("PromptProfile™: failed to open sidebar", e)));
   button.addEventListener("mouseenter", () => showLabsTooltip(button));
   button.addEventListener("focus", () => showLabsTooltip(button));
   button.addEventListener("mouseleave", () => AdapterBase.hideTooltip(button));
@@ -221,10 +221,10 @@ function positionFloatingButton(inputNode) {
     
     if (referenceElement && referenceElement instanceof HTMLElement) {
       targetContainer = referenceElement.parentElement;
-      console.log("[Prompanion LabsGoogle] Target button found");
+      console.log("[PromptProfile™ LabsGoogle] Target button found");
     }
   } catch (error) {
-    console.warn("[Prompanion LabsGoogle] Reference detection error:", error);
+    console.warn("[PromptProfile™ LabsGoogle] Reference detection error:", error);
   }
   
   if (!targetContainer || !referenceElement) {
@@ -263,7 +263,7 @@ function positionFloatingButton(inputNode) {
   floatingButtonWrapper.style.transform = "translateY(-50%)";
   floatingButtonWrapper.style.left = "auto";
   floatingButtonWrapper.style.display = "flex";
-  console.log("[Prompanion LabsGoogle] Button positioned at:", spacing, "px from right");
+  console.log("[PromptProfile™ LabsGoogle] Button positioned at:", spacing, "px from right");
 }
 
 function ensureDomObserver() {
@@ -299,13 +299,13 @@ function locateComposer() {
     const element = document.querySelector(selector);
     if (element instanceof HTMLElement) {
       input = element;
-      console.log("[Prompanion LabsGoogle] Composer found with selector:", selector);
+      console.log("[PromptProfile™ LabsGoogle] Composer found with selector:", selector);
       break;
     }
   }
 
   if (!input) {
-    console.warn("[Prompanion LabsGoogle] No composer input found");
+    console.warn("[PromptProfile™ LabsGoogle] No composer input found");
     return null;
   }
 
@@ -348,7 +348,7 @@ function handleInsertTextMessage(message, sender, sendResponse) {
     sendResponse({ ok: success });
     return false;
   } catch (error) {
-    console.error("[Prompanion LabsGoogle] Insert text handler failed", error);
+    console.error("[PromptProfile™ LabsGoogle] Insert text handler failed", error);
     sendResponse({ ok: false, reason: error?.message ?? "UNKNOWN" });
     return false;
   }
@@ -401,11 +401,11 @@ function ensureEnhanceTooltipElement() {
   }
 
   enhanceTooltipElement = document.createElement("div");
-  enhanceTooltipElement.className = "prompanion-enhance-tooltip";
+  enhanceTooltipElement.className = "promptprofile-enhance-tooltip";
   
   const dismiss = document.createElement("button");
   dismiss.type = "button";
-  dismiss.className = "prompanion-enhance-tooltip__dismiss";
+  dismiss.className = "promptprofile-enhance-tooltip__dismiss";
   dismiss.textContent = "×";
   dismiss.addEventListener("click", (e) => {
     e.preventDefault();
@@ -416,7 +416,7 @@ function ensureEnhanceTooltipElement() {
 
   const action = document.createElement("button");
   action.type = "button";
-  action.className = "prompanion-enhance-tooltip__action";
+  action.className = "promptprofile-enhance-tooltip__action";
   AdapterBase.setButtonTextContent(action, "Refine");
   
   enhanceTooltipElement.append(dismiss, action);
@@ -425,14 +425,14 @@ function ensureEnhanceTooltipElement() {
 
 // Global mousedown capture for Refine button
 document.addEventListener("mousedown", (e) => {
-  const refineButton = e.target.closest(".prompanion-enhance-tooltip__action");
-  if (refineButton && !refineButton.classList.contains("prompanion-enhance-tooltip__upgrade")) {
+  const refineButton = e.target.closest(".promptprofile-enhance-tooltip__action");
+  if (refineButton && !refineButton.classList.contains("promptprofile-enhance-tooltip__upgrade")) {
     handleRefineButtonClick(e);
   }
 }, true);
 
 document.addEventListener("click", (e) => {
-  if (e.target.closest(".prompanion-enhance-tooltip__action")) {
+  if (e.target.closest(".promptprofile-enhance-tooltip__action")) {
     e.preventDefault();
     e.stopPropagation();
   }
@@ -451,20 +451,20 @@ async function handleRefineButtonClick(e) {
   let composerNode = composer?.input || enhanceTooltipActiveTextarea || floatingButtonTargetInput;
   
   if (!composerNode) {
-    console.error("[Prompanion LabsGoogle] Refine failed: No composer node found");
+    console.error("[PromptProfile™ LabsGoogle] Refine failed: No composer node found");
     return false;
   }
 
   const promptText = (composerNode.value || composerNode.textContent || "").trim();
   if (!promptText) {
-    console.warn("[Prompanion LabsGoogle] Refine ignored: Text is empty");
+    console.warn("[PromptProfile™ LabsGoogle] Refine ignored: Text is empty");
     return false;
   }
 
-  console.log("[Prompanion LabsGoogle] Text to refine:", promptText.substring(0, 50));
+  console.log("[PromptProfile™ LabsGoogle] Text to refine:", promptText.substring(0, 50));
   enhanceActionInFlight = true;
   
-  const actionButton = enhanceTooltipElement?.querySelector(".prompanion-enhance-tooltip__action");
+  const actionButton = enhanceTooltipElement?.querySelector(".promptprofile-enhance-tooltip__action");
   if (actionButton) {
     actionButton.disabled = true;
     AdapterBase.setButtonTextContent(actionButton, "Refining...");
@@ -473,13 +473,13 @@ async function handleRefineButtonClick(e) {
 
   try {
     const result = await requestPromptEnhancement(promptText);
-    console.log("[Prompanion LabsGoogle] Enhancement result received:", result);
+    console.log("[PromptProfile™ LabsGoogle] Enhancement result received:", result);
 
     if (result && result.ok) {
       const refinedText = (result.optionA && typeof result.optionA === "string") ? result.optionA.trim() : promptText;
       
       const success = setComposerText(composerNode, refinedText);
-      console.log("[Prompanion LabsGoogle] Insertion success:", success);
+      console.log("[PromptProfile™ LabsGoogle] Insertion success:", success);
       
       hideEnhanceTooltip();
       enhanceTooltipDismissed = true;
@@ -497,7 +497,7 @@ async function handleRefineButtonClick(e) {
       showUpgradeButtonInTooltip();
     }
   } catch (err) {
-    console.error("[Prompanion LabsGoogle] Refine process error:", err);
+    console.error("[PromptProfile™ LabsGoogle] Refine process error:", err);
   } finally {
     enhanceActionInFlight = false;
     if (enhanceTooltipElement) {
@@ -569,7 +569,7 @@ function showEnhanceTooltip() {
   if (!enhanceTooltipElement) return;
   
   // Reset button state whenever showing
-  const actionButton = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
+  const actionButton = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
   if (actionButton && !enhanceActionInFlight) {
     actionButton.disabled = false;
     AdapterBase.setButtonTextContent(actionButton, "Refine");
@@ -587,7 +587,7 @@ function hideEnhanceTooltip() {
   enhanceTooltipElement.classList.remove("is-loading");
   enhanceActionInFlight = false;
   
-  const actionButton = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
+  const actionButton = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
   if (actionButton && !enhanceTooltipElement.classList.contains("show-upgrade")) {
     actionButton.disabled = false;
     AdapterBase.setButtonTextContent(actionButton, "Refine");

@@ -346,7 +346,7 @@ export class ChatHistoryExtractor {
       : document.body;
 
     if (!container) {
-      console.warn(`[Prompanion Chat History] Container not found for ${this.platformName}`);
+      console.warn(`[PromptProfile™ Chat History] Container not found for ${this.platformName}`);
       return;
     }
 
@@ -365,7 +365,7 @@ export class ChatHistoryExtractor {
       this.scanForMessages();
     }, 5000); // Scan every 5 seconds
 
-    console.log(`[Prompanion Chat History] Started capturing for ${this.platformName}`);
+    console.log(`[PromptProfile™ Chat History] Started capturing for ${this.platformName}`);
   }
 
   /**
@@ -399,7 +399,7 @@ export class ChatHistoryExtractor {
       this.scanTimer = null;
     }
 
-    console.log(`[Prompanion Chat History] Stopped capturing for ${this.platformName}`);
+    console.log(`[PromptProfile™ Chat History] Stopped capturing for ${this.platformName}`);
   }
 
   /**
@@ -412,7 +412,7 @@ export class ChatHistoryExtractor {
     }
 
     if (!chrome?.runtime?.sendMessage) {
-      console.warn("[Prompanion Chat History] chrome.runtime.sendMessage not available");
+      console.warn("[PromptProfile™ Chat History] chrome.runtime.sendMessage not available");
       return;
     }
 
@@ -429,7 +429,7 @@ export class ChatHistoryExtractor {
     chrome.runtime.sendMessage(payload, (response) => {
       if (chrome.runtime.lastError) {
         console.warn(
-          "[Prompanion Chat History] Failed to send messages to background:",
+          "[PromptProfile™ Chat History] Failed to send messages to background:",
           chrome.runtime.lastError.message
         );
       }
@@ -509,7 +509,7 @@ export async function getChatHistoryContext(platform, conversationId = null, max
 
     return messages;
   } catch (error) {
-    console.error("[Prompanion Chat History] Failed to get context:", error);
+    console.error("[PromptProfile™ Chat History] Failed to get context:", error);
     return [];
   }
 }

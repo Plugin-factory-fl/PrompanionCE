@@ -1,5 +1,5 @@
 /**
- * AdapterBase - Base class for Prompanion adapters
+ * AdapterBase - Base class for PromptProfile™ adapters
  * Contains shared constants and configuration used across all adapters
  */
 
@@ -536,7 +536,7 @@ class AdapterBase {
             if (errorMessage.includes("Extension context invalidated") || 
                 errorMessage.includes("message port closed") ||
                 errorMessage.includes("Could not establish connection")) {
-              const contextError = new Error("Extension context invalidated. Please reload the page to continue using Prompanion.");
+              const contextError = new Error("Extension context invalidated. Please reload the page to continue using PromptProfile™.");
               console.error(`[AdapterBase] Extension context invalidated (${message.type}):`, contextError);
               
               // Show user-friendly notification
@@ -569,7 +569,7 @@ class AdapterBase {
         if (errorMessage.includes("Extension context invalidated") || 
             errorMessage.includes("message port closed") ||
             errorMessage.includes("Could not establish connection")) {
-          const contextError = new Error("Extension context invalidated. Please reload the page to continue using Prompanion.");
+          const contextError = new Error("Extension context invalidated. Please reload the page to continue using PromptProfile™.");
           console.error(`[AdapterBase] Extension context invalidated (${message.type}):`, contextError);
           
           // Show user-friendly notification
@@ -621,7 +621,7 @@ class AdapterBase {
     
     notification.innerHTML = `
       <div style="font-weight: 600; margin-bottom: 8px;">Prompanion Extension Reloaded</div>
-      <div style="opacity: 0.95;">Please reload this page to continue using Prompanion features.</div>
+      <div style="opacity: 0.95;">Please reload this page to continue using PromptProfile™ features.</div>
       <button id="prompanion-reload-page" style="
         margin-top: 12px;
         padding: 8px 16px;
@@ -1126,14 +1126,14 @@ class AdapterBase {
     button.id = this.BUTTON_ID;
     button.type = "button";
     button.className = this.BUTTON_CLASS;
-    button.setAttribute("aria-label", "Open Prompanion to enhance your prompts");
+    button.setAttribute("aria-label", "Open PromptProfile™ to enhance your prompts");
     
     // Create icon
     const icon = this._createStickyButtonIcon();
     button.append(icon);
     
     // Attach tooltip
-    this.attachTooltip(button, "Open Prompanion to enhance your prompts for the best response.", this.BUTTON_ID);
+    this.attachTooltip(button, "Open PromptProfile™ to enhance your prompts for the best response.", this.BUTTON_ID);
     
     // Add event listeners
     button.addEventListener("click", () => {

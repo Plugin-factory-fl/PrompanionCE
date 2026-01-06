@@ -10,19 +10,19 @@ const STATE_KEY = "prompanion-sidepanel-state";
  */
 export async function cleanupStorage() {
   try {
-    console.log("[Prompanion Cleanup] Starting storage cleanup...");
+    console.log("[PromptProfile™ Cleanup] Starting storage cleanup...");
     
     // Get current state
     const result = await chrome.storage.sync.get(STATE_KEY);
     const state = result[STATE_KEY];
     
     if (!state) {
-      console.log("[Prompanion Cleanup] No state found, nothing to clean");
+      console.log("[PromptProfile™ Cleanup] No state found, nothing to clean");
       return { cleaned: false, sizeBefore: 0, sizeAfter: 0 };
     }
 
     const sizeBefore = JSON.stringify(state).length;
-    console.log("[Prompanion Cleanup] Storage size before cleanup:", sizeBefore, "bytes");
+    console.log("[PromptProfile™ Cleanup] Storage size before cleanup:", sizeBefore, "bytes");
 
     // Clean up conversations - remove old ones and truncate history more aggressively
     if (state.conversations && Array.isArray(state.conversations)) {
@@ -55,7 +55,7 @@ export async function cleanupStorage() {
           return conv;
         });
       
-      console.log("[Prompanion Cleanup] Cleaned conversations");
+      console.log("[PromptProfile™ Cleanup] Cleaned conversations");
     }
 
     // Clear old prompts more aggressively (keep only current session, truncate if too long)
@@ -82,7 +82,7 @@ export async function cleanupStorage() {
         }
         return folder;
       });
-      console.log("[Prompanion Cleanup] Cleaned library");
+      console.log("[PromptProfile™ Cleanup] Cleaned library");
     }
 
     // Remove unnecessary fields
@@ -92,7 +92,7 @@ export async function cleanupStorage() {
     // More aggressive cleanup: truncate prompts if still too large
     const currentSize = JSON.stringify(state).length;
     if (currentSize > 7000) { // If still over 7KB, truncate more aggressively
-      console.log("[Prompanion Cleanup] Still too large after initial cleanup, truncating more aggressively...");
+      console.log("[PromptProfile™ Cleanup] Still too large after initial cleanup, truncating more aggressively...");
       
       // Truncate prompts more aggressively
       if (state.originalPrompt && state.originalPrompt.length > 300) {
@@ -135,17 +135,17 @@ export async function cleanupStorage() {
     }
 
     const sizeAfter = JSON.stringify(state).length;
-    console.log("[Prompanion Cleanup] Storage size after cleanup:", sizeAfter, "bytes");
-    console.log("[Prompanion Cleanup] Saved:", sizeBefore - sizeAfter, "bytes");
+    console.log("[PromptProfile™ Cleanup] Storage size after cleanup:", sizeAfter, "bytes");
+    console.log("[PromptProfile™ Cleanup] Saved:", sizeBefore - sizeAfter, "bytes");
 
     // Save cleaned state
     try {
       await chrome.storage.sync.set({ [STATE_KEY]: state });
-      console.log("[Prompanion Cleanup] Cleaned state saved successfully");
+      console.log("[PromptProfile™ Cleanup] Cleaned state saved successfully");
       return { cleaned: true, sizeBefore, sizeAfter, saved: sizeBefore - sizeAfter };
     } catch (error) {
       if (error.message?.includes("quota") || error.message?.includes("QUOTA_BYTES")) {
-        console.error("[Prompanion Cleanup] Still too large after cleanup, need more aggressive cleanup");
+        console.error("[PromptProfile™ Cleanup] Still too large after cleanup, need more aggressive cleanup");
         // More aggressive cleanup - remove conversations entirely
         state.conversations = [];
         state.originalPrompt = "";
@@ -156,7 +156,7 @@ export async function cleanupStorage() {
       throw error;
     }
   } catch (error) {
-    console.error("[Prompanion Cleanup] Error during cleanup:", error);
+    console.error("[PromptProfile™ Cleanup] Error during cleanup:", error);
     throw error;
   }
 }
@@ -211,7 +211,7 @@ export async function getStorageInfo() {
       breakdown
     };
   } catch (error) {
-    console.error("[Prompanion Cleanup] Error getting storage info:", error);
+    console.error("[PromptProfile™ Cleanup] Error getting storage info:", error);
     return null;
   }
 }

@@ -14,7 +14,7 @@ async function getAuthToken() {
     const result = await chrome.storage.local.get("authToken");
     return result.authToken || null;
   } catch (error) {
-    console.error("Prompanion: failed to get auth token", error);
+    console.error("PromptProfile™: failed to get auth token", error);
     return null;
   }
 }
@@ -44,7 +44,7 @@ export async function callOpenAI(messages, chatHistory = [], modelOverride = nul
 
   // Always use ChatGPT - model selection removed
   const model = "chatgpt";
-  console.log("[Prompanion OpenAI Client] Using model for chat: chatgpt");
+  console.log("[PromptProfile™ OpenAI Client] Using model for chat: chatgpt");
 
   // messages array already includes the system message with chat history context from buildChatApiMessages
   // We should use it directly, not mix it with raw chatHistory
@@ -59,7 +59,7 @@ export async function callOpenAI(messages, chatHistory = [], modelOverride = nul
   
   // First limit message count
   if (chatHistoryForRequest.length > MAX_CHAT_HISTORY_MESSAGES) {
-    console.warn(`[Prompanion OpenAI Client] Truncating chat history from ${chatHistoryForRequest.length} to ${MAX_CHAT_HISTORY_MESSAGES} messages`);
+    console.warn(`[PromptProfile™ OpenAI Client] Truncating chat history from ${chatHistoryForRequest.length} to ${MAX_CHAT_HISTORY_MESSAGES} messages`);
     chatHistoryForRequest = chatHistoryForRequest.slice(-MAX_CHAT_HISTORY_MESSAGES);
   }
   
@@ -74,7 +74,7 @@ export async function callOpenAI(messages, chatHistory = [], modelOverride = nul
   
   // If still too large, truncate system message content
   if (requestBodySize > MAX_REQUEST_SIZE) {
-    console.warn(`[Prompanion OpenAI Client] Request body size (${requestBodySize} bytes) exceeds limit, truncating system message`);
+    console.warn(`[PromptProfile™ OpenAI Client] Request body size (${requestBodySize} bytes) exceeds limit, truncating system message`);
     
     const systemMessage = chatHistoryForRequest.find(msg => msg.role === "system");
     if (systemMessage && systemMessage.content) {
@@ -87,7 +87,7 @@ export async function callOpenAI(messages, chatHistory = [], modelOverride = nul
           chatHistory: chatHistoryForRequest
         };
         requestBodySize = JSON.stringify(requestBody).length;
-        console.log(`[Prompanion OpenAI Client] System message truncated, new request size: ${requestBodySize} bytes`);
+        console.log(`[PromptProfile™ OpenAI Client] System message truncated, new request size: ${requestBodySize} bytes`);
       }
     }
     
@@ -114,12 +114,12 @@ export async function callOpenAI(messages, chatHistory = [], modelOverride = nul
         message: lastMessage.content,
         chatHistory: chatHistoryForRequest
       };
-      console.warn(`[Prompanion OpenAI Client] Further truncated to ${chatHistoryForRequest.length} messages, final size: ${JSON.stringify(requestBody).length} bytes`);
+      console.warn(`[PromptProfile™ OpenAI Client] Further truncated to ${chatHistoryForRequest.length} messages, final size: ${JSON.stringify(requestBody).length} bytes`);
     }
   }
   
   // Log for debugging
-  console.log("[Prompanion OpenAI Client] Sending messages to API:", {
+  console.log("[PromptProfile™ OpenAI Client] Sending messages to API:", {
     totalMessages: messages.length,
     chatHistoryMessages: chatHistoryForRequest.length,
     hasSystemMessage: chatHistoryForRequest.some(msg => msg.role === "system"),
@@ -140,7 +140,7 @@ export async function callOpenAI(messages, chatHistory = [], modelOverride = nul
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-    console.error("[Prompanion OpenAI Client] API error response:", {
+    console.error("[PromptProfile™ OpenAI Client] API error response:", {
       status: response.status,
       statusText: response.statusText,
       error: errorData.error,
@@ -187,7 +187,7 @@ export async function callOpenAI(messages, chatHistory = [], modelOverride = nul
 export async function generateConversationTitle(contextualMessages, fallback = "Conversation") {
   const token = await getAuthToken();
   if (!token) {
-    console.log("[Prompanion] No auth token for title generation, using fallback");
+    console.log("[PromptProfile™] No auth token for title generation, using fallback");
     return fallback.slice(0, 40);
   }
 
@@ -206,14 +206,14 @@ export async function generateConversationTitle(contextualMessages, fallback = "
       }
     ];
 
-    console.log("[Prompanion] Calling OpenAI for title generation with", messagesForTitle.length, "messages");
+    console.log("[PromptProfile™] Calling OpenAI for title generation with", messagesForTitle.length, "messages");
     const result = await callOpenAI(messages);
     const summary = typeof result === 'string' ? result : result.reply;
     const title = summary ? summary.trim().slice(0, 60) : fallback.slice(0, 60);
-    console.log("[Prompanion] Title generation result:", title);
+    console.log("[PromptProfile™] Title generation result:", title);
     return title;
   } catch (error) {
-    console.error("[Prompanion] Failed to summarize conversation:", error);
+    console.error("[PromptProfile™] Failed to summarize conversation:", error);
     return fallback.slice(0, 60);
   }
 }

@@ -5,13 +5,13 @@
 // This eliminates duplicate listener registrations and provides unified message handling.
 // ============================================================================
 
-console.log("[Prompanion Grok] ========== GROK ADAPTER LOADING ==========");
-console.log("[Prompanion Grok] Timestamp:", new Date().toISOString());
-console.log("[Prompanion Grok] Location:", window.location.href);
+console.log("[PromptProfile™ Grok] ========== GROK ADAPTER LOADING ==========");
+console.log("[PromptProfile™ Grok] Timestamp:", new Date().toISOString());
+console.log("[PromptProfile™ Grok] Location:", window.location.href);
 
 // Import constants from AdapterBase
 if (typeof AdapterBase === "undefined") {
-  console.error("[Prompanion Grok] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
+  console.error("[PromptProfile™ Grok] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
   throw new Error("AdapterBase must be loaded before Grok adapter.js");
 }
 
@@ -22,7 +22,7 @@ const SELECTION_TOOLBAR_VISIBLE_CLASS = AdapterBase.SELECTION_TOOLBAR_VISIBLE_CL
 const HIGHLIGHT_BUTTON_SELECTORS = AdapterBase.HIGHLIGHT_BUTTON_SELECTORS;
 const BUTTON_SIZE = AdapterBase.BUTTON_SIZE;
 
-console.log("[Prompanion Grok] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
+console.log("[PromptProfile™ Grok] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
 let domObserverStarted = false;
 
 let enhanceTooltipElement = null;
@@ -52,7 +52,7 @@ let highlightObserver = null;
 
 function ensureStyle() {
   // Load generic adapter styles from external CSS file
-  const styleId = "prompanion-adapter-styles";
+  const styleId = "promptprofile-adapter-styles";
   let styleElement = document.getElementById(styleId);
   
   if (!styleElement) {
@@ -169,12 +169,12 @@ function ensureHighlightObserver() {
   
   // CRITICAL: Also listen for selectionchange events to ensure toolbar updates on Windows
   // This is especially important for cross-platform compatibility
-  if (!document._prompanionGrokSelectionListener) {
-    document._prompanionGrokSelectionListener = () => {
+  if (!document._promptprofileGrokSelectionListener) {
+    document._promptprofileGrokSelectionListener = () => {
       requestSelectionToolbarUpdate();
     };
-    document.addEventListener("selectionchange", document._prompanionGrokSelectionListener);
-    console.log("[Prompanion Grok] Selection change listener registered");
+    document.addEventListener("selectionchange", document._promptprofileGrokSelectionListener);
+    console.log("[PromptProfile™ Grok] Selection change listener registered");
   }
 }
 
@@ -207,7 +207,7 @@ function ensureSelectionToolbar() {
   
   const dismiss = document.createElement("button");
   dismiss.type = "button";
-  dismiss.className = "prompanion-selection-toolbar__dismiss";
+  dismiss.className = "promptprofile-selection-toolbar__dismiss";
   dismiss.textContent = "×";
   dismiss.setAttribute("aria-label", "Dismiss");
   dismiss.addEventListener("click", (e) => {
@@ -218,7 +218,7 @@ function ensureSelectionToolbar() {
   
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "prompanion-selection-toolbar__button";
+  button.className = "promptprofile-selection-toolbar__button";
   button.textContent = "Elaborate";
   button.addEventListener("pointerdown", (e) => e.preventDefault());
   button.addEventListener("mousedown", (e) => e.stopPropagation());
@@ -228,7 +228,7 @@ function ensureSelectionToolbar() {
   
   // Verify document.body exists before appending
   if (!document.body) {
-    console.error("[Prompanion Grok] Cannot create selection toolbar: document.body not available");
+    console.error("[PromptProfile™ Grok] Cannot create selection toolbar: document.body not available");
     return null;
   }
   
@@ -318,7 +318,7 @@ function updateSelectionToolbar() {
     }
   }
   
-  console.log("[Prompanion Grok] updateSelectionToolbar called", {
+  console.log("[PromptProfile™ Grok] updateSelectionToolbar called", {
     hasSelection: !!selection,
     isCollapsed: selection?.isCollapsed,
     textLength: text?.length,
@@ -335,12 +335,12 @@ function updateSelectionToolbar() {
     if (!text) reasons.push("no text");
     if (inComposer) reasons.push("in composer");
     if (!targetsAssistant) reasons.push("not targeting assistant");
-    console.log("[Prompanion Grok] Hiding toolbar - conditions not met:", reasons.join(", "));
+    console.log("[PromptProfile™ Grok] Hiding toolbar - conditions not met:", reasons.join(", "));
     hideSelectionToolbar();
     return;
   }
   
-  console.log("[Prompanion Grok] Showing toolbar - all conditions met");
+  console.log("[PromptProfile™ Grok] Showing toolbar - all conditions met");
   const rangeRect = AdapterBase.getSelectionRect(selection);
   if (!rangeRect) {
     hideSelectionToolbar();
@@ -349,7 +349,7 @@ function updateSelectionToolbar() {
 
   const toolbar = ensureSelectionToolbar();
   if (!toolbar) {
-    console.error("[Prompanion Grok] Failed to create selection toolbar");
+    console.error("[PromptProfile™ Grok] Failed to create selection toolbar");
     return;
   }
   selectionToolbarText = text;
@@ -374,13 +374,13 @@ function updateSelectionToolbar() {
   
   // Verify we got valid dimensions
   if (!w || !h) {
-    console.warn("[Prompanion Grok] Toolbar has invalid dimensions:", { w, h }, "retrying...");
+    console.warn("[PromptProfile™ Grok] Toolbar has invalid dimensions:", { w, h }, "retrying...");
     // Force another reflow and remeasure
     void toolbar.offsetWidth;
     w = toolbar.offsetWidth;
     h = toolbar.offsetHeight;
     if (!w || !h) {
-      console.error("[Prompanion Grok] Toolbar dimensions still invalid, cannot position tooltip");
+      console.error("[PromptProfile™ Grok] Toolbar dimensions still invalid, cannot position tooltip");
       return;
     }
   }
@@ -417,32 +417,32 @@ function updateSelectionToolbar() {
 
 function captureGrokChatHistory(maxMessages = 20) {
   // Make these logs VERY visible
-  console.log("%c[Prompanion Grok] ========== captureGrokChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion Grok] ========== captureGrokChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion Grok] ========== captureGrokChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("[Prompanion Grok] Current URL:", window.location.href);
-  console.log("[Prompanion Grok] Document ready state:", document.readyState);
-  console.log("[Prompanion Grok] Timestamp:", new Date().toISOString());
+  console.log("%c[PromptProfile™ Grok] ========== captureGrokChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Grok] ========== captureGrokChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Grok] ========== captureGrokChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("[PromptProfile™ Grok] Current URL:", window.location.href);
+  console.log("[PromptProfile™ Grok] Document ready state:", document.readyState);
+  console.log("[PromptProfile™ Grok] Timestamp:", new Date().toISOString());
   
   // Check if we're on a conversation page
   const isConversationPage = window.location.href.includes("/c/") || 
                             window.location.href.includes("/chat") ||
                             document.querySelector("main, [role='main']");
-  console.log("[Prompanion Grok] Is conversation page:", isConversationPage);
+  console.log("[PromptProfile™ Grok] Is conversation page:", isConversationPage);
   
   const messages = [];
   
   try {
     // First, try to find the main conversation container (Grok uses main element)
     const mainContainer = document.querySelector("main");
-    console.log("[Prompanion Grok] Main container found:", !!mainContainer);
+    console.log("[PromptProfile™ Grok] Main container found:", !!mainContainer);
     
     // Determine the best search root - prefer main container, then document
     let searchRoot = document;
     if (mainContainer) {
       searchRoot = mainContainer;
-      console.log("[Prompanion Grok] Using main container as search root");
-      console.log("[Prompanion Grok] Main container details:", {
+      console.log("[PromptProfile™ Grok] Using main container as search root");
+      console.log("[PromptProfile™ Grok] Main container details:", {
         tagName: mainContainer.tagName,
         className: mainContainer.className,
         childCount: mainContainer.children.length,
@@ -450,7 +450,7 @@ function captureGrokChatHistory(maxMessages = 20) {
         hasText: (mainContainer.innerText || mainContainer.textContent || "").trim().length > 0
       });
     } else {
-      console.warn("[Prompanion Grok] ⚠️ Main container not found - searching entire document");
+      console.warn("[PromptProfile™ Grok] ⚠️ Main container not found - searching entire document");
     }
     
     // Grok-specific selectors - try multiple patterns to handle DOM changes
@@ -480,7 +480,7 @@ function captureGrokChatHistory(maxMessages = 20) {
       "[class*='user'][class*='message']"
     ];
     
-    console.log("[Prompanion Grok] Searching for messages with multiple selector strategies");
+    console.log("[PromptProfile™ Grok] Searching for messages with multiple selector strategies");
     
     // Try each selector pattern and combine results
     let assistantElements = [];
@@ -490,12 +490,12 @@ function captureGrokChatHistory(maxMessages = 20) {
       try {
         const found = Array.from(searchRoot.querySelectorAll(selector));
         if (found.length > 0) {
-          console.log(`[Prompanion Grok] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
+          console.log(`[PromptProfile™ Grok] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
           assistantElements = found;
           break; // Use first selector that finds elements
         }
       } catch (e) {
-        console.warn(`[Prompanion Grok] Selector failed: ${selector}`, e);
+        console.warn(`[PromptProfile™ Grok] Selector failed: ${selector}`, e);
       }
     }
     
@@ -503,16 +503,16 @@ function captureGrokChatHistory(maxMessages = 20) {
       try {
         const found = Array.from(searchRoot.querySelectorAll(selector));
         if (found.length > 0) {
-          console.log(`[Prompanion Grok] ✓ Found ${found.length} user messages with selector: ${selector}`);
+          console.log(`[PromptProfile™ Grok] ✓ Found ${found.length} user messages with selector: ${selector}`);
           userElements = found;
           break; // Use first selector that finds elements
         }
       } catch (e) {
-        console.warn(`[Prompanion Grok] Selector failed: ${selector}`, e);
+        console.warn(`[PromptProfile™ Grok] Selector failed: ${selector}`, e);
       }
     }
     
-    console.log("[Prompanion Grok] Final element counts after standard selectors:", {
+    console.log("[PromptProfile™ Grok] Final element counts after standard selectors:", {
       assistantCount: assistantElements.length,
       userCount: userElements.length,
       totalElements: assistantElements.length + userElements.length
@@ -520,11 +520,11 @@ function captureGrokChatHistory(maxMessages = 20) {
     
     // If no elements found with standard selectors, try searching within main container
     if (assistantElements.length === 0 && userElements.length === 0 && mainContainer) {
-      console.warn("[Prompanion Grok] ⚠️ No messages found with standard selectors, searching within main container...");
+      console.warn("[PromptProfile™ Grok] ⚠️ No messages found with standard selectors, searching within main container...");
       
       // Look for all divs within main that might be messages
       const allDivsInMain = mainContainer.querySelectorAll("div");
-      console.log(`[Prompanion Grok] Found ${allDivsInMain.length} divs within main container`);
+      console.log(`[PromptProfile™ Grok] Found ${allDivsInMain.length} divs within main container`);
       
       // Look for message-like structures - Grok messages are typically in nested divs
       const potentialMessages = Array.from(allDivsInMain).filter(div => {
@@ -540,7 +540,7 @@ function captureGrokChatHistory(maxMessages = 20) {
                div.children.length > 0;
       });
       
-      console.log(`[Prompanion Grok] Found ${potentialMessages.length} potential message divs in main`);
+      console.log(`[PromptProfile™ Grok] Found ${potentialMessages.length} potential message divs in main`);
       
       // Sort potential messages by their position in the DOM (top to bottom)
       const sortedMessages = potentialMessages.sort((a, b) => {
@@ -574,10 +574,10 @@ function captureGrokChatHistory(maxMessages = 20) {
           // If we have clear markers, use them
           if (hasAssistantMarker && assistantElements.length < maxMessages) {
             assistantElements.push(msg);
-            console.log(`[Prompanion Grok] Added assistant message from main search (${text.substring(0, 50)}...)`);
+            console.log(`[PromptProfile™ Grok] Added assistant message from main search (${text.substring(0, 50)}...)`);
           } else if (hasUserMarker && userElements.length < maxMessages) {
             userElements.push(msg);
-            console.log(`[Prompanion Grok] Added user message from main search (${text.substring(0, 50)}...)`);
+            console.log(`[PromptProfile™ Grok] Added user message from main search (${text.substring(0, 50)}...)`);
           } else {
             // No clear markers - use alternating pattern
             // Grok conversations typically start with user, then assistant, then user, etc.
@@ -585,31 +585,31 @@ function captureGrokChatHistory(maxMessages = 20) {
             if (totalFound % 2 === 0 && userElements.length < maxMessages) {
               // Even index (0, 2, 4...) = user message
               userElements.push(msg);
-              console.log(`[Prompanion Grok] Added user message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
+              console.log(`[PromptProfile™ Grok] Added user message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
             } else if (assistantElements.length < maxMessages) {
               // Odd index (1, 3, 5...) = assistant message
               assistantElements.push(msg);
-              console.log(`[Prompanion Grok] Added assistant message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
+              console.log(`[PromptProfile™ Grok] Added assistant message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
             }
           }
         }
       }
       
-      console.log(`[Prompanion Grok] After main search: ${assistantElements.length} assistant, ${userElements.length} user messages`);
+      console.log(`[PromptProfile™ Grok] After main search: ${assistantElements.length} assistant, ${userElements.length} user messages`);
     }
     
     // If still no elements found, try alternative approach with other containers
     if (assistantElements.length === 0 && userElements.length === 0) {
-      console.warn("[Prompanion Grok] ⚠️ Still no messages found, trying broader search...");
+      console.warn("[PromptProfile™ Grok] ⚠️ Still no messages found, trying broader search...");
       
       // Try finding messages by looking for conversation containers
       const conversationContainers = document.querySelectorAll("main, [role='main'], [class*='conversation'], [class*='chat'], [id*='conversation'], [id*='chat']");
-      console.log("[Prompanion Grok] Found conversation containers:", conversationContainers.length);
+      console.log("[PromptProfile™ Grok] Found conversation containers:", conversationContainers.length);
       
       // Log container structure for debugging
       if (conversationContainers.length > 0) {
         const firstContainer = conversationContainers[0];
-        console.log("[Prompanion Grok] First container structure:", {
+        console.log("[PromptProfile™ Grok] First container structure:", {
           tagName: firstContainer.tagName,
           className: firstContainer.className,
           id: firstContainer.id,
@@ -621,7 +621,7 @@ function captureGrokChatHistory(maxMessages = 20) {
       // Look for message-like structures within containers
       for (const container of conversationContainers) {
         const potentialMessages = container.querySelectorAll("div[class*='message'], div[class*='turn'], article, [class*='group'], [class*='item']");
-        console.log(`[Prompanion Grok] Found ${potentialMessages.length} potential message elements in container`);
+        console.log(`[PromptProfile™ Grok] Found ${potentialMessages.length} potential message elements in container`);
         
         // Try to identify role by looking for common patterns
         for (const msg of potentialMessages) {
@@ -636,10 +636,10 @@ function captureGrokChatHistory(maxMessages = 20) {
             
             if (isLikelyAssistant && assistantElements.length < maxMessages) {
               assistantElements.push(msg);
-              console.log(`[Prompanion Grok] Added assistant element from fallback search`);
+              console.log(`[PromptProfile™ Grok] Added assistant element from fallback search`);
             } else if (!isLikelyAssistant && userElements.length < maxMessages) {
               userElements.push(msg);
-              console.log(`[Prompanion Grok] Added user element from fallback search`);
+              console.log(`[PromptProfile™ Grok] Added user element from fallback search`);
             }
           }
         }
@@ -648,7 +648,7 @@ function captureGrokChatHistory(maxMessages = 20) {
     
     // Last resort: search for any divs with substantial text that might be messages
     if (assistantElements.length === 0 && userElements.length === 0) {
-      console.warn("[Prompanion Grok] ⚠️ Still no messages found, trying last-resort search...");
+      console.warn("[PromptProfile™ Grok] ⚠️ Still no messages found, trying last-resort search...");
       const allDivs = document.querySelectorAll("div");
       let foundCount = 0;
       for (const div of allDivs) {
@@ -678,7 +678,7 @@ function captureGrokChatHistory(maxMessages = 20) {
           if (foundCount >= maxMessages * 2) break;
         }
       }
-      console.log(`[Prompanion Grok] Last-resort search found ${foundCount} potential messages`);
+      console.log(`[PromptProfile™ Grok] Last-resort search found ${foundCount} potential messages`);
     }
     
     // Combine and sort by DOM position (maintain conversation order)
@@ -697,7 +697,7 @@ function captureGrokChatHistory(maxMessages = 20) {
     // Sort by position in document (top to bottom)
     allElements.sort((a, b) => a.position - b.position);
     
-    console.log("[Prompanion Grok] Processing", allElements.length, "message elements");
+    console.log("[PromptProfile™ Grok] Processing", allElements.length, "message elements");
     
     for (const { el, role } of allElements) {
       if (messages.length >= maxMessages) break;
@@ -723,7 +723,7 @@ function captureGrokChatHistory(maxMessages = 20) {
           const extracted = (contentEl.innerText || contentEl.textContent)?.trim();
           if (extracted && extracted.length > 0) {
             content = extracted;
-            console.log(`[Prompanion Grok] Extracted content using selector "${selector}": ${content.substring(0, 50)}...`);
+            console.log(`[PromptProfile™ Grok] Extracted content using selector "${selector}": ${content.substring(0, 50)}...`);
             break;
           }
         }
@@ -780,12 +780,12 @@ function captureGrokChatHistory(maxMessages = 20) {
             content: content,
             timestamp: Date.now()
           });
-          console.log(`[Prompanion Grok] Added ${role} message (${content.length} chars): ${content.substring(0, 50)}...`);
+          console.log(`[PromptProfile™ Grok] Added ${role} message (${content.length} chars): ${content.substring(0, 50)}...`);
         } else {
-          console.log(`[Prompanion Grok] Skipped ${role} message - too short or UI-only: "${content.substring(0, 30)}"`);
+          console.log(`[PromptProfile™ Grok] Skipped ${role} message - too short or UI-only: "${content.substring(0, 30)}"`);
         }
       } else {
-        console.warn(`[Prompanion Grok] Could not extract content from ${role} message element:`, {
+        console.warn(`[PromptProfile™ Grok] Could not extract content from ${role} message element:`, {
           tagName: el.tagName,
           className: el.className,
           hasChildren: el.children.length > 0,
@@ -795,10 +795,10 @@ function captureGrokChatHistory(maxMessages = 20) {
       }
     }
     
-    console.log(`[Prompanion Grok] ✓ Captured ${messages.length} messages from Grok conversation`);
+    console.log(`[PromptProfile™ Grok] ✓ Captured ${messages.length} messages from Grok conversation`);
     if (messages.length === 0) {
-      console.warn("[Prompanion Grok] ⚠️ No messages captured - check if conversation elements exist in DOM");
-      console.warn("[Prompanion Grok] DOM Diagnostic Info:", {
+      console.warn("[PromptProfile™ Grok] ⚠️ No messages captured - check if conversation elements exist in DOM");
+      console.warn("[PromptProfile™ Grok] DOM Diagnostic Info:", {
         bodyChildren: document.body?.children?.length || 0,
         mainElements: document.querySelectorAll("main").length,
         articles: document.querySelectorAll("article").length,
@@ -809,7 +809,7 @@ function captureGrokChatHistory(maxMessages = 20) {
       });
       
       // Try one more aggressive search: look for any divs with substantial text that might be messages
-      console.warn("[Prompanion Grok] Attempting final aggressive search for message-like content...");
+      console.warn("[PromptProfile™ Grok] Attempting final aggressive search for message-like content...");
       const allTextDivs = Array.from(document.querySelectorAll("div")).filter(div => {
         const text = (div.innerText || div.textContent || "").trim();
         return text.length > 20 && text.length < 10000 && 
@@ -822,9 +822,9 @@ function captureGrokChatHistory(maxMessages = 20) {
                div.children.length > 0;
       });
       
-      console.warn(`[Prompanion Grok] Found ${allTextDivs.length} potential message divs in final search`);
+      console.warn(`[PromptProfile™ Grok] Found ${allTextDivs.length} potential message divs in final search`);
       if (allTextDivs.length > 0) {
-        console.warn("[Prompanion Grok] Sample divs found:", allTextDivs.slice(0, 5).map(div => ({
+        console.warn("[PromptProfile™ Grok] Sample divs found:", allTextDivs.slice(0, 5).map(div => ({
           className: div.className,
           id: div.id,
           textPreview: (div.innerText || div.textContent || "").substring(0, 100),
@@ -834,8 +834,8 @@ function captureGrokChatHistory(maxMessages = 20) {
     }
     return messages;
   } catch (error) {
-    console.error("[Prompanion Grok] ✗ Error capturing Grok chat history:", error);
-    console.error("[Prompanion Grok] Error details:", {
+    console.error("[PromptProfile™ Grok] ✗ Error capturing Grok chat history:", error);
+    console.error("[PromptProfile™ Grok] Error details:", {
       message: error.message,
       stack: error.stack,
       name: error.name
@@ -856,16 +856,16 @@ function getElementPosition(element) {
 
 async function submitSelectionToSideChat(text) {
   // Make these logs VERY visible
-  console.log("%c[Prompanion Grok] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion Grok] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion Grok] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Grok] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Grok] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Grok] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
   
   const snippet = typeof text === "string" ? text.trim() : "";
-  console.log("[Prompanion Grok] Snippet:", snippet?.substring(0, 50));
-  console.log("[Prompanion Grok] selectionAskInFlight:", selectionAskInFlight);
+  console.log("[PromptProfile™ Grok] Snippet:", snippet?.substring(0, 50));
+  console.log("[PromptProfile™ Grok] selectionAskInFlight:", selectionAskInFlight);
   
   if (!snippet || selectionAskInFlight) {
-    console.log("[Prompanion Grok] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
+    console.log("[PromptProfile™ Grok] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
     return;
   }
   selectionAskInFlight = true;
@@ -873,15 +873,15 @@ async function submitSelectionToSideChat(text) {
   try {
     // Capture chat history from Grok conversation for context
     let chatHistory = [];
-    console.log("%c[Prompanion Grok] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
+    console.log("%c[PromptProfile™ Grok] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
     try {
       chatHistory = captureGrokChatHistory(20);
-      console.log(`%c[Prompanion Grok] ✓ Captured ${chatHistory.length} messages from conversation for SideChat context`, 
+      console.log(`%c[PromptProfile™ Grok] ✓ Captured ${chatHistory.length} messages from conversation for SideChat context`, 
         chatHistory.length > 0 ? "color: green; font-size: 14px; font-weight: bold;" : "color: red; font-size: 14px; font-weight: bold;");
       
       // Log sample of captured history for debugging
       if (chatHistory.length > 0) {
-        console.log("[Prompanion Grok] Sample captured messages:", {
+        console.log("[PromptProfile™ Grok] Sample captured messages:", {
           firstMessage: {
             role: chatHistory[0].role,
             contentPreview: chatHistory[0].content?.substring(0, 50) + "..."
@@ -893,17 +893,17 @@ async function submitSelectionToSideChat(text) {
           totalMessages: chatHistory.length
         });
       } else {
-        console.warn("[Prompanion Grok] ⚠️ captureGrokChatHistory returned empty array - no messages found in DOM");
+        console.warn("[PromptProfile™ Grok] ⚠️ captureGrokChatHistory returned empty array - no messages found in DOM");
       }
     } catch (error) {
-      console.error("[Prompanion Grok] ✗ Failed to capture chat history:", error);
-      console.error("[Prompanion Grok] Error stack:", error.stack);
+      console.error("[PromptProfile™ Grok] ✗ Failed to capture chat history:", error);
+      console.error("[PromptProfile™ Grok] Error stack:", error.stack);
       // Continue with empty array - better than failing completely
       chatHistory = [];
     }
     
-    console.log("[Prompanion Grok] ========== SENDING PROMPANION_SIDECHAT_REQUEST ==========");
-    console.log("[Prompanion Grok] Sending PROMPANION_SIDECHAT_REQUEST with:", {
+    console.log("[PromptProfile™ Grok] ========== SENDING PROMPANION_SIDECHAT_REQUEST ==========");
+    console.log("[PromptProfile™ Grok] Sending PROMPANION_SIDECHAT_REQUEST with:", {
       textLength: snippet.length,
       textPreview: snippet.substring(0, 50),
       chatHistoryLength: chatHistory.length,
@@ -925,18 +925,18 @@ async function submitSelectionToSideChat(text) {
       text: snippet,
       chatHistory: chatHistory 
     }, (response) => {
-      console.log("[Prompanion Grok] ========== PROMPANION_SIDECHAT_REQUEST RESPONSE ==========");
-      console.log("[Prompanion Grok] Response:", response);
+      console.log("[PromptProfile™ Grok] ========== PROMPANION_SIDECHAT_REQUEST RESPONSE ==========");
+      console.log("[PromptProfile™ Grok] Response:", response);
       if (!response?.ok) {
-        console.warn("Prompanion: sidechat request rejected", response?.reason);
+        console.warn("PromptProfile™: sidechat request rejected", response?.reason);
       }
       selectionAskInFlight = false;
     }).catch((error) => {
-      console.warn("Prompanion: failed to request sidechat from selection", error);
+      console.warn("PromptProfile™: failed to request sidechat from selection", error);
       selectionAskInFlight = false;
     });
   } catch (error) {
-    console.error("Prompanion Grok: sidechat request threw synchronously", error);
+    console.error("PromptProfile™ Grok: sidechat request threw synchronously", error);
     selectionAskInFlight = false;
   }
 }
@@ -969,10 +969,10 @@ function requestPromptEnhancement(promptText) {
     .catch((error) => {
       const errorMessage = error?.message || "";
       if (errorMessage.includes("Extension context invalidated")) {
-        console.error("[Prompanion Grok] Extension context invalidated - user should reload page");
+        console.error("[PromptProfile™ Grok] Extension context invalidated - user should reload page");
         // The notification is already shown by AdapterBase._showContextInvalidatedNotification()
       } else {
-        console.warn("[Prompanion Grok] Enhancement request failed:", error);
+        console.warn("[PromptProfile™ Grok] Enhancement request failed:", error);
       }
       return { ok: false, reason: errorMessage || "UNKNOWN_ERROR" };
     });
@@ -1029,9 +1029,9 @@ function buildButton() {
   button.className = BUTTON_CLASS;
   button.append(createIcon());
   // Use AdapterBase for generic hover tooltip
-  AdapterBase.attachTooltip(button, "Open Prompanion to enhance your prompts for the best response.", BUTTON_ID);
+  AdapterBase.attachTooltip(button, "Open PromptProfile™ to enhance your prompts for the best response.", BUTTON_ID);
   button.addEventListener("click", () => AdapterBase.togglePanel()
-    .catch((e) => console.error("Prompanion Grok: failed to open sidebar", e)));
+    .catch((e) => console.error("PromptProfile™ Grok: failed to open sidebar", e)));
   button.addEventListener("mouseenter", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("focus", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("mouseleave", () => AdapterBase.hideTooltip(button));
@@ -1065,7 +1065,7 @@ function ensureFloatingButton() {
 
 function placeButton(targetContainer, inputNode) {
   // Removed the !inputNode gatekeeper that caused the 20s delay
-  console.log("[Prompanion Grok] placeButton called");
+  console.log("[PromptProfile™ Grok] placeButton called");
   
   ensureFloatingButton();
   if (!floatingButtonWrapper) return;
@@ -1237,63 +1237,63 @@ function init() {
 function handleInsertTextMessage(message, sender, sendResponse) {
   try {
     const textToInsert = typeof message.text === "string" ? message.text.trim() : "";
-    console.log("[Prompanion Grok] ========== INSERT TEXT REQUEST ==========");
-    console.log("[Prompanion Grok] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
-    console.log("[Prompanion Grok] Text length:", textToInsert.length);
+    console.log("[PromptProfile™ Grok] ========== INSERT TEXT REQUEST ==========");
+    console.log("[PromptProfile™ Grok] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
+    console.log("[PromptProfile™ Grok] Text length:", textToInsert.length);
     
     if (!textToInsert) {
-      console.log("[Prompanion Grok] Insert failed: EMPTY_TEXT");
+      console.log("[PromptProfile™ Grok] Insert failed: EMPTY_TEXT");
       sendResponse({ ok: false, reason: "EMPTY_TEXT" });
       return false; // sendResponse called synchronously, close channel
     }
 
-    console.log("[Prompanion Grok] Searching for composer node...");
+    console.log("[PromptProfile™ Grok] Searching for composer node...");
     const composerNode = findComposerNode();
-    console.log("[Prompanion Grok] Composer node found:", composerNode);
-    console.log("[Prompanion Grok] Node type:", composerNode?.constructor?.name);
-    console.log("[Prompanion Grok] Node isContentEditable:", composerNode?.isContentEditable);
-    console.log("[Prompanion Grok] Node tagName:", composerNode?.tagName);
-    console.log("[Prompanion Grok] Node className:", composerNode?.className);
-    console.log("[Prompanion Grok] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
-    console.log("[Prompanion Grok] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
+    console.log("[PromptProfile™ Grok] Composer node found:", composerNode);
+    console.log("[PromptProfile™ Grok] Node type:", composerNode?.constructor?.name);
+    console.log("[PromptProfile™ Grok] Node isContentEditable:", composerNode?.isContentEditable);
+    console.log("[PromptProfile™ Grok] Node tagName:", composerNode?.tagName);
+    console.log("[PromptProfile™ Grok] Node className:", composerNode?.className);
+    console.log("[PromptProfile™ Grok] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
+    console.log("[PromptProfile™ Grok] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
     
     if (!composerNode) {
-      console.log("[Prompanion Grok] Insert failed: NO_COMPOSER_NODE");
+      console.log("[PromptProfile™ Grok] Insert failed: NO_COMPOSER_NODE");
       sendResponse({ ok: false, reason: "NO_COMPOSER_NODE" });
       return false; // sendResponse called synchronously, close channel
     }
 
-    console.log("[Prompanion Grok] Calling setComposerText...");
+    console.log("[PromptProfile™ Grok] Calling setComposerText...");
     const success = setComposerText(composerNode, textToInsert);
-    console.log("[Prompanion Grok] setComposerText returned:", success);
+    console.log("[PromptProfile™ Grok] setComposerText returned:", success);
     
     // Verify insertion
     const currentValue = composerNode.value || composerNode.textContent || "";
     const textInserted = currentValue.includes(textToInsert.substring(0, Math.min(20, textToInsert.length)));
-    console.log("[Prompanion Grok] Verification - text appears in node:", textInserted);
-    console.log("[Prompanion Grok] Current node value:", currentValue.substring(0, 100));
+    console.log("[PromptProfile™ Grok] Verification - text appears in node:", textInserted);
+    console.log("[PromptProfile™ Grok] Current node value:", currentValue.substring(0, 100));
     
     if (success && textInserted) {
-      console.log("[Prompanion Grok] Insert succeeded!");
+      console.log("[PromptProfile™ Grok] Insert succeeded!");
       sendResponse({ ok: true });
     } else if (success && !textInserted) {
-      console.warn("[Prompanion Grok] setComposerText returned true but text not verified in node");
+      console.warn("[PromptProfile™ Grok] setComposerText returned true but text not verified in node");
       sendResponse({ ok: false, reason: "INSERTION_NOT_VERIFIED" });
     } else {
-      console.log("[Prompanion Grok] Insert failed: SET_TEXT_FAILED");
+      console.log("[PromptProfile™ Grok] Insert failed: SET_TEXT_FAILED");
       sendResponse({ ok: false, reason: "SET_TEXT_FAILED" });
     }
     return false; // sendResponse called synchronously, close channel
   } catch (error) {
-    console.error("[Prompanion Grok] Insert text handler failed", error);
-    console.error("[Prompanion Grok] Error stack:", error.stack);
+    console.error("[PromptProfile™ Grok] Insert text handler failed", error);
+    console.error("[PromptProfile™ Grok] Error stack:", error.stack);
     sendResponse({ ok: false, reason: error?.message ?? "UNKNOWN" });
     return false; // sendResponse called synchronously, close channel
   }
 }
 
 // Register message handler using AdapterBase (must be after handleInsertTextMessage is defined)
-console.log("[Prompanion Grok] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
+console.log("[PromptProfile™ Grok] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
 AdapterBase.registerMessageHandler("PROMPANION_INSERT_TEXT", handleInsertTextMessage);
 
 function bootstrap() {
@@ -1342,12 +1342,12 @@ function teardownEnhanceTooltip() {
 
 function ensureEnhanceTooltipElement() {
   if (!enhanceTooltipElement) {
-    console.log("[Prompanion Grok] Creating enhance tooltip element");
+    console.log("[PromptProfile™ Grok] Creating enhance tooltip element");
     enhanceTooltipElement = document.createElement("div");
-    enhanceTooltipElement.className = "prompanion-enhance-tooltip";
+    enhanceTooltipElement.className = "promptprofile-enhance-tooltip";
     const dismiss = document.createElement("button");
     dismiss.type = "button";
-    dismiss.className = "prompanion-enhance-tooltip__dismiss";
+    dismiss.className = "promptprofile-enhance-tooltip__dismiss";
     dismiss.textContent = "×";
     dismiss.setAttribute("aria-label", "Dismiss prompt enhancement suggestion");
     dismiss.addEventListener("click", () => {
@@ -1356,52 +1356,52 @@ function ensureEnhanceTooltipElement() {
     });
     const action = document.createElement("button");
     action.type = "button";
-    action.className = "prompanion-enhance-tooltip__action";
+    action.className = "promptprofile-enhance-tooltip__action";
     AdapterBase.setButtonTextContent(action, "Refine");
-    console.log("[Prompanion Grok] Attaching click handler to Refine button");
-    console.log("[Prompanion Grok] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
+    console.log("[PromptProfile™ Grok] Attaching click handler to Refine button");
+    console.log("[PromptProfile™ Grok] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
     action.addEventListener("click", handleRefineButtonClick);
-    console.log("[Prompanion Grok] Click handler attached, button:", action);
+    console.log("[PromptProfile™ Grok] Click handler attached, button:", action);
     enhanceTooltipElement.append(dismiss, action);
-    console.log("[Prompanion Grok] Enhance tooltip element created");
+    console.log("[PromptProfile™ Grok] Enhance tooltip element created");
   }
   if (!enhanceTooltipElement.isConnected) {
-    console.log("[Prompanion Grok] Appending enhance tooltip to body");
+    console.log("[PromptProfile™ Grok] Appending enhance tooltip to body");
     document.body.append(enhanceTooltipElement);
   }
   hideEnhanceTooltip();
 }
 
 function handleRefineButtonClick(e) {
-  console.log("[Prompanion Grok] ========== REFINE BUTTON HANDLER FIRED ==========");
-  console.log("[Prompanion Grok] Event type:", e.type);
-  console.log("[Prompanion Grok] Event target:", e.target);
+  console.log("[PromptProfile™ Grok] ========== REFINE BUTTON HANDLER FIRED ==========");
+  console.log("[PromptProfile™ Grok] Event type:", e.type);
+  console.log("[PromptProfile™ Grok] Event target:", e.target);
   e.preventDefault();
   e.stopPropagation();
   if (enhanceActionInFlight) {
     return;
   }
   const composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
-  console.log("[Prompanion Grok] Composer node:", composerNode);
+  console.log("[PromptProfile™ Grok] Composer node:", composerNode);
   if (!composerNode) {
-    console.error("[Prompanion Grok] No composer node found!");
+    console.error("[PromptProfile™ Grok] No composer node found!");
     return;
   }
   const promptText = extractInputText().trim();
-  console.log("[Prompanion Grok] Prompt text:", promptText);
+  console.log("[PromptProfile™ Grok] Prompt text:", promptText);
   if (!promptText) {
     return;
   }
   enhanceActionInFlight = true;
   enhanceTooltipDismissed = true;
   hideEnhanceTooltip();
-  console.log("[Prompanion Grok] Requesting prompt enhancement...");
+  console.log("[PromptProfile™ Grok] Requesting prompt enhancement...");
   requestPromptEnhancement(promptText)
     .then((result) => {
       if (!result || !result.ok) {
         enhanceActionInFlight = false;
         if (result?.reason === "EXTENSION_CONTEXT_INVALIDATED") {
-          console.error("[Prompanion Grok] Cannot enhance prompt - extension context invalidated. Please reload the page.");
+          console.error("[PromptProfile™ Grok] Cannot enhance prompt - extension context invalidated. Please reload the page.");
         }
         return;
       }
@@ -1412,7 +1412,7 @@ function handleRefineButtonClick(e) {
       enhanceActionInFlight = false;
     })
     .catch((error) => {
-      console.error("Prompanion Grok: refine request threw", error);
+      console.error("PromptProfile™ Grok: refine request threw", error);
       enhanceActionInFlight = false;
     });
 }
@@ -1514,36 +1514,36 @@ function detachTooltipResizeHandler() {
 
 // Backup message listener registration (IIFE to ensure it runs immediately)
 (function registerInsertTextListener() {
-  console.log("[Prompanion Grok] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
-  console.log("[Prompanion Grok] Current time:", new Date().toISOString());
+  console.log("[PromptProfile™ Grok] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
+  console.log("[PromptProfile™ Grok] Current time:", new Date().toISOString());
   
   if (typeof chrome === "undefined") {
-    console.error("[Prompanion Grok] chrome is undefined in backup registration");
+    console.error("[PromptProfile™ Grok] chrome is undefined in backup registration");
     return;
   }
   
   if (!chrome.runtime || !chrome.runtime.onMessage) {
-    console.error("[Prompanion Grok] chrome.runtime.onMessage not available in backup registration");
+    console.error("[PromptProfile™ Grok] chrome.runtime.onMessage not available in backup registration");
     return;
   }
   
   try {
     chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       if (message && message.type === "PROMPANION_INSERT_TEXT") {
-        console.log("[Prompanion Grok] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
+        console.log("[PromptProfile™ Grok] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
         if (typeof handleInsertTextMessage === "function") {
           handleInsertTextMessage(message, sender, sendResponse);
         } else {
-          console.error("[Prompanion Grok] handleInsertTextMessage is not a function!");
+          console.error("[PromptProfile™ Grok] handleInsertTextMessage is not a function!");
           sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
         }
         return true;
       }
       return false;
     });
-    console.log("[Prompanion Grok] ✓ Backup listener registered successfully");
+    console.log("[PromptProfile™ Grok] ✓ Backup listener registered successfully");
   } catch (error) {
-    console.error("[Prompanion Grok] ✗ Backup listener registration failed:", error);
+    console.error("[PromptProfile™ Grok] ✗ Backup listener registration failed:", error);
   }
 })();
 
@@ -1559,16 +1559,16 @@ if (readyState === "complete" || readyState === "interactive") {
 // AdapterBase will handle selection changes efficiently
 
 // Verify message listener is registered
-console.log("[Prompanion Grok] ========== VERIFYING MESSAGE LISTENER ==========");
+console.log("[PromptProfile™ Grok] ========== VERIFYING MESSAGE LISTENER ==========");
 if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
-  console.log("[Prompanion Grok] chrome.runtime.onMessage is available");
-  console.log("[Prompanion Grok] chrome.runtime.id:", chrome.runtime.id);
-  console.log("[Prompanion Grok] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
+  console.log("[PromptProfile™ Grok] chrome.runtime.onMessage is available");
+  console.log("[PromptProfile™ Grok] chrome.runtime.id:", chrome.runtime.id);
+  console.log("[PromptProfile™ Grok] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
 } else {
-  console.error("[Prompanion Grok] chrome.runtime.onMessage is NOT available at this point!");
+  console.error("[PromptProfile™ Grok] chrome.runtime.onMessage is NOT available at this point!");
 }
 
-window.addEventListener("prompanion-panel-resize", () => {
+window.addEventListener("promptprofile-panel-resize", () => {
   refreshFloatingButtonPosition();
 });
 
@@ -1581,20 +1581,20 @@ window.addEventListener("resize", () => {
 
 document.addEventListener("mousedown", (e) => {
   if (enhanceTooltipElement?.classList.contains("is-visible")) {
-    const button = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
-    const clickedButton = e.target.closest(".prompanion-enhance-tooltip__action");
+    const button = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
+    const clickedButton = e.target.closest(".promptprofile-enhance-tooltip__action");
     if (clickedButton || button === e.target) {
-      console.log("[Prompanion Grok] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
-      console.log("[Prompanion Grok] Setting tooltipClickInProgress flag");
+      console.log("[PromptProfile™ Grok] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
+      console.log("[PromptProfile™ Grok] Setting tooltipClickInProgress flag");
       tooltipClickInProgress = true;
       const buttonRef = button;
       const mousedownTime = Date.now();
       
       const clickHandler = (clickEvent) => {
         const timeSinceMousedown = Date.now() - mousedownTime;
-        console.log("[Prompanion Grok] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
-        console.log("[Prompanion Grok] Time since mousedown:", timeSinceMousedown, "ms");
-        console.log("[Prompanion Grok] Click target:", clickEvent.target);
+        console.log("[PromptProfile™ Grok] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
+        console.log("[PromptProfile™ Grok] Time since mousedown:", timeSinceMousedown, "ms");
+        console.log("[PromptProfile™ Grok] Click target:", clickEvent.target);
         if (typeof handleRefineButtonClick === "function") {
           handleRefineButtonClick(clickEvent);
         }
@@ -1605,7 +1605,7 @@ document.addEventListener("mousedown", (e) => {
       
       setTimeout(() => {
         tooltipClickInProgress = false;
-        console.log("[Prompanion Grok] tooltipClickInProgress flag cleared");
+        console.log("[PromptProfile™ Grok] tooltipClickInProgress flag cleared");
         document.removeEventListener("click", clickHandler, true);
       }, 300);
     }

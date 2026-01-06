@@ -5,18 +5,18 @@
 // This eliminates duplicate listener registrations and provides unified message handling.
 // ============================================================================
 
-console.log("[Prompanion] ========== PERPLEXITY ADAPTER LOADING ==========");
-console.log("[Prompanion] Timestamp:", new Date().toISOString());
-console.log("[Prompanion] Location:", window.location.href);
+console.log("[PromptProfile™] ========== PERPLEXITY ADAPTER LOADING ==========");
+console.log("[PromptProfile™] Timestamp:", new Date().toISOString());
+console.log("[PromptProfile™] Location:", window.location.href);
 
 // Import constants from AdapterBase
 if (typeof AdapterBase === "undefined") {
-  console.error("[Prompanion] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
+  console.error("[PromptProfile™] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
   throw new Error("AdapterBase must be loaded before adapter.js");
 }
 
-const BUTTON_ID = "prompanion-perplexity-trigger";
-const BUTTON_CLASS = "prompanion-perplexity-trigger";
+const BUTTON_ID = "promptprofile-perplexity-trigger";
+const BUTTON_CLASS = "promptprofile-perplexity-trigger";
 const SELECTION_TOOLBAR_ID = AdapterBase.SELECTION_TOOLBAR_ID;
 const SELECTION_TOOLBAR_VISIBLE_CLASS = AdapterBase.SELECTION_TOOLBAR_VISIBLE_CLASS;
 const HIGHLIGHT_BUTTON_SELECTORS = [
@@ -27,7 +27,7 @@ const HIGHLIGHT_BUTTON_SELECTORS = [
 ];
 const BUTTON_SIZE = AdapterBase.BUTTON_SIZE;
 
-console.log("[Prompanion] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
+console.log("[PromptProfile™] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
 let domObserverStarted = false;
 
 let enhanceTooltipElement = null;
@@ -59,7 +59,7 @@ const MAX_POSITION_RETRIES = 5;
 
 function ensureStyle() {
   // Load generic adapter styles from external CSS file
-  const styleId = "prompanion-adapter-styles";
+  const styleId = "promptprofile-adapter-styles";
   let styleElement = document.getElementById(styleId);
   
   if (!styleElement) {
@@ -252,12 +252,12 @@ function nodeInAssistantMessage(node) {
         const containerRect = messageContainer.getBoundingClientRect();
         // If message container is above the input, it's likely an assistant message
         if (containerRect.bottom < inputRect.top) {
-          console.log("[Prompanion] nodeInAssistantMessage: detected assistant message (above input)");
+          console.log("[PromptProfile™] nodeInAssistantMessage: detected assistant message (above input)");
           return true;
         }
       } else {
         // No input found or input not visible, assume it's an assistant message if in message container
-        console.log("[Prompanion] nodeInAssistantMessage: detected assistant message (no input found)");
+        console.log("[PromptProfile™] nodeInAssistantMessage: detected assistant message (no input found)");
         return true;
       }
     }
@@ -278,7 +278,7 @@ function nodeInAssistantMessage(node) {
                          element.closest("[class*='chat']");
       
       if (mainContent && !isInComposer) {
-        console.log("[Prompanion] nodeInAssistantMessage: detected assistant message (fallback - in main content)");
+        console.log("[PromptProfile™] nodeInAssistantMessage: detected assistant message (fallback - in main content)");
         return true;
       }
     }
@@ -295,7 +295,7 @@ function selectionTargetsAssistant(selection) {
   const focusInAssistant = nodeInAssistantMessage(selection.focusNode);
   
   if (anchorInAssistant || focusInAssistant) {
-    console.log("[Prompanion] selectionTargetsAssistant: true (anchor or focus in assistant)", {
+    console.log("[PromptProfile™] selectionTargetsAssistant: true (anchor or focus in assistant)", {
       anchorInAssistant,
       focusInAssistant
     });
@@ -308,12 +308,12 @@ function selectionTargetsAssistant(selection) {
     if (range) {
       const containerInAssistant = nodeInAssistantMessage(range.commonAncestorContainer);
       if (containerInAssistant) {
-        console.log("[Prompanion] selectionTargetsAssistant: true (container in assistant)");
+        console.log("[PromptProfile™] selectionTargetsAssistant: true (container in assistant)");
         return true;
       }
     }
   } catch (e) {
-    console.log("[Prompanion] selectionTargetsAssistant: error checking range", e);
+    console.log("[PromptProfile™] selectionTargetsAssistant: error checking range", e);
   }
   
   // Additional check: if selection is not in composer and has text, assume assistant
@@ -339,12 +339,12 @@ function selectionTargetsAssistant(selection) {
     ));
     
     if (!isInUserMessage) {
-      console.log("[Prompanion] selectionTargetsAssistant: true (fallback - not in composer, not user)");
+      console.log("[PromptProfile™] selectionTargetsAssistant: true (fallback - not in composer, not user)");
       return true;
     }
   }
   
-  console.log("[Prompanion] selectionTargetsAssistant: false");
+  console.log("[PromptProfile™] selectionTargetsAssistant: false");
   return false;
 }
 
@@ -391,7 +391,7 @@ function ensureSelectionToolbar() {
   
   const dismiss = document.createElement("button");
   dismiss.type = "button";
-  dismiss.className = "prompanion-selection-toolbar__dismiss";
+  dismiss.className = "promptprofile-selection-toolbar__dismiss";
   dismiss.textContent = "×";
   dismiss.setAttribute("aria-label", "Dismiss");
   dismiss.addEventListener("click", (e) => {
@@ -402,7 +402,7 @@ function ensureSelectionToolbar() {
   
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "prompanion-selection-toolbar__button";
+  button.className = "promptprofile-selection-toolbar__button";
   button.textContent = "Elaborate";
   button.addEventListener("pointerdown", (e) => e.preventDefault());
   button.addEventListener("mousedown", (e) => e.stopPropagation());
@@ -412,7 +412,7 @@ function ensureSelectionToolbar() {
   
   // Verify document.body exists before appending
   if (!document.body) {
-    console.error("[Prompanion] Cannot create selection toolbar: document.body not available");
+    console.error("[PromptProfile™] Cannot create selection toolbar: document.body not available");
     return null;
   }
   
@@ -451,7 +451,7 @@ function updateSelectionToolbar() {
   const inComposer = selection ? selectionWithinComposer(selection) : false;
   const targetsAssistant = selection ? selectionTargetsAssistant(selection) : false;
   
-  console.log("[Prompanion] updateSelectionToolbar called", {
+  console.log("[PromptProfile™] updateSelectionToolbar called", {
     hasSelection: !!selection,
     isCollapsed: selection?.isCollapsed,
     textLength: text?.length,
@@ -471,7 +471,7 @@ function updateSelectionToolbar() {
       const container = range.commonAncestorContainer;
       const element = AdapterBase.getElementFromNode(container);
       if (element) {
-        console.log("[Prompanion] Selection container details:", {
+        console.log("[PromptProfile™] Selection container details:", {
           tagName: element.tagName,
           className: element.className,
           id: element.id,
@@ -485,12 +485,12 @@ function updateSelectionToolbar() {
         });
       }
     } catch (e) {
-      console.log("[Prompanion] Error getting selection details:", e);
+      console.log("[PromptProfile™] Error getting selection details:", e);
     }
   }
   
   if (!selection || selection.isCollapsed || !text || inComposer || !targetsAssistant) {
-    console.log("[Prompanion] Hiding toolbar - conditions not met", {
+    console.log("[PromptProfile™] Hiding toolbar - conditions not met", {
       noSelection: !selection,
       isCollapsed: selection?.isCollapsed,
       noText: !text,
@@ -501,7 +501,7 @@ function updateSelectionToolbar() {
     return;
   }
   
-  console.log("[Prompanion] Showing toolbar - all conditions met");
+  console.log("[PromptProfile™] Showing toolbar - all conditions met");
   const rangeRect = AdapterBase.getSelectionRect(selection);
   if (!rangeRect) {
     hideSelectionToolbar();
@@ -510,11 +510,11 @@ function updateSelectionToolbar() {
 
   const toolbar = ensureSelectionToolbar();
   if (!toolbar) {
-    console.error("[Prompanion] Failed to create selection toolbar");
+    console.error("[PromptProfile™] Failed to create selection toolbar");
     return;
   }
   selectionToolbarText = text;
-  console.log("[Prompanion Perplexity] Selection toolbar text updated:", {
+  console.log("[PromptProfile™ Perplexity] Selection toolbar text updated:", {
     textLength: text?.length || 0,
     textPreview: text?.substring(0, 50) || "EMPTY"
   });
@@ -539,13 +539,13 @@ function updateSelectionToolbar() {
   
   // Verify we got valid dimensions
   if (!w || !h) {
-    console.warn("[Prompanion] Toolbar has invalid dimensions:", { w, h }, "retrying...");
+    console.warn("[PromptProfile™] Toolbar has invalid dimensions:", { w, h }, "retrying...");
     // Force another reflow and remeasure
     void toolbar.offsetWidth;
     w = toolbar.offsetWidth;
     h = toolbar.offsetHeight;
     if (!w || !h) {
-      console.error("[Prompanion] Toolbar dimensions still invalid, cannot position tooltip");
+      console.error("[PromptProfile™] Toolbar dimensions still invalid, cannot position tooltip");
       return;
     }
   }
@@ -582,32 +582,32 @@ function updateSelectionToolbar() {
 
 function capturePerplexityChatHistory(maxMessages = 20) {
   // Make these logs VERY visible
-  console.log("%c[Prompanion Perplexity] ========== capturePerplexityChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion Perplexity] ========== capturePerplexityChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion Perplexity] ========== capturePerplexityChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("[Prompanion Perplexity] Current URL:", window.location.href);
-  console.log("[Prompanion Perplexity] Document ready state:", document.readyState);
-  console.log("[Prompanion Perplexity] Timestamp:", new Date().toISOString());
+  console.log("%c[PromptProfile™ Perplexity] ========== capturePerplexityChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Perplexity] ========== capturePerplexityChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Perplexity] ========== capturePerplexityChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("[PromptProfile™ Perplexity] Current URL:", window.location.href);
+  console.log("[PromptProfile™ Perplexity] Document ready state:", document.readyState);
+  console.log("[PromptProfile™ Perplexity] Timestamp:", new Date().toISOString());
   
   // Check if we're on a conversation page
   const isConversationPage = window.location.href.includes("/search") || 
                             window.location.href.includes("/chat") ||
                             document.querySelector("main, [role='main']");
-  console.log("[Prompanion Perplexity] Is conversation page:", isConversationPage);
+  console.log("[PromptProfile™ Perplexity] Is conversation page:", isConversationPage);
   
   const messages = [];
   
   try {
     // First, try to find the main conversation container
     const mainContainer = document.querySelector("main, [role='main']");
-    console.log("[Prompanion Perplexity] Main container found:", !!mainContainer);
+    console.log("[PromptProfile™ Perplexity] Main container found:", !!mainContainer);
     
     // Determine the best search root - prefer main container, then document
     let searchRoot = document;
     if (mainContainer) {
       searchRoot = mainContainer;
-      console.log("[Prompanion Perplexity] Using main container as search root");
-      console.log("[Prompanion Perplexity] Main container details:", {
+      console.log("[PromptProfile™ Perplexity] Using main container as search root");
+      console.log("[PromptProfile™ Perplexity] Main container details:", {
         tagName: mainContainer.tagName,
         className: mainContainer.className,
         childCount: mainContainer.children.length,
@@ -615,7 +615,7 @@ function capturePerplexityChatHistory(maxMessages = 20) {
         hasText: (mainContainer.innerText || mainContainer.textContent || "").trim().length > 0
       });
     } else {
-      console.warn("[Prompanion Perplexity] ⚠️ Main container not found - searching entire document");
+      console.warn("[PromptProfile™ Perplexity] ⚠️ Main container not found - searching entire document");
     }
     
     // Perplexity-specific selectors - try multiple patterns to handle DOM changes
@@ -647,7 +647,7 @@ function capturePerplexityChatHistory(maxMessages = 20) {
       "div[class*='user-turn']"
     ];
     
-    console.log("[Prompanion Perplexity] Searching for messages with multiple selector strategies");
+    console.log("[PromptProfile™ Perplexity] Searching for messages with multiple selector strategies");
     
     // Try each selector pattern and combine results
     let assistantElements = [];
@@ -657,12 +657,12 @@ function capturePerplexityChatHistory(maxMessages = 20) {
       try {
         const found = Array.from(searchRoot.querySelectorAll(selector));
         if (found.length > 0) {
-          console.log(`[Prompanion Perplexity] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
+          console.log(`[PromptProfile™ Perplexity] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
           assistantElements = found;
           break; // Use first selector that finds elements
         }
       } catch (e) {
-        console.warn(`[Prompanion Perplexity] Selector failed: ${selector}`, e);
+        console.warn(`[PromptProfile™ Perplexity] Selector failed: ${selector}`, e);
       }
     }
     
@@ -670,16 +670,16 @@ function capturePerplexityChatHistory(maxMessages = 20) {
       try {
         const found = Array.from(searchRoot.querySelectorAll(selector));
         if (found.length > 0) {
-          console.log(`[Prompanion Perplexity] ✓ Found ${found.length} user messages with selector: ${selector}`);
+          console.log(`[PromptProfile™ Perplexity] ✓ Found ${found.length} user messages with selector: ${selector}`);
           userElements = found;
           break; // Use first selector that finds elements
         }
       } catch (e) {
-        console.warn(`[Prompanion Perplexity] Selector failed: ${selector}`, e);
+        console.warn(`[PromptProfile™ Perplexity] Selector failed: ${selector}`, e);
       }
     }
     
-    console.log("[Prompanion Perplexity] Final element counts after standard selectors:", {
+    console.log("[PromptProfile™ Perplexity] Final element counts after standard selectors:", {
       assistantCount: assistantElements.length,
       userCount: userElements.length,
       totalElements: assistantElements.length + userElements.length
@@ -687,11 +687,11 @@ function capturePerplexityChatHistory(maxMessages = 20) {
     
     // If no elements found with standard selectors, try searching within main container
     if (assistantElements.length === 0 && userElements.length === 0 && mainContainer) {
-      console.warn("[Prompanion Perplexity] ⚠️ No messages found with standard selectors, searching within main container...");
+      console.warn("[PromptProfile™ Perplexity] ⚠️ No messages found with standard selectors, searching within main container...");
       
       // Look for all divs within main that might be messages
       const allDivsInMain = mainContainer.querySelectorAll("div");
-      console.log(`[Prompanion Perplexity] Found ${allDivsInMain.length} divs within main container`);
+      console.log(`[PromptProfile™ Perplexity] Found ${allDivsInMain.length} divs within main container`);
       
       // Look for message-like structures - Perplexity messages are typically in nested divs
       const potentialMessages = Array.from(allDivsInMain).filter(div => {
@@ -707,7 +707,7 @@ function capturePerplexityChatHistory(maxMessages = 20) {
                div.children.length > 0;
       });
       
-      console.log(`[Prompanion Perplexity] Found ${potentialMessages.length} potential message divs in main`);
+      console.log(`[PromptProfile™ Perplexity] Found ${potentialMessages.length} potential message divs in main`);
       
       // Sort potential messages by their position in the DOM (top to bottom)
       const sortedMessages = potentialMessages.sort((a, b) => {
@@ -741,10 +741,10 @@ function capturePerplexityChatHistory(maxMessages = 20) {
           // If we have clear markers, use them
           if (hasAssistantMarker && assistantElements.length < maxMessages) {
             assistantElements.push(msg);
-            console.log(`[Prompanion Perplexity] Added assistant message from main search (${text.substring(0, 50)}...)`);
+            console.log(`[PromptProfile™ Perplexity] Added assistant message from main search (${text.substring(0, 50)}...)`);
           } else if (hasUserMarker && userElements.length < maxMessages) {
             userElements.push(msg);
-            console.log(`[Prompanion Perplexity] Added user message from main search (${text.substring(0, 50)}...)`);
+            console.log(`[PromptProfile™ Perplexity] Added user message from main search (${text.substring(0, 50)}...)`);
           } else {
             // No clear markers - use alternating pattern
             // Perplexity conversations typically start with user, then assistant, then user, etc.
@@ -752,31 +752,31 @@ function capturePerplexityChatHistory(maxMessages = 20) {
             if (totalFound % 2 === 0 && userElements.length < maxMessages) {
               // Even index (0, 2, 4...) = user message
               userElements.push(msg);
-              console.log(`[Prompanion Perplexity] Added user message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
+              console.log(`[PromptProfile™ Perplexity] Added user message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
             } else if (assistantElements.length < maxMessages) {
               // Odd index (1, 3, 5...) = assistant message
               assistantElements.push(msg);
-              console.log(`[Prompanion Perplexity] Added assistant message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
+              console.log(`[PromptProfile™ Perplexity] Added assistant message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
             }
           }
         }
       }
       
-      console.log(`[Prompanion Perplexity] After main search: ${assistantElements.length} assistant, ${userElements.length} user messages`);
+      console.log(`[PromptProfile™ Perplexity] After main search: ${assistantElements.length} assistant, ${userElements.length} user messages`);
     }
     
     // If still no elements found, try alternative approach with other containers
     if (assistantElements.length === 0 && userElements.length === 0) {
-      console.warn("[Prompanion Perplexity] ⚠️ Still no messages found, trying broader search...");
+      console.warn("[PromptProfile™ Perplexity] ⚠️ Still no messages found, trying broader search...");
       
       // Try finding messages by looking for conversation containers
       const conversationContainers = document.querySelectorAll("main, [role='main'], [class*='conversation'], [class*='chat'], [id*='conversation'], [id*='chat']");
-      console.log("[Prompanion Perplexity] Found conversation containers:", conversationContainers.length);
+      console.log("[PromptProfile™ Perplexity] Found conversation containers:", conversationContainers.length);
       
       // Log container structure for debugging
       if (conversationContainers.length > 0) {
         const firstContainer = conversationContainers[0];
-        console.log("[Prompanion Perplexity] First container structure:", {
+        console.log("[PromptProfile™ Perplexity] First container structure:", {
           tagName: firstContainer.tagName,
           className: firstContainer.className,
           id: firstContainer.id,
@@ -788,7 +788,7 @@ function capturePerplexityChatHistory(maxMessages = 20) {
       // Look for message-like structures within containers
       for (const container of conversationContainers) {
         const potentialMessages = container.querySelectorAll("div[class*='message'], div[class*='turn'], article, [class*='group'], [class*='item']");
-        console.log(`[Prompanion Perplexity] Found ${potentialMessages.length} potential message elements in container`);
+        console.log(`[PromptProfile™ Perplexity] Found ${potentialMessages.length} potential message elements in container`);
         
         // Try to identify role by looking for common patterns
         for (const msg of potentialMessages) {
@@ -803,10 +803,10 @@ function capturePerplexityChatHistory(maxMessages = 20) {
             
             if (isLikelyAssistant && assistantElements.length < maxMessages) {
               assistantElements.push(msg);
-              console.log(`[Prompanion Perplexity] Added assistant element from fallback search`);
+              console.log(`[PromptProfile™ Perplexity] Added assistant element from fallback search`);
             } else if (!isLikelyAssistant && userElements.length < maxMessages) {
               userElements.push(msg);
-              console.log(`[Prompanion Perplexity] Added user element from fallback search`);
+              console.log(`[PromptProfile™ Perplexity] Added user element from fallback search`);
             }
           }
         }
@@ -815,7 +815,7 @@ function capturePerplexityChatHistory(maxMessages = 20) {
     
     // Last resort: search for any divs with substantial text that might be messages
     if (assistantElements.length === 0 && userElements.length === 0) {
-      console.warn("[Prompanion Perplexity] ⚠️ Still no messages found, trying last-resort search...");
+      console.warn("[PromptProfile™ Perplexity] ⚠️ Still no messages found, trying last-resort search...");
       const allDivs = document.querySelectorAll("div");
       let foundCount = 0;
       for (const div of allDivs) {
@@ -845,7 +845,7 @@ function capturePerplexityChatHistory(maxMessages = 20) {
           if (foundCount >= maxMessages * 2) break;
         }
       }
-      console.log(`[Prompanion Perplexity] Last-resort search found ${foundCount} potential messages`);
+      console.log(`[PromptProfile™ Perplexity] Last-resort search found ${foundCount} potential messages`);
     }
     
     // Combine and sort by DOM position (maintain conversation order)
@@ -864,7 +864,7 @@ function capturePerplexityChatHistory(maxMessages = 20) {
     // Sort by position in document (top to bottom)
     allElements.sort((a, b) => a.position - b.position);
     
-    console.log("[Prompanion Perplexity] Processing", allElements.length, "message elements");
+    console.log("[PromptProfile™ Perplexity] Processing", allElements.length, "message elements");
     
     for (const { el, role } of allElements) {
       if (messages.length >= maxMessages) break;
@@ -890,7 +890,7 @@ function capturePerplexityChatHistory(maxMessages = 20) {
           const extracted = (contentEl.innerText || contentEl.textContent)?.trim();
           if (extracted && extracted.length > 0) {
             content = extracted;
-            console.log(`[Prompanion Perplexity] Extracted content using selector "${selector}": ${content.substring(0, 50)}...`);
+            console.log(`[PromptProfile™ Perplexity] Extracted content using selector "${selector}": ${content.substring(0, 50)}...`);
             break;
           }
         }
@@ -947,12 +947,12 @@ function capturePerplexityChatHistory(maxMessages = 20) {
             content: content,
             timestamp: Date.now()
           });
-          console.log(`[Prompanion Perplexity] Added ${role} message (${content.length} chars): ${content.substring(0, 50)}...`);
+          console.log(`[PromptProfile™ Perplexity] Added ${role} message (${content.length} chars): ${content.substring(0, 50)}...`);
         } else {
-          console.log(`[Prompanion Perplexity] Skipped ${role} message - too short or UI-only: "${content.substring(0, 30)}"`);
+          console.log(`[PromptProfile™ Perplexity] Skipped ${role} message - too short or UI-only: "${content.substring(0, 30)}"`);
         }
       } else {
-        console.warn(`[Prompanion Perplexity] Could not extract content from ${role} message element:`, {
+        console.warn(`[PromptProfile™ Perplexity] Could not extract content from ${role} message element:`, {
           tagName: el.tagName,
           className: el.className,
           hasChildren: el.children.length > 0,
@@ -962,10 +962,10 @@ function capturePerplexityChatHistory(maxMessages = 20) {
       }
     }
     
-    console.log(`[Prompanion Perplexity] ✓ Captured ${messages.length} messages from Perplexity conversation`);
+    console.log(`[PromptProfile™ Perplexity] ✓ Captured ${messages.length} messages from Perplexity conversation`);
     if (messages.length === 0) {
-      console.warn("[Prompanion Perplexity] ⚠️ No messages captured - check if conversation elements exist in DOM");
-      console.warn("[Prompanion Perplexity] DOM Diagnostic Info:", {
+      console.warn("[PromptProfile™ Perplexity] ⚠️ No messages captured - check if conversation elements exist in DOM");
+      console.warn("[PromptProfile™ Perplexity] DOM Diagnostic Info:", {
         bodyChildren: document.body?.children?.length || 0,
         mainElements: document.querySelectorAll("main").length,
         articles: document.querySelectorAll("article").length,
@@ -976,7 +976,7 @@ function capturePerplexityChatHistory(maxMessages = 20) {
       });
       
       // Try one more aggressive search: look for any divs with substantial text that might be messages
-      console.warn("[Prompanion Perplexity] Attempting final aggressive search for message-like content...");
+      console.warn("[PromptProfile™ Perplexity] Attempting final aggressive search for message-like content...");
       const allTextDivs = Array.from(document.querySelectorAll("div")).filter(div => {
         const text = (div.innerText || div.textContent || "").trim();
         return text.length > 20 && text.length < 10000 && 
@@ -989,9 +989,9 @@ function capturePerplexityChatHistory(maxMessages = 20) {
                div.children.length > 0;
       });
       
-      console.warn(`[Prompanion Perplexity] Found ${allTextDivs.length} potential message divs in final search`);
+      console.warn(`[PromptProfile™ Perplexity] Found ${allTextDivs.length} potential message divs in final search`);
       if (allTextDivs.length > 0) {
-        console.warn("[Prompanion Perplexity] Sample divs found:", allTextDivs.slice(0, 5).map(div => ({
+        console.warn("[PromptProfile™ Perplexity] Sample divs found:", allTextDivs.slice(0, 5).map(div => ({
           className: div.className,
           id: div.id,
           textPreview: (div.innerText || div.textContent || "").substring(0, 100),
@@ -1001,8 +1001,8 @@ function capturePerplexityChatHistory(maxMessages = 20) {
     }
     return messages;
   } catch (error) {
-    console.error("[Prompanion Perplexity] ✗ Error capturing Perplexity chat history:", error);
-    console.error("[Prompanion Perplexity] Error details:", {
+    console.error("[PromptProfile™ Perplexity] ✗ Error capturing Perplexity chat history:", error);
+    console.error("[PromptProfile™ Perplexity] Error details:", {
       message: error.message,
       stack: error.stack,
       name: error.name
@@ -1023,16 +1023,16 @@ function getElementPosition(element) {
 
 async function submitSelectionToSideChat(text) {
   // Make these logs VERY visible
-  console.log("%c[Prompanion Perplexity] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion Perplexity] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion Perplexity] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Perplexity] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Perplexity] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Perplexity] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
   
   const snippet = typeof text === "string" ? text.trim() : "";
-  console.log("[Prompanion Perplexity] Snippet:", snippet?.substring(0, 50));
-  console.log("[Prompanion Perplexity] selectionAskInFlight:", selectionAskInFlight);
+  console.log("[PromptProfile™ Perplexity] Snippet:", snippet?.substring(0, 50));
+  console.log("[PromptProfile™ Perplexity] selectionAskInFlight:", selectionAskInFlight);
   
   if (!snippet || selectionAskInFlight) {
-    console.log("[Prompanion Perplexity] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
+    console.log("[PromptProfile™ Perplexity] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
     return;
   }
   selectionAskInFlight = true;
@@ -1040,15 +1040,15 @@ async function submitSelectionToSideChat(text) {
   try {
     // Capture chat history from Perplexity conversation for context
     let chatHistory = [];
-    console.log("%c[Prompanion Perplexity] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
+    console.log("%c[PromptProfile™ Perplexity] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
     try {
       chatHistory = capturePerplexityChatHistory(20);
-      console.log(`%c[Prompanion Perplexity] ✓ Captured ${chatHistory.length} messages from conversation for SideChat context`, 
+      console.log(`%c[PromptProfile™ Perplexity] ✓ Captured ${chatHistory.length} messages from conversation for SideChat context`, 
         chatHistory.length > 0 ? "color: green; font-size: 14px; font-weight: bold;" : "color: red; font-size: 14px; font-weight: bold;");
       
       // Log sample of captured history for debugging
       if (chatHistory.length > 0) {
-        console.log("[Prompanion Perplexity] Sample captured messages:", {
+        console.log("[PromptProfile™ Perplexity] Sample captured messages:", {
           firstMessage: {
             role: chatHistory[0].role,
             contentPreview: chatHistory[0].content?.substring(0, 50) + "..."
@@ -1060,17 +1060,17 @@ async function submitSelectionToSideChat(text) {
           totalMessages: chatHistory.length
         });
       } else {
-        console.warn("[Prompanion Perplexity] ⚠️ capturePerplexityChatHistory returned empty array - no messages found in DOM");
+        console.warn("[PromptProfile™ Perplexity] ⚠️ capturePerplexityChatHistory returned empty array - no messages found in DOM");
       }
     } catch (error) {
-      console.error("[Prompanion Perplexity] ✗ Failed to capture chat history:", error);
-      console.error("[Prompanion Perplexity] Error stack:", error.stack);
+      console.error("[PromptProfile™ Perplexity] ✗ Failed to capture chat history:", error);
+      console.error("[PromptProfile™ Perplexity] Error stack:", error.stack);
       // Continue with empty array - better than failing completely
       chatHistory = [];
     }
     
-    console.log("[Prompanion Perplexity] ========== SENDING PROMPANION_SIDECHAT_REQUEST ==========");
-    console.log("[Prompanion Perplexity] Sending PROMPANION_SIDECHAT_REQUEST with:", {
+    console.log("[PromptProfile™ Perplexity] ========== SENDING PROMPANION_SIDECHAT_REQUEST ==========");
+    console.log("[PromptProfile™ Perplexity] Sending PROMPANION_SIDECHAT_REQUEST with:", {
       textLength: snippet.length,
       textPreview: snippet.substring(0, 50),
       chatHistoryLength: chatHistory.length,
@@ -1092,18 +1092,18 @@ async function submitSelectionToSideChat(text) {
       text: snippet,
       chatHistory: chatHistory 
     }, (response) => {
-      console.log("[Prompanion Perplexity] ========== PROMPANION_SIDECHAT_REQUEST RESPONSE ==========");
-      console.log("[Prompanion Perplexity] Response:", response);
+      console.log("[PromptProfile™ Perplexity] ========== PROMPANION_SIDECHAT_REQUEST RESPONSE ==========");
+      console.log("[PromptProfile™ Perplexity] Response:", response);
       if (!response?.ok) {
-        console.warn("Prompanion: sidechat request rejected", response?.reason);
+        console.warn("PromptProfile™: sidechat request rejected", response?.reason);
       }
       selectionAskInFlight = false;
     }).catch((error) => {
-      console.warn("Prompanion: failed to request sidechat from selection", error);
+      console.warn("PromptProfile™: failed to request sidechat from selection", error);
       selectionAskInFlight = false;
     });
   } catch (error) {
-    console.error("Prompanion Perplexity: sidechat request threw synchronously", error);
+    console.error("PromptProfile™ Perplexity: sidechat request threw synchronously", error);
     selectionAskInFlight = false;
   }
 }
@@ -1112,15 +1112,15 @@ function handleSelectionToolbarAction(event) {
   event.preventDefault();
   event.stopPropagation();
   const text = selectionToolbarText;
-  console.log("%c[Prompanion Perplexity] ========== ELABORATE BUTTON CLICKED ==========", "color: green; font-size: 16px; font-weight: bold;");
-  console.log("[Prompanion Perplexity] Selection toolbar text:", {
+  console.log("%c[PromptProfile™ Perplexity] ========== ELABORATE BUTTON CLICKED ==========", "color: green; font-size: 16px; font-weight: bold;");
+  console.log("[PromptProfile™ Perplexity] Selection toolbar text:", {
     textLength: text?.length || 0,
     textPreview: text?.substring(0, 100) || "EMPTY",
     hasText: !!text && text.trim().length > 0
   });
   
   if (!text || !text.trim()) {
-    console.error("[Prompanion Perplexity] ERROR: No text selected! Cannot elaborate.");
+    console.error("[PromptProfile™ Perplexity] ERROR: No text selected! Cannot elaborate.");
     return;
   }
   
@@ -1146,7 +1146,7 @@ function createIcon() {
 function requestPromptEnhancement(promptText) {
   return AdapterBase.sendMessage({ type: "PROMPANION_PREPARE_ENHANCEMENT", prompt: promptText, openPanel: false })
     .catch((error) => {
-      console.warn("Prompanion: enhancement request failed", error);
+      console.warn("PromptProfile™: enhancement request failed", error);
       return { ok: false };
     });
 }
@@ -1206,9 +1206,9 @@ function buildButton() {
   button.className = BUTTON_CLASS;
   button.append(createIcon());
   // Use AdapterBase for generic hover tooltip
-  AdapterBase.attachTooltip(button, "Open Prompanion to enhance your prompts for the best response.", BUTTON_ID);
+  AdapterBase.attachTooltip(button, "Open PromptProfile™ to enhance your prompts for the best response.", BUTTON_ID);
   button.addEventListener("click", () => AdapterBase.togglePanel()
-    .catch((e) => console.error("Prompanion: failed to open sidebar from Perplexity adapter", e)));
+    .catch((e) => console.error("PromptProfile™: failed to open sidebar from Perplexity adapter", e)));
   button.addEventListener("mouseenter", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("focus", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("mouseleave", () => AdapterBase.hideTooltip(button));
@@ -1252,7 +1252,7 @@ function placeButton(targetContainer, inputNode, buttonTargetElement = null) {
 
 function positionFloatingButton(inputNode, containerNode = floatingButtonTargetContainer, buttonTargetElement = null) {
   if (!floatingButtonWrapper) {
-    console.log("[Prompanion Perplexity] positionFloatingButton: no wrapper");
+    console.log("[PromptProfile™ Perplexity] positionFloatingButton: no wrapper");
     return;
   }
   
@@ -1273,7 +1273,7 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
         const potentialTarget = siblings[2]; // 0-indexed, so [2] is the 3rd child
         if (potentialTarget && potentialTarget.offsetParent) {
           targetElement = potentialTarget;
-          console.log("[Prompanion Perplexity] Found target element via sibling search");
+          console.log("[PromptProfile™ Perplexity] Found target element via sibling search");
           break;
         }
       }
@@ -1297,7 +1297,7 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
           const inputRect = inputNode.getBoundingClientRect();
           if (divRect.left > inputRect.right && div.offsetParent) {
             targetElement = div;
-            console.log("[Prompanion Perplexity] Found target element via pattern matching");
+            console.log("[PromptProfile™ Perplexity] Found target element via pattern matching");
             break;
           }
         }
@@ -1308,7 +1308,7 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
   if (!targetElement) {
     // Check retry count to prevent infinite loops
     if (positionRetryCount >= MAX_POSITION_RETRIES) {
-      console.warn("[Prompanion Perplexity] Target element not found after max retries, using fallback positioning");
+      console.warn("[PromptProfile™ Perplexity] Target element not found after max retries, using fallback positioning");
       positionRetryCount = 0; // Reset for next attempt
       // Use fallback: position relative to input container
       if (inputNode) {
@@ -1333,7 +1333,7 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     }
     
     positionRetryCount++;
-    console.warn(`[Prompanion Perplexity] Target element not found, retrying (${positionRetryCount}/${MAX_POSITION_RETRIES})...`);
+    console.warn(`[PromptProfile™ Perplexity] Target element not found, retrying (${positionRetryCount}/${MAX_POSITION_RETRIES})...`);
     // Retry after a short delay
     if (inputNode && floatingButtonWrapper) {
       setTimeout(() => {
@@ -1346,7 +1346,7 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
   // Reset retry count on success
   positionRetryCount = 0;
   
-  console.log("[Prompanion Perplexity] positionFloatingButton: found target element", {
+  console.log("[PromptProfile™ Perplexity] positionFloatingButton: found target element", {
     tagName: targetElement.tagName,
     className: targetElement.className,
     id: targetElement.id
@@ -1374,7 +1374,7 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
           current.classList.contains("relative") || 
           current.classList.contains("flex")) {
         inputBarContainer = current;
-        console.log("[Prompanion Perplexity] Found input bar container via target element walk");
+        console.log("[PromptProfile™ Perplexity] Found input bar container via target element walk");
         break;
       }
     }
@@ -1400,7 +1400,7 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
             current.classList.contains("relative") || 
             current.classList.contains("flex")) {
           inputBarContainer = current;
-          console.log("[Prompanion Perplexity] Found input bar container via input walk");
+          console.log("[PromptProfile™ Perplexity] Found input bar container via input walk");
           break;
         }
       }
@@ -1417,7 +1417,7 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
       // If parent is reasonably sized (not the entire window), use it
       if (parentRect.height < 200 && parentRect.width < 2000) {
         inputBarContainer = targetParent;
-        console.log("[Prompanion Perplexity] Using target parent as container (fallback)");
+        console.log("[PromptProfile™ Perplexity] Using target parent as container (fallback)");
       }
     }
   }
@@ -1428,7 +1428,7 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
   }
   
   if (!inputBarContainer) {
-    console.warn("[Prompanion Perplexity] No container found");
+    console.warn("[PromptProfile™ Perplexity] No container found");
     return;
   }
   
@@ -1505,7 +1505,7 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     floatingButtonWrapper.style.margin = "0";
   });
   
-  console.log("[Prompanion Perplexity] Button positioned 8px to the left of browser button:", {
+  console.log("[PromptProfile™ Perplexity] Button positioned 8px to the left of browser button:", {
     targetRect: { left: targetRect.left, right: targetRect.right, top: targetRect.top, width: targetRect.width, height: targetRect.height },
     browserContainerRect: { left: browserContainerRect.left, right: browserContainerRect.right, top: browserContainerRect.top, width: browserContainerRect.width, height: browserContainerRect.height },
     containerRect: { left: containerRect.left, right: containerRect.right, top: containerRect.top, width: containerRect.width, height: containerRect.height },
@@ -1540,7 +1540,7 @@ function findElementByXPath(xpath) {
     );
     return result.singleNodeValue instanceof HTMLElement ? result.singleNodeValue : null;
   } catch (e) {
-    console.error("[Prompanion] XPath evaluation failed:", e);
+    console.error("[PromptProfile™] XPath evaluation failed:", e);
     return null;
   }
 }
@@ -1607,18 +1607,18 @@ function locateComposer() {
   }
   
   if (!input) {
-    console.log("[Prompanion] locateComposer: input not found");
+    console.log("[PromptProfile™] locateComposer: input not found");
     return null;
   }
   
-  console.log("[Prompanion] locateComposer: found input", input.id, input.className);
+  console.log("[PromptProfile™] locateComposer: found input", input.id, input.className);
   
   // Find target element for button placement using XPath
   // Target: //*[@id="root"]/div[1]/div/div/div[2]/div/div[1]/div[1]/div/div[3]/div/div/div[2]/div/div/div/span/div/div[1]/div/div[3]
   const targetXPath = "//*[@id='root']/div[1]/div/div/div[2]/div/div[1]/div[1]/div/div[3]/div/div/div[2]/div/div/div/span/div/div[1]/div/div[3]";
   let buttonTargetElement = findElementByXPath(targetXPath);
   
-  console.log("[Prompanion] locateComposer: button target element", buttonTargetElement);
+  console.log("[PromptProfile™] locateComposer: button target element", buttonTargetElement);
   
   // Find container for button placement
   // Use the target element's parent or a suitable container
@@ -1636,7 +1636,7 @@ function locateComposer() {
       
       if (hasRelativePosition || hasFlex || current.classList.contains("relative") || current.classList.contains("flex")) {
         container = current;
-        console.log("[Prompanion] locateComposer: found container from target element", container.tagName, container.className);
+        console.log("[PromptProfile™] locateComposer: found container from target element", container.tagName, container.className);
         break;
       }
       current = current.parentElement;
@@ -1646,13 +1646,13 @@ function locateComposer() {
     // If no suitable container found, use the target element's parent
     if (!container) {
       container = buttonTargetElement.parentElement;
-      console.log("[Prompanion] locateComposer: using target element's parent as container", container?.tagName);
+      console.log("[PromptProfile™] locateComposer: using target element's parent as container", container?.tagName);
     }
   }
   
   // Fallback: use the old method if target element not found
   if (!container) {
-    console.log("[Prompanion] locateComposer: target element not found, using fallback");
+    console.log("[PromptProfile™] locateComposer: target element not found, using fallback");
     let current = input.parentElement;
     let depth = 0;
     while (current && depth < 10) {
@@ -1663,7 +1663,7 @@ function locateComposer() {
       
       if (hasRelativePosition || hasWFullClass || hasRelativeClass) {
         container = current;
-        console.log("[Prompanion] locateComposer: found container (fallback)", container.className);
+        console.log("[PromptProfile™] locateComposer: found container (fallback)", container.className);
         break;
       }
       current = current.parentElement;
@@ -1685,7 +1685,7 @@ function locateComposer() {
     const containerStyle = getComputedStyle(container);
     if (containerStyle.position === "static") {
       container.style.position = "relative";
-      console.log("[Prompanion] locateComposer: set container position to relative");
+      console.log("[PromptProfile™] locateComposer: set container position to relative");
     }
   }
   
@@ -1716,63 +1716,63 @@ function init() {
 function handleInsertTextMessage(message, sender, sendResponse) {
   try {
     const textToInsert = typeof message.text === "string" ? message.text.trim() : "";
-    console.log("[Prompanion] ========== INSERT TEXT REQUEST ==========");
-    console.log("[Prompanion] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
-    console.log("[Prompanion] Text length:", textToInsert.length);
+    console.log("[PromptProfile™] ========== INSERT TEXT REQUEST ==========");
+    console.log("[PromptProfile™] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
+    console.log("[PromptProfile™] Text length:", textToInsert.length);
     
     if (!textToInsert) {
-      console.log("[Prompanion] Insert failed: EMPTY_TEXT");
+      console.log("[PromptProfile™] Insert failed: EMPTY_TEXT");
       sendResponse({ ok: false, reason: "EMPTY_TEXT" });
       return false; // sendResponse called synchronously, close channel
     }
 
-    console.log("[Prompanion] Searching for composer node...");
+    console.log("[PromptProfile™] Searching for composer node...");
     const composerNode = findComposerNode();
-    console.log("[Prompanion] Composer node found:", composerNode);
-    console.log("[Prompanion] Node type:", composerNode?.constructor?.name);
-    console.log("[Prompanion] Node isContentEditable:", composerNode?.isContentEditable);
-    console.log("[Prompanion] Node tagName:", composerNode?.tagName);
-    console.log("[Prompanion] Node className:", composerNode?.className);
-    console.log("[Prompanion] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
-    console.log("[Prompanion] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
+    console.log("[PromptProfile™] Composer node found:", composerNode);
+    console.log("[PromptProfile™] Node type:", composerNode?.constructor?.name);
+    console.log("[PromptProfile™] Node isContentEditable:", composerNode?.isContentEditable);
+    console.log("[PromptProfile™] Node tagName:", composerNode?.tagName);
+    console.log("[PromptProfile™] Node className:", composerNode?.className);
+    console.log("[PromptProfile™] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
+    console.log("[PromptProfile™] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
     
     if (!composerNode) {
-      console.log("[Prompanion] Insert failed: NO_COMPOSER_NODE");
+      console.log("[PromptProfile™] Insert failed: NO_COMPOSER_NODE");
       sendResponse({ ok: false, reason: "NO_COMPOSER_NODE" });
       return false; // sendResponse called synchronously, close channel
     }
 
-    console.log("[Prompanion] Calling setComposerText...");
+    console.log("[PromptProfile™] Calling setComposerText...");
     const success = setComposerText(composerNode, textToInsert);
-    console.log("[Prompanion] setComposerText returned:", success);
+    console.log("[PromptProfile™] setComposerText returned:", success);
     
     // Verify insertion
     const currentValue = composerNode.value || composerNode.textContent || "";
     const textInserted = currentValue.includes(textToInsert.substring(0, Math.min(20, textToInsert.length)));
-    console.log("[Prompanion] Verification - text appears in node:", textInserted);
-    console.log("[Prompanion] Current node value:", currentValue.substring(0, 100));
+    console.log("[PromptProfile™] Verification - text appears in node:", textInserted);
+    console.log("[PromptProfile™] Current node value:", currentValue.substring(0, 100));
     
     if (success && textInserted) {
-      console.log("[Prompanion] Insert succeeded!");
+      console.log("[PromptProfile™] Insert succeeded!");
       sendResponse({ ok: true });
     } else if (success && !textInserted) {
-      console.warn("[Prompanion] setComposerText returned true but text not verified in node");
+      console.warn("[PromptProfile™] setComposerText returned true but text not verified in node");
       sendResponse({ ok: false, reason: "INSERTION_NOT_VERIFIED" });
     } else {
-      console.log("[Prompanion] Insert failed: SET_TEXT_FAILED");
+      console.log("[PromptProfile™] Insert failed: SET_TEXT_FAILED");
       sendResponse({ ok: false, reason: "SET_TEXT_FAILED" });
     }
     return false; // sendResponse called synchronously, close channel
   } catch (error) {
-    console.error("[Prompanion] Insert text handler failed", error);
-    console.error("[Prompanion] Error stack:", error.stack);
+    console.error("[PromptProfile™] Insert text handler failed", error);
+    console.error("[PromptProfile™] Error stack:", error.stack);
     sendResponse({ ok: false, reason: error?.message ?? "UNKNOWN" });
     return false; // sendResponse called synchronously, close channel
   }
 }
 
 // Register message handler using AdapterBase (must be after handleInsertTextMessage is defined)
-console.log("[Prompanion] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
+console.log("[PromptProfile™] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
 AdapterBase.registerMessageHandler("PROMPANION_INSERT_TEXT", handleInsertTextMessage);
 
 function bootstrap() {
@@ -1816,12 +1816,12 @@ function teardownEnhanceTooltip() {
 
 function ensureEnhanceTooltipElement() {
   if (!enhanceTooltipElement) {
-    console.log("[Prompanion] Creating enhance tooltip element");
+    console.log("[PromptProfile™] Creating enhance tooltip element");
     enhanceTooltipElement = document.createElement("div");
-    enhanceTooltipElement.className = "prompanion-enhance-tooltip";
+    enhanceTooltipElement.className = "promptprofile-enhance-tooltip";
     const dismiss = document.createElement("button");
     dismiss.type = "button";
-    dismiss.className = "prompanion-enhance-tooltip__dismiss";
+    dismiss.className = "promptprofile-enhance-tooltip__dismiss";
     dismiss.textContent = "×";
     dismiss.setAttribute("aria-label", "Dismiss prompt enhancement suggestion");
     dismiss.addEventListener("click", () => {
@@ -1830,46 +1830,46 @@ function ensureEnhanceTooltipElement() {
     });
     const action = document.createElement("button");
     action.type = "button";
-    action.className = "prompanion-enhance-tooltip__action";
+    action.className = "promptprofile-enhance-tooltip__action";
     AdapterBase.setButtonTextContent(action, "Refine");
-    console.log("[Prompanion] Attaching click handler to Refine button");
-    console.log("[Prompanion] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
+    console.log("[PromptProfile™] Attaching click handler to Refine button");
+    console.log("[PromptProfile™] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
     action.addEventListener("click", handleRefineButtonClick);
-    console.log("[Prompanion] Click handler attached, button:", action);
+    console.log("[PromptProfile™] Click handler attached, button:", action);
     enhanceTooltipElement.append(dismiss, action);
-    console.log("[Prompanion] Enhance tooltip element created");
+    console.log("[PromptProfile™] Enhance tooltip element created");
   }
   if (!enhanceTooltipElement.isConnected) {
-    console.log("[Prompanion] Appending enhance tooltip to body");
+    console.log("[PromptProfile™] Appending enhance tooltip to body");
     document.body.append(enhanceTooltipElement);
   }
   hideEnhanceTooltip();
 }
 
 function handleRefineButtonClick(e) {
-  console.log("[Prompanion] ========== REFINE BUTTON HANDLER FIRED ==========");
-  console.log("[Prompanion] Event type:", e.type);
-  console.log("[Prompanion] Event target:", e.target);
+  console.log("[PromptProfile™] ========== REFINE BUTTON HANDLER FIRED ==========");
+  console.log("[PromptProfile™] Event type:", e.type);
+  console.log("[PromptProfile™] Event target:", e.target);
   e.preventDefault();
   e.stopPropagation();
   if (enhanceActionInFlight) {
     return;
   }
   const composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
-  console.log("[Prompanion] Composer node:", composerNode);
+  console.log("[PromptProfile™] Composer node:", composerNode);
   if (!composerNode) {
-    console.error("[Prompanion] No composer node found!");
+    console.error("[PromptProfile™] No composer node found!");
     return;
   }
   const promptText = extractInputText().trim();
-  console.log("[Prompanion] Prompt text:", promptText);
+  console.log("[PromptProfile™] Prompt text:", promptText);
   if (!promptText) {
     return;
   }
   enhanceActionInFlight = true;
   enhanceTooltipDismissed = true;
   hideEnhanceTooltip();
-  console.log("[Prompanion] Requesting prompt enhancement...");
+  console.log("[PromptProfile™] Requesting prompt enhancement...");
   requestPromptEnhancement(promptText)
     .then((result) => {
       if (!result || !result.ok) {
@@ -1883,7 +1883,7 @@ function handleRefineButtonClick(e) {
       enhanceActionInFlight = false;
     })
     .catch((error) => {
-      console.error("Prompanion: refine request threw", error);
+      console.error("PromptProfile™: refine request threw", error);
       enhanceActionInFlight = false;
     });
 }
@@ -1985,36 +1985,36 @@ function detachTooltipResizeHandler() {
 
 // Backup message listener registration (IIFE to ensure it runs immediately)
 (function registerInsertTextListener() {
-  console.log("[Prompanion] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
-  console.log("[Prompanion] Current time:", new Date().toISOString());
+  console.log("[PromptProfile™] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
+  console.log("[PromptProfile™] Current time:", new Date().toISOString());
   
   if (typeof chrome === "undefined") {
-    console.error("[Prompanion] chrome is undefined in backup registration");
+    console.error("[PromptProfile™] chrome is undefined in backup registration");
     return;
   }
   
   if (!chrome.runtime || !chrome.runtime.onMessage) {
-    console.error("[Prompanion] chrome.runtime.onMessage not available in backup registration");
+    console.error("[PromptProfile™] chrome.runtime.onMessage not available in backup registration");
     return;
   }
   
   try {
     chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       if (message && message.type === "PROMPANION_INSERT_TEXT") {
-        console.log("[Prompanion] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
+        console.log("[PromptProfile™] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
         if (typeof handleInsertTextMessage === "function") {
           handleInsertTextMessage(message, sender, sendResponse);
         } else {
-          console.error("[Prompanion] handleInsertTextMessage is not a function!");
+          console.error("[PromptProfile™] handleInsertTextMessage is not a function!");
           sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
         }
         return true;
       }
       return false;
     });
-    console.log("[Prompanion] ✓ Backup listener registered successfully");
+    console.log("[PromptProfile™] ✓ Backup listener registered successfully");
   } catch (error) {
-    console.error("[Prompanion] ✗ Backup listener registration failed:", error);
+    console.error("[PromptProfile™] ✗ Backup listener registration failed:", error);
   }
 })();
 
@@ -2030,35 +2030,35 @@ if (readyState === "complete" || readyState === "interactive") {
 // AdapterBase will handle selection changes efficiently
 
 // Verify message listener is registered
-console.log("[Prompanion] ========== VERIFYING MESSAGE LISTENER ==========");
+console.log("[PromptProfile™] ========== VERIFYING MESSAGE LISTENER ==========");
 if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
-  console.log("[Prompanion] chrome.runtime.onMessage is available");
-  console.log("[Prompanion] chrome.runtime.id:", chrome.runtime.id);
-  console.log("[Prompanion] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
+  console.log("[PromptProfile™] chrome.runtime.onMessage is available");
+  console.log("[PromptProfile™] chrome.runtime.id:", chrome.runtime.id);
+  console.log("[PromptProfile™] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
 } else {
-  console.error("[Prompanion] chrome.runtime.onMessage is NOT available at this point!");
+  console.error("[PromptProfile™] chrome.runtime.onMessage is NOT available at this point!");
 }
 
-window.addEventListener("prompanion-panel-resize", () => {
+window.addEventListener("promptprofile-panel-resize", () => {
   refreshFloatingButtonPosition();
 });
 
 document.addEventListener("mousedown", (e) => {
   if (enhanceTooltipElement?.classList.contains("is-visible")) {
-    const button = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
-    const clickedButton = e.target.closest(".prompanion-enhance-tooltip__action");
+    const button = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
+    const clickedButton = e.target.closest(".promptprofile-enhance-tooltip__action");
     if (clickedButton || button === e.target) {
-      console.log("[Prompanion] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
-      console.log("[Prompanion] Setting tooltipClickInProgress flag");
+      console.log("[PromptProfile™] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
+      console.log("[PromptProfile™] Setting tooltipClickInProgress flag");
       tooltipClickInProgress = true;
       const buttonRef = button;
       const mousedownTime = Date.now();
       
       const clickHandler = (clickEvent) => {
         const timeSinceMousedown = Date.now() - mousedownTime;
-        console.log("[Prompanion] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
-        console.log("[Prompanion] Time since mousedown:", timeSinceMousedown, "ms");
-        console.log("[Prompanion] Click target:", clickEvent.target);
+        console.log("[PromptProfile™] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
+        console.log("[PromptProfile™] Time since mousedown:", timeSinceMousedown, "ms");
+        console.log("[PromptProfile™] Click target:", clickEvent.target);
         if (typeof handleRefineButtonClick === "function") {
           handleRefineButtonClick(clickEvent);
         }
@@ -2069,7 +2069,7 @@ document.addEventListener("mousedown", (e) => {
       
       setTimeout(() => {
         tooltipClickInProgress = false;
-        console.log("[Prompanion] tooltipClickInProgress flag cleared");
+        console.log("[PromptProfile™] tooltipClickInProgress flag cleared");
         document.removeEventListener("click", clickHandler, true);
       }, 300);
     }

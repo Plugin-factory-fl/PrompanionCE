@@ -661,30 +661,30 @@ export function registerLibraryHandlers(stateRef, dependencies = {}) {
 
       (async () => {
         try {
-          console.log("[Prompanion Library] ========== SENDING INSERT TEXT MESSAGE ==========");
-          console.log("[Prompanion Library] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
-          console.log("[Prompanion Library] Text length:", textToInsert.length);
+          console.log("[PromptProfile™ Library] ========== SENDING INSERT TEXT MESSAGE ==========");
+          console.log("[PromptProfile™ Library] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
+          console.log("[PromptProfile™ Library] Text length:", textToInsert.length);
           
           const response = await sendChromeMessage({
             type: "PROMPANION_INSERT_TEXT",
             text: textToInsert
           });
 
-          console.log("[Prompanion Library] Received response:", response);
+          console.log("[PromptProfile™ Library] Received response:", response);
 
           if (!response || !response.ok) {
-            console.error("[Prompanion Library] Insert failed:", response?.reason);
+            console.error("[PromptProfile™ Library] Insert failed:", response?.reason);
             throw new Error(response?.reason || "Failed to insert text into the LLM");
           }
 
-          console.log("[Prompanion Library] Insert succeeded!");
+          console.log("[PromptProfile™ Library] Insert succeeded!");
           button.textContent = "Inserted";
           setTimeout(() => {
             button.textContent = originalButtonText;
           }, 1200);
         } catch (error) {
-          console.error("[Prompanion Library] Insert failed with error:", error);
-          console.error("[Prompanion Library] Error message:", error.message);
+          console.error("[PromptProfile™ Library] Insert failed with error:", error);
+          console.error("[PromptProfile™ Library] Error message:", error.message);
           const errorMessage = error.message || "Failed to insert text. Please make sure the LLM chat is open and try again.";
           alert(errorMessage);
           button.textContent = originalButtonText;

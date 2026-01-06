@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Prompanion Prompt Enhancer",
+  "name": "PromptProfile™ Prompt Enhancer",
   "description": "Real-time AI prompt enhancement side panel for supported AI chat platforms.",
   "version": "0.1.0",
   "action": {
-    "default_title": "Prompanion Prompt Enhancer",
+    "default_title": "PromptProfile™ Prompt Enhancer",
     "default_icon": {
       "16": "Assets/icons/icon16.png",
       "32": "Assets/icons/icon32.png",
@@ -137,7 +137,7 @@
       "suggested_key": {
         "default": "Alt+Shift+P"
       },
-      "description": "Open Prompanion side panel"
+      "description": "Open PromptProfile™ side panel"
     }
   }
 }

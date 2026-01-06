@@ -1,4 +1,4 @@
-# Deployment Guide for Prompanion Backend
+# Deployment Guide for PromptProfile™ Backend
 
 ## Quick Start Checklist
 

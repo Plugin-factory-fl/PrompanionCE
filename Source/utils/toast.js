@@ -24,7 +24,7 @@ export function showSideChatToast(message, type = 'success', duration = 3000) {
   }
   
   if (!chatSection) {
-    console.warn("[Prompanion] Could not find chat section for toast");
+    console.warn("[PromptProfile™] Could not find chat section for toast");
     return null;
   }
 
@@ -84,7 +84,7 @@ export function showSideChatToast(message, type = 'success', duration = 3000) {
     }, duration);
   }
 
-  console.log("[Prompanion] Toast shown:", message, "Type:", type);
+  console.log("[PromptProfile™] Toast shown:", message, "Type:", type);
   return toast;
 }
 

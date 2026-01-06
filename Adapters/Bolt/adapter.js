@@ -8,7 +8,7 @@
 
 // Import constants from AdapterBase
 if (typeof AdapterBase === "undefined") {
-  console.error("[Prompanion] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
+  console.error("[PromptProfile™] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
   throw new Error("AdapterBase must be loaded before adapter.js");
 }
 
@@ -40,7 +40,7 @@ let tooltipClickInProgress = false;
 // Clean up any existing old toolbar elements on load
 if (document.body) {
   const oldToolbar = document.getElementById(SELECTION_TOOLBAR_ID);
-  if (oldToolbar && !oldToolbar.classList.contains('prompanion-selection-toolbar')) {
+  if (oldToolbar && !oldToolbar.classList.contains('promptprofile-selection-toolbar')) {
     // Only remove if it's the old style toolbar, not the AdapterBase one
     oldToolbar.remove();
   }
@@ -56,7 +56,7 @@ let highlightObserver = null;
 
 function ensureStyle() {
   // Load generic adapter styles from external CSS file
-  const styleId = "prompanion-adapter-styles";
+  const styleId = "promptprofile-adapter-styles";
   let styleElement = document.getElementById(styleId);
   
   if (!styleElement) {
@@ -71,7 +71,7 @@ function ensureStyle() {
   }
   
   // Inject CSS rule for Bolt container push with very high specificity
-  const pushStyleId = 'prompanion-bolt-container-push-style';
+  const pushStyleId = 'promptprofile-bolt-container-push-style';
   if (document.getElementById(pushStyleId)) {
     return;
   }
@@ -80,7 +80,7 @@ function ensureStyle() {
   style.id = pushStyleId;
   style.textContent = `
     /* High specificity rule to override Bolt.new's width */
-    div.flex.flex-col.h-full.w-full[data-prompanion-pushed="true"] {
+    div.flex.flex-col.h-full.w-full[data-promptprofile-pushed="true"] {
       width: calc(100% - min(546px, 94vw)) !important;
       max-width: calc(100% - min(546px, 94vw)) !important;
       flex-basis: calc(100% - min(546px, 94vw)) !important;
@@ -295,7 +295,7 @@ function captureBoltChatHistory(maxMessages = 20) {
     
     return messages;
   } catch (error) {
-    console.error("[Prompanion] Error capturing GPT chat history:", error);
+    console.error("[PromptProfile™] Error capturing GPT chat history:", error);
     return [];
   }
 }
@@ -320,7 +320,7 @@ async function submitSelectionToSideChat(text) {
     try {
       chatHistory = captureBoltChatHistory(20);
     } catch (error) {
-      console.error("[Prompanion Bolt] Failed to capture chat history:", error);
+      console.error("[PromptProfile™ Bolt] Failed to capture chat history:", error);
       chatHistory = [];
     }
 
@@ -330,15 +330,15 @@ async function submitSelectionToSideChat(text) {
       chatHistory: chatHistory 
     }, (response) => {
       if (!response?.ok) {
-        console.warn("Prompanion: sidechat request rejected", response?.reason);
+        console.warn("PromptProfile™: sidechat request rejected", response?.reason);
       }
       selectionAskInFlight = false;
     }).catch((error) => {
-      console.warn("Prompanion: failed to request sidechat from selection", error);
+      console.warn("PromptProfile™: failed to request sidechat from selection", error);
       selectionAskInFlight = false;
     });
   } catch (error) {
-    console.error("Prompanion: sidechat request threw synchronously", error);
+    console.error("PromptProfile™: sidechat request threw synchronously", error);
     selectionAskInFlight = false;
   }
 }
@@ -389,10 +389,10 @@ function requestPromptEnhancement(promptText) {
     .catch((error) => {
       const errorMessage = error?.message || "";
       if (errorMessage.includes("Extension context invalidated")) {
-        console.error("[Prompanion Bolt] Extension context invalidated - user should reload page");
+        console.error("[PromptProfile™ Bolt] Extension context invalidated - user should reload page");
         // The notification is already shown by AdapterBase._showContextInvalidatedNotification()
       } else {
-        console.warn("[Prompanion Bolt] Enhancement request failed:", error);
+        console.warn("[PromptProfile™ Bolt] Enhancement request failed:", error);
       }
       return { ok: false, reason: errorMessage || "UNKNOWN_ERROR" };
     });
@@ -446,9 +446,9 @@ function buildButton() {
   button.className = BUTTON_CLASS;
   button.append(createIcon());
   // Use AdapterBase for generic hover tooltip
-  AdapterBase.attachTooltip(button, "Open Prompanion to enhance your prompts for the best response.", BUTTON_ID);
+  AdapterBase.attachTooltip(button, "Open PromptProfile™ to enhance your prompts for the best response.", BUTTON_ID);
   button.addEventListener("click", () => AdapterBase.togglePanel()
-    .catch((e) => console.error("Prompanion: failed to open sidebar from Bolt adapter", e)));
+    .catch((e) => console.error("PromptProfile™: failed to open sidebar from Bolt adapter", e)));
   // Use AdapterBase for generic hover tooltip
   button.addEventListener("mouseenter", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("focus", () => AdapterBase.showTooltip(button, BUTTON_ID));
@@ -728,7 +728,7 @@ function locateComposer() {
     }
   }
   if (!input) {
-    console.warn("[Prompanion Bolt] locateComposer() - no input found");
+    console.warn("[PromptProfile™ Bolt] locateComposer() - no input found");
     return null;
   }
   const container = input.closest("[data-testid='composer-footer']") ??
@@ -804,74 +804,74 @@ function findComposerNode() {
 function handleInsertTextMessage(message, sender, sendResponse) {
   try {
     const textToInsert = typeof message.text === "string" ? message.text.trim() : "";
-    console.log("[Prompanion] ========== INSERT TEXT REQUEST ==========");
-    console.log("[Prompanion] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
-    console.log("[Prompanion] Text length:", textToInsert.length);
+    console.log("[PromptProfile™] ========== INSERT TEXT REQUEST ==========");
+    console.log("[PromptProfile™] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
+    console.log("[PromptProfile™] Text length:", textToInsert.length);
     
     if (!textToInsert) {
-      console.log("[Prompanion] Insert failed: EMPTY_TEXT");
+      console.log("[PromptProfile™] Insert failed: EMPTY_TEXT");
       sendResponse({ ok: false, reason: "EMPTY_TEXT" });
       return false; // sendResponse called synchronously, close channel
     }
 
-    console.log("[Prompanion] Searching for composer node...");
+    console.log("[PromptProfile™] Searching for composer node...");
     const composerNode = findComposerNode();
-    console.log("[Prompanion] Composer node found:", composerNode);
-    console.log("[Prompanion] Node type:", composerNode?.constructor?.name);
-    console.log("[Prompanion] Node isContentEditable:", composerNode?.isContentEditable);
-    console.log("[Prompanion] Node tagName:", composerNode?.tagName);
-    console.log("[Prompanion] Node className:", composerNode?.className);
-    console.log("[Prompanion] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
-    console.log("[Prompanion] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
+    console.log("[PromptProfile™] Composer node found:", composerNode);
+    console.log("[PromptProfile™] Node type:", composerNode?.constructor?.name);
+    console.log("[PromptProfile™] Node isContentEditable:", composerNode?.isContentEditable);
+    console.log("[PromptProfile™] Node tagName:", composerNode?.tagName);
+    console.log("[PromptProfile™] Node className:", composerNode?.className);
+    console.log("[PromptProfile™] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
+    console.log("[PromptProfile™] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
     
     if (!composerNode) {
-      console.log("[Prompanion] Insert failed: NO_COMPOSER_NODE");
+      console.log("[PromptProfile™] Insert failed: NO_COMPOSER_NODE");
       sendResponse({ ok: false, reason: "NO_COMPOSER_NODE" });
       return false; // sendResponse called synchronously, close channel
     }
 
-    console.log("[Prompanion] Calling setComposerText...");
+    console.log("[PromptProfile™] Calling setComposerText...");
     const success = setComposerText(composerNode, textToInsert);
-    console.log("[Prompanion] setComposerText returned:", success);
+    console.log("[PromptProfile™] setComposerText returned:", success);
     
     // Verify insertion
     const currentValue = composerNode.value || composerNode.textContent || "";
     const textInserted = currentValue.includes(textToInsert.substring(0, Math.min(20, textToInsert.length)));
-    console.log("[Prompanion] Verification - text appears in node:", textInserted);
-    console.log("[Prompanion] Current node value:", currentValue.substring(0, 100));
+    console.log("[PromptProfile™] Verification - text appears in node:", textInserted);
+    console.log("[PromptProfile™] Current node value:", currentValue.substring(0, 100));
     
     if (success && textInserted) {
-      console.log("[Prompanion] Insert succeeded!");
+      console.log("[PromptProfile™] Insert succeeded!");
       sendResponse({ ok: true });
     } else if (success && !textInserted) {
-      console.warn("[Prompanion] setComposerText returned true but text not verified in node");
+      console.warn("[PromptProfile™] setComposerText returned true but text not verified in node");
       sendResponse({ ok: false, reason: "INSERTION_NOT_VERIFIED" });
     } else {
-      console.log("[Prompanion] Insert failed: SET_TEXT_FAILED");
+      console.log("[PromptProfile™] Insert failed: SET_TEXT_FAILED");
       sendResponse({ ok: false, reason: "SET_TEXT_FAILED" });
     }
     return false; // sendResponse called synchronously, close channel
   } catch (error) {
-    console.error("[Prompanion] Insert text handler failed", error);
-    console.error("[Prompanion] Error stack:", error.stack);
+    console.error("[PromptProfile™] Insert text handler failed", error);
+    console.error("[PromptProfile™] Error stack:", error.stack);
     sendResponse({ ok: false, reason: error?.message ?? "UNKNOWN" });
     return false; // sendResponse called synchronously, close channel
   }
 }
 
 // Register message handler using AdapterBase (must be after handleInsertTextMessage is defined)
-console.log("[Prompanion] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
+console.log("[PromptProfile™] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
 AdapterBase.registerMessageHandler("PROMPANION_INSERT_TEXT", handleInsertTextMessage);
 
 function bootstrap() {
-  console.log("[Prompanion Bolt] bootstrap() called");
+  console.log("[PromptProfile™ Bolt] bootstrap() called");
   
   // Clean up any old toolbar elements that might exist
   const oldToolbars = document.querySelectorAll(`#${SELECTION_TOOLBAR_ID}`);
   oldToolbars.forEach(toolbar => {
     // Check if it's the old style (has the old class structure)
-    if (toolbar.querySelector('.prompanion-selection-toolbar__dismiss')) {
-      console.log("[Prompanion Bolt] Removing old selection toolbar element");
+    if (toolbar.querySelector('.promptprofile-selection-toolbar__dismiss')) {
+      console.log("[PromptProfile™ Bolt] Removing old selection toolbar element");
       toolbar.remove();
     }
   });
@@ -879,16 +879,16 @@ function bootstrap() {
   ensureHighlightObserver();
   initSelectionToolbar(); // Initialize the selection toolbar system
   if (!init()) {
-    console.log("[Prompanion Bolt] bootstrap() - init() returned false, setting up MutationObserver");
+    console.log("[PromptProfile™ Bolt] bootstrap() - init() returned false, setting up MutationObserver");
     const observer = new MutationObserver(() => {
       if (init()) {
-        console.log("[Prompanion Bolt] bootstrap() - composer found on retry, disconnecting observer");
+        console.log("[PromptProfile™ Bolt] bootstrap() - composer found on retry, disconnecting observer");
         observer.disconnect();
       }
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
   } else {
-    console.log("[Prompanion Bolt] bootstrap() - init() returned true, composer found immediately");
+    console.log("[PromptProfile™ Bolt] bootstrap() - init() returned true, composer found immediately");
   }
 }
 
@@ -896,14 +896,14 @@ function bootstrap() {
 // Use AdapterBase.attachTooltip(), AdapterBase.showTooltip(), etc.
 
 function setupEnhanceTooltip(input, container) {
-  console.log("[Prompanion Bolt] setupEnhanceTooltip called", {
+  console.log("[PromptProfile™ Bolt] setupEnhanceTooltip called", {
     input: input?.tagName,
     inputClass: input?.className,
     alreadyActive: enhanceTooltipActiveTextarea === input,
     isCodeMirror: input?.classList?.contains('cm-content')
   });
   if (!input) {
-    console.log("[Prompanion Bolt] setupEnhanceTooltip - skipping (no input)");
+    console.log("[PromptProfile™ Bolt] setupEnhanceTooltip - skipping (no input)");
     return;
   }
   
@@ -912,17 +912,17 @@ function setupEnhanceTooltip(input, container) {
   const inputChanged = enhanceTooltipActiveTextarea !== input;
   
   if (!inputChanged) {
-    console.log("[Prompanion Bolt] setupEnhanceTooltip - same input, checking if events are still bound");
+    console.log("[PromptProfile™ Bolt] setupEnhanceTooltip - same input, checking if events are still bound");
     // Even if it's the same input, re-bind events in case they were lost (e.g., DOM replacement)
-    if (!input._prompanionInputHandler) {
-      console.log("[Prompanion Bolt] setupEnhanceTooltip - events lost, re-binding");
+    if (!input._promptprofileInputHandler) {
+      console.log("[PromptProfile™ Bolt] setupEnhanceTooltip - events lost, re-binding");
       bindInputEvents(input);
     } else {
-      console.log("[Prompanion Bolt] setupEnhanceTooltip - events still bound, skipping");
+      console.log("[PromptProfile™ Bolt] setupEnhanceTooltip - events still bound, skipping");
       return;
     }
   } else {
-    console.log("[Prompanion Bolt] setupEnhanceTooltip - input changed, re-setting up");
+    console.log("[PromptProfile™ Bolt] setupEnhanceTooltip - input changed, re-setting up");
     teardownEnhanceTooltip();
     enhanceTooltipActiveTextarea = input;
     enhanceTooltipDismissed = false;
@@ -930,19 +930,19 @@ function setupEnhanceTooltip(input, container) {
     ensureEnhanceTooltipElement();
     bindInputEvents(input);
   }
-  console.log("[Prompanion Bolt] setupEnhanceTooltip - complete");
+  console.log("[PromptProfile™ Bolt] setupEnhanceTooltip - complete");
 }
 
 function teardownEnhanceTooltip() {
   if (enhanceTooltipActiveTextarea) {
     // Remove listeners using stored handlers if available
-    if (enhanceTooltipActiveTextarea._prompanionInputHandler) {
-      enhanceTooltipActiveTextarea.removeEventListener("input", enhanceTooltipActiveTextarea._prompanionInputHandler, true);
-      enhanceTooltipActiveTextarea.removeEventListener("keyup", enhanceTooltipActiveTextarea._prompanionKeyupHandler, true);
-      enhanceTooltipActiveTextarea.removeEventListener("focus", enhanceTooltipActiveTextarea._prompanionFocusHandler, true);
-      delete enhanceTooltipActiveTextarea._prompanionInputHandler;
-      delete enhanceTooltipActiveTextarea._prompanionKeyupHandler;
-      delete enhanceTooltipActiveTextarea._prompanionFocusHandler;
+    if (enhanceTooltipActiveTextarea._promptprofileInputHandler) {
+      enhanceTooltipActiveTextarea.removeEventListener("input", enhanceTooltipActiveTextarea._promptprofileInputHandler, true);
+      enhanceTooltipActiveTextarea.removeEventListener("keyup", enhanceTooltipActiveTextarea._promptprofileKeyupHandler, true);
+      enhanceTooltipActiveTextarea.removeEventListener("focus", enhanceTooltipActiveTextarea._promptprofileFocusHandler, true);
+      delete enhanceTooltipActiveTextarea._promptprofileInputHandler;
+      delete enhanceTooltipActiveTextarea._promptprofileKeyupHandler;
+      delete enhanceTooltipActiveTextarea._promptprofileFocusHandler;
     } else {
       // Fallback to old method
       enhanceTooltipActiveTextarea.removeEventListener("input", handleInputChange);
@@ -952,9 +952,9 @@ function teardownEnhanceTooltip() {
     enhanceTooltipActiveTextarea.removeEventListener("blur", handleInputBlur, true);
     
     // Clean up MutationObserver for CodeMirror
-    if (enhanceTooltipActiveTextarea._prompanionMutationObserver) {
-      enhanceTooltipActiveTextarea._prompanionMutationObserver.disconnect();
-      enhanceTooltipActiveTextarea._prompanionMutationObserver = null;
+    if (enhanceTooltipActiveTextarea._promptprofileMutationObserver) {
+      enhanceTooltipActiveTextarea._promptprofileMutationObserver.disconnect();
+      enhanceTooltipActiveTextarea._promptprofileMutationObserver = null;
     }
   }
 
@@ -966,12 +966,12 @@ function teardownEnhanceTooltip() {
 
 function ensureEnhanceTooltipElement() {
   if (!enhanceTooltipElement) {
-    console.log("[Prompanion] Creating enhance tooltip element");
+    console.log("[PromptProfile™] Creating enhance tooltip element");
     enhanceTooltipElement = document.createElement("div");
-    enhanceTooltipElement.className = "prompanion-enhance-tooltip";
+    enhanceTooltipElement.className = "promptprofile-enhance-tooltip";
     const dismiss = document.createElement("button");
     dismiss.type = "button";
-    dismiss.className = "prompanion-enhance-tooltip__dismiss";
+    dismiss.className = "promptprofile-enhance-tooltip__dismiss";
     dismiss.textContent = "×";
     dismiss.setAttribute("aria-label", "Dismiss prompt enhancement suggestion");
     dismiss.addEventListener("click", () => {
@@ -981,57 +981,57 @@ function ensureEnhanceTooltipElement() {
     });
     const action = document.createElement("button");
     action.type = "button";
-    action.className = "prompanion-enhance-tooltip__action";
+    action.className = "promptprofile-enhance-tooltip__action";
     AdapterBase.setButtonTextContent(action, "Refine");
-    console.log("[Prompanion] Attaching click handler to Refine button");
-    console.log("[Prompanion] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
+    console.log("[PromptProfile™] Attaching click handler to Refine button");
+    console.log("[PromptProfile™] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
     action.addEventListener("click", handleRefineButtonClick);
-    console.log("[Prompanion] Click handler attached, button:", action);
+    console.log("[PromptProfile™] Click handler attached, button:", action);
     enhanceTooltipElement.append(dismiss, action);
-    console.log("[Prompanion] Enhance tooltip element created");
+    console.log("[PromptProfile™] Enhance tooltip element created");
   }
   if (!enhanceTooltipElement.isConnected) {
-    console.log("[Prompanion] Appending enhance tooltip to body");
+    console.log("[PromptProfile™] Appending enhance tooltip to body");
     document.body.append(enhanceTooltipElement);
   }
   hideEnhanceTooltip();
 }
 
 function handleRefineButtonClick(e) {
-  console.log("[Prompanion] ========== REFINE BUTTON HANDLER FIRED ==========");
-  console.log("[Prompanion] Event type:", e.type);
-  console.log("[Prompanion] Event target:", e.target);
+  console.log("[PromptProfile™] ========== REFINE BUTTON HANDLER FIRED ==========");
+  console.log("[PromptProfile™] Event type:", e.type);
+  console.log("[PromptProfile™] Event target:", e.target);
   e.preventDefault();
   e.stopPropagation();
   if (enhanceActionInFlight) {
     return;
   }
   const composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
-  console.log("[Prompanion] Composer node:", composerNode);
+  console.log("[PromptProfile™] Composer node:", composerNode);
   if (!composerNode) {
-    console.error("[Prompanion] No composer node found!");
+    console.error("[PromptProfile™] No composer node found!");
     return;
   }
   const promptText = extractInputText().trim();
-  console.log("[Prompanion] Prompt text:", promptText);
+  console.log("[PromptProfile™] Prompt text:", promptText);
   if (!promptText) {
     return;
   }
   enhanceActionInFlight = true;
   // Don't hide tooltip yet - wait to see if there's a limit error
-  console.log("[Prompanion] Requesting prompt enhancement...");
+  console.log("[PromptProfile™] Requesting prompt enhancement...");
   requestPromptEnhancement(promptText)
     .then((result) => {
       if (!result || !result.ok) {
         enhanceActionInFlight = false;
         if (result?.reason === "EXTENSION_CONTEXT_INVALIDATED") {
-        console.error("[Prompanion Bolt] Cannot enhance prompt - extension context invalidated. Please reload the page.");
+        console.error("[PromptProfile™ Bolt] Cannot enhance prompt - extension context invalidated. Please reload the page.");
         enhanceTooltipDismissed = true;
         enhanceTooltipDismissedTime = Date.now();
         hideEnhanceTooltip();
         } else if (result?.error === "LIMIT_REACHED") {
           // Show upgrade button in tooltip instead of hiding
-          console.log("[Prompanion] Limit reached, showing upgrade button");
+          console.log("[PromptProfile™] Limit reached, showing upgrade button");
           showUpgradeButtonInTooltip();
         } else {
           // Other errors - hide tooltip normally
@@ -1052,7 +1052,7 @@ function handleRefineButtonClick(e) {
       enhanceActionInFlight = false;
     })
     .catch((error) => {
-      console.error("Prompanion: refine request threw", error);
+      console.error("PromptProfile™: refine request threw", error);
       enhanceActionInFlight = false;
       enhanceTooltipDismissed = true;
       enhanceTooltipDismissedTime = Date.now();
@@ -1067,7 +1067,7 @@ function bindInputEvents(input) {
                              input.closest('div[class*="cm-editor"]') !== null;
   const isRegularTextarea = input instanceof HTMLTextAreaElement && !isEditModeTextarea;
   
-  console.log("[Prompanion Bolt] bindInputEvents called for:", {
+  console.log("[PromptProfile™ Bolt] bindInputEvents called for:", {
     tagName: input?.tagName,
     className: input?.className,
     disabled: input?.disabled,
@@ -1079,10 +1079,10 @@ function bindInputEvents(input) {
   });
   
   // Remove old listeners
-  if (input._prompanionInputHandler) {
-    input.removeEventListener("input", input._prompanionInputHandler, true);
-    input.removeEventListener("keyup", input._prompanionKeyupHandler, true);
-    input.removeEventListener("focus", input._prompanionFocusHandler, true);
+  if (input._promptprofileInputHandler) {
+    input.removeEventListener("input", input._promptprofileInputHandler, true);
+    input.removeEventListener("keyup", input._promptprofileKeyupHandler, true);
+    input.removeEventListener("focus", input._promptprofileFocusHandler, true);
   } else {
     input.removeEventListener("input", handleInputChange);
     input.removeEventListener("keyup", handleInputChange);
@@ -1091,70 +1091,70 @@ function bindInputEvents(input) {
   input.removeEventListener("blur", handleInputBlur, true);
   
   // Clean up existing MutationObserver for CodeMirror
-  if (input._prompanionMutationObserver) {
-    input._prompanionMutationObserver.disconnect();
-    input._prompanionMutationObserver = null;
+  if (input._promptprofileMutationObserver) {
+    input._promptprofileMutationObserver.disconnect();
+    input._promptprofileMutationObserver = null;
   }
   
   // Clean up CodeMirror-specific handlers
-  if (input._prompanionCodeMirrorStopPolling) {
-    input._prompanionCodeMirrorStopPolling();
+  if (input._promptprofileCodeMirrorStopPolling) {
+    input._promptprofileCodeMirrorStopPolling();
   }
-  if (input._prompanionCodeMirrorPollingInterval) {
-    clearInterval(input._prompanionCodeMirrorPollingInterval);
+  if (input._promptprofileCodeMirrorPollingInterval) {
+    clearInterval(input._promptprofileCodeMirrorPollingInterval);
   }
   
-  if (input._prompanionCodeMirrorKeydown) {
-    document.removeEventListener("keydown", input._prompanionCodeMirrorKeydown, true);
-    if (input._prompanionCodeMirrorEditor) {
-      input._prompanionCodeMirrorEditor.removeEventListener("keydown", input._prompanionCodeMirrorKeydown, true);
+  if (input._promptprofileCodeMirrorKeydown) {
+    document.removeEventListener("keydown", input._promptprofileCodeMirrorKeydown, true);
+    if (input._promptprofileCodeMirrorEditor) {
+      input._promptprofileCodeMirrorEditor.removeEventListener("keydown", input._promptprofileCodeMirrorKeydown, true);
     }
-    delete input._prompanionCodeMirrorKeydown;
+    delete input._promptprofileCodeMirrorKeydown;
   }
-  if (input._prompanionCodeMirrorKeyup) {
-    document.removeEventListener("keyup", input._prompanionCodeMirrorKeyup, true);
-    if (input._prompanionCodeMirrorEditor) {
-      input._prompanionCodeMirrorEditor.removeEventListener("keyup", input._prompanionCodeMirrorKeyup, true);
+  if (input._promptprofileCodeMirrorKeyup) {
+    document.removeEventListener("keyup", input._promptprofileCodeMirrorKeyup, true);
+    if (input._promptprofileCodeMirrorEditor) {
+      input._promptprofileCodeMirrorEditor.removeEventListener("keyup", input._promptprofileCodeMirrorKeyup, true);
     }
-    delete input._prompanionCodeMirrorKeyup;
+    delete input._promptprofileCodeMirrorKeyup;
   }
-  if (input._prompanionCodeMirrorPaste) {
-    document.removeEventListener("paste", input._prompanionCodeMirrorPaste, true);
-    if (input._prompanionCodeMirrorEditor) {
-      input._prompanionCodeMirrorEditor.removeEventListener("paste", input._prompanionCodeMirrorPaste, true);
+  if (input._promptprofileCodeMirrorPaste) {
+    document.removeEventListener("paste", input._promptprofileCodeMirrorPaste, true);
+    if (input._promptprofileCodeMirrorEditor) {
+      input._promptprofileCodeMirrorEditor.removeEventListener("paste", input._promptprofileCodeMirrorPaste, true);
     }
-    delete input._prompanionCodeMirrorPaste;
+    delete input._promptprofileCodeMirrorPaste;
   }
-  if (input._prompanionCodeMirrorFocus) {
-    if (input._prompanionCodeMirrorEditor) {
-      input._prompanionCodeMirrorEditor.removeEventListener("focus", input._prompanionCodeMirrorFocus, true);
+  if (input._promptprofileCodeMirrorFocus) {
+    if (input._promptprofileCodeMirrorEditor) {
+      input._promptprofileCodeMirrorEditor.removeEventListener("focus", input._promptprofileCodeMirrorFocus, true);
     }
-    delete input._prompanionCodeMirrorFocus;
+    delete input._promptprofileCodeMirrorFocus;
   }
-  if (input._prompanionCodeMirrorBlur) {
-    if (input._prompanionCodeMirrorEditor) {
-      input._prompanionCodeMirrorEditor.removeEventListener("blur", input._prompanionCodeMirrorBlur, true);
+  if (input._promptprofileCodeMirrorBlur) {
+    if (input._promptprofileCodeMirrorEditor) {
+      input._promptprofileCodeMirrorEditor.removeEventListener("blur", input._promptprofileCodeMirrorBlur, true);
     }
-    delete input._prompanionCodeMirrorBlur;
+    delete input._promptprofileCodeMirrorBlur;
   }
-  if (input._prompanionCodeMirrorEditor) {
-    delete input._prompanionCodeMirrorEditor;
+  if (input._promptprofileCodeMirrorEditor) {
+    delete input._promptprofileCodeMirrorEditor;
   }
-  delete input._prompanionCodeMirrorPollingInterval;
-  delete input._prompanionCodeMirrorStartPolling;
-  delete input._prompanionCodeMirrorStopPolling;
+  delete input._promptprofileCodeMirrorPollingInterval;
+  delete input._promptprofileCodeMirrorStartPolling;
+  delete input._promptprofileCodeMirrorStopPolling;
   
   // Add new listeners with capture to ensure we catch events
   const inputHandler = (e) => {
-    console.log("[Prompanion Bolt] Input event fired:", e.type, "target:", e.target?.tagName);
+    console.log("[PromptProfile™ Bolt] Input event fired:", e.type, "target:", e.target?.tagName);
     handleInputChange();
   };
   const keyupHandler = (e) => {
-    console.log("[Prompanion Bolt] Keyup event fired:", e.key);
+    console.log("[PromptProfile™ Bolt] Keyup event fired:", e.key);
     handleInputChange();
   };
   const focusHandler = () => {
-    console.log("[Prompanion Bolt] Focus event fired");
+    console.log("[PromptProfile™ Bolt] Focus event fired");
     handleInputChange();
   };
   
@@ -1164,20 +1164,20 @@ function bindInputEvents(input) {
   input.addEventListener("blur", handleInputBlur, true);
   
   // Store handlers for cleanup
-  input._prompanionInputHandler = inputHandler;
-  input._prompanionKeyupHandler = keyupHandler;
-  input._prompanionFocusHandler = focusHandler;
+  input._promptprofileInputHandler = inputHandler;
+  input._promptprofileKeyupHandler = keyupHandler;
+  input._promptprofileFocusHandler = focusHandler;
   
   // For CodeMirror or edit mode textarea, use multiple detection methods since it might not fire standard input events reliably
   if (isCodeMirror || isEditModeTextarea) {
-    console.log("[Prompanion Bolt] bindInputEvents - setting up CodeMirror/edit mode textarea-specific listeners");
+    console.log("[PromptProfile™ Bolt] bindInputEvents - setting up CodeMirror/edit mode textarea-specific listeners");
     
     // Find the CodeMirror editor container (cm-editor or cm-scroller) for better event handling
     // For regular textarea, use the textarea itself
     const codeMirrorEditor = isCodeMirror 
       ? (input.closest('.cm-editor') || input.closest('.cm-scroller') || input)
       : input;
-    console.log("[Prompanion Bolt] Editor container:", {
+    console.log("[PromptProfile™ Bolt] Editor container:", {
       tagName: codeMirrorEditor?.tagName,
       className: codeMirrorEditor?.className,
       isCodeMirror: isCodeMirror,
@@ -1186,14 +1186,14 @@ function bindInputEvents(input) {
     
     // Method 1: MutationObserver with less aggressive throttling
     let mutationTimeout = null;
-    input._prompanionMutationObserver = new MutationObserver((mutations) => {
+    input._promptprofileMutationObserver = new MutationObserver((mutations) => {
       // Throttle MutationObserver callbacks to avoid excessive calls
       if (mutationTimeout) {
         clearTimeout(mutationTimeout);
       }
       mutationTimeout = setTimeout(() => {
         const textLength = extractInputText().length;
-        console.log("[Prompanion Bolt] CodeMirror content changed (MutationObserver)", {
+        console.log("[PromptProfile™ Bolt] CodeMirror content changed (MutationObserver)", {
           mutationCount: mutations.length,
           textLength: textLength
         });
@@ -1203,7 +1203,7 @@ function bindInputEvents(input) {
       }, 50); // Reduced delay for more responsive detection
     });
     
-    input._prompanionMutationObserver.observe(input, {
+    input._promptprofileMutationObserver.observe(input, {
       childList: true,
       subtree: true,
       characterData: true,
@@ -1216,10 +1216,10 @@ function bindInputEvents(input) {
     
     const startPolling = () => {
       if (pollingInterval) {
-        console.log("[Prompanion Bolt] Polling already active, skipping");
+        console.log("[PromptProfile™ Bolt] Polling already active, skipping");
         return; // Already polling
       }
-      console.log("[Prompanion Bolt] Starting polling for", isCodeMirror ? "CodeMirror" : "edit mode textarea");
+      console.log("[PromptProfile™ Bolt] Starting polling for", isCodeMirror ? "CodeMirror" : "edit mode textarea");
       lastTextContent = extractInputText(); // Initialize with current text
       pollingInterval = setInterval(() => {
         const activeElement = document.activeElement;
@@ -1236,7 +1236,7 @@ function bindInputEvents(input) {
         // Always check text content, even if not focused (focus detection might be unreliable)
         const currentText = extractInputText();
         if (currentText !== lastTextContent) {
-          console.log("[Prompanion Bolt] Text changed (polling)", {
+          console.log("[PromptProfile™ Bolt] Text changed (polling)", {
             oldLength: lastTextContent.length,
             newLength: currentText.length,
             isActive,
@@ -1254,7 +1254,7 @@ function bindInputEvents(input) {
     
     const stopPolling = () => {
       if (pollingInterval) {
-        console.log("[Prompanion Bolt] Stopping CodeMirror polling");
+        console.log("[PromptProfile™ Bolt] Stopping CodeMirror polling");
         clearInterval(pollingInterval);
         pollingInterval = null;
       }
@@ -1271,7 +1271,7 @@ function bindInputEvents(input) {
                             (activeElement?.closest && activeElement.closest('.cm-editor') === codeMirrorEditor);
       
       if (isInCodeMirror) {
-        console.log("[Prompanion Bolt] CodeMirror key event:", e.type, e.key, "activeElement:", activeElement?.tagName);
+        console.log("[PromptProfile™ Bolt] CodeMirror key event:", e.type, e.key, "activeElement:", activeElement?.tagName);
         // Start polling if not already started
         if (!pollingInterval) {
           startPolling();
@@ -1291,7 +1291,7 @@ function bindInputEvents(input) {
                             input.contains(activeElement);
       
       if (isInCodeMirror) {
-        console.log("[Prompanion Bolt] CodeMirror paste event");
+        console.log("[PromptProfile™ Bolt] CodeMirror paste event");
         if (!pollingInterval) {
           startPolling();
         }
@@ -1302,7 +1302,7 @@ function bindInputEvents(input) {
     };
     
     const codeMirrorFocusHandler = () => {
-      console.log("[Prompanion Bolt] CodeMirror focus event");
+      console.log("[PromptProfile™ Bolt] CodeMirror focus event");
       startPolling();
       // Initial check
       setTimeout(() => {
@@ -1311,7 +1311,7 @@ function bindInputEvents(input) {
     };
     
     const codeMirrorBlurHandler = () => {
-      console.log("[Prompanion Bolt] CodeMirror blur event");
+      console.log("[PromptProfile™ Bolt] CodeMirror blur event");
       stopPolling();
     };
     
@@ -1328,7 +1328,7 @@ function bindInputEvents(input) {
     codeMirrorEditor.addEventListener("blur", codeMirrorBlurHandler, true);
     
     // Start polling immediately - CodeMirror might be focused but focus events might not fire
-    console.log("[Prompanion Bolt] Starting CodeMirror polling immediately");
+    console.log("[PromptProfile™ Bolt] Starting CodeMirror polling immediately");
     startPolling();
     
     // Also check if already focused
@@ -1337,25 +1337,25 @@ function bindInputEvents(input) {
                               activeElement === codeMirrorEditor ||
                               activeElement === input ||
                               input.contains(activeElement);
-    console.log("[Prompanion Bolt] CodeMirror focus check:", {
+    console.log("[PromptProfile™ Bolt] CodeMirror focus check:", {
       isCurrentlyFocused,
       activeElementTag: activeElement?.tagName,
       activeElementClass: activeElement?.className
     });
     
     // Store handlers and editor reference for cleanup
-    input._prompanionCodeMirrorEditor = codeMirrorEditor;
-    input._prompanionCodeMirrorKeydown = codeMirrorKeyHandler;
-    input._prompanionCodeMirrorKeyup = codeMirrorKeyHandler;
-    input._prompanionCodeMirrorPaste = codeMirrorPasteHandler;
-    input._prompanionCodeMirrorFocus = codeMirrorFocusHandler;
-    input._prompanionCodeMirrorBlur = codeMirrorBlurHandler;
-    input._prompanionCodeMirrorPollingInterval = pollingInterval;
-    input._prompanionCodeMirrorStartPolling = startPolling;
-    input._prompanionCodeMirrorStopPolling = stopPolling;
+    input._promptprofileCodeMirrorEditor = codeMirrorEditor;
+    input._promptprofileCodeMirrorKeydown = codeMirrorKeyHandler;
+    input._promptprofileCodeMirrorKeyup = codeMirrorKeyHandler;
+    input._promptprofileCodeMirrorPaste = codeMirrorPasteHandler;
+    input._promptprofileCodeMirrorFocus = codeMirrorFocusHandler;
+    input._promptprofileCodeMirrorBlur = codeMirrorBlurHandler;
+    input._promptprofileCodeMirrorPollingInterval = pollingInterval;
+    input._promptprofileCodeMirrorStartPolling = startPolling;
+    input._promptprofileCodeMirrorStopPolling = stopPolling;
   }
   
-  console.log("[Prompanion Bolt] bindInputEvents - event listeners attached, calling handleInputChange()");
+  console.log("[PromptProfile™ Bolt] bindInputEvents - event listeners attached, calling handleInputChange()");
   handleInputChange();
 }
 
@@ -1388,15 +1388,15 @@ function extractInputText() {
 
 function handleInputChange() {
   if (!enhanceTooltipActiveTextarea) {
-    console.log("[Prompanion Bolt] handleInputChange - no active textarea");
+    console.log("[PromptProfile™ Bolt] handleInputChange - no active textarea");
     return;
   }
   const rawText = extractInputText();
   const text = (rawText.startsWith("window.__oai") || rawText.includes("__oai_logHTML") ? "" : rawText).trim();
   const wordCount = text.split(/\s+/).filter(Boolean).length;
-  console.log("[Prompanion Bolt] handleInputChange - wordCount:", wordCount, "text length:", text.length);
+  console.log("[PromptProfile™ Bolt] handleInputChange - wordCount:", wordCount, "text length:", text.length);
   if (wordCount < 3) {
-    console.log("[Prompanion Bolt] handleInputChange - wordCount < 3, hiding tooltip");
+    console.log("[PromptProfile™ Bolt] handleInputChange - wordCount < 3, hiding tooltip");
     hideEnhanceTooltip();
     enhanceTooltipDismissed = false;
     clearTimeout(enhanceTooltipTimer);
@@ -1405,18 +1405,18 @@ function handleInputChange() {
     return;
   }
   if (enhanceTooltipDismissed && text === lastEnhanceTextSnapshot) {
-    console.log("[Prompanion Bolt] handleInputChange - tooltip dismissed and text unchanged");
+    console.log("[PromptProfile™ Bolt] handleInputChange - tooltip dismissed and text unchanged");
     return;
   }
   // Don't reset dismissed flag if it was recently dismissed (within cooldown period)
   const timeSinceDismiss = Date.now() - enhanceTooltipDismissedTime;
   if (enhanceTooltipDismissed && timeSinceDismiss < ENHANCE_TOOLTIP_DISMISS_COOLDOWN_MS) {
-    console.log("[Prompanion Bolt] handleInputChange - tooltip recently dismissed, not resetting flag");
+    console.log("[PromptProfile™ Bolt] handleInputChange - tooltip recently dismissed, not resetting flag");
     return;
   }
   lastEnhanceTextSnapshot = text;
   enhanceTooltipDismissed = false;
-  console.log("[Prompanion Bolt] handleInputChange - scheduling tooltip (wordCount >= 3)");
+  console.log("[PromptProfile™ Bolt] handleInputChange - scheduling tooltip (wordCount >= 3)");
   scheduleEnhanceTooltip();
   if (enhanceTooltipElement?.classList.contains("is-visible") && !tooltipClickInProgress) {
     positionEnhanceTooltip();
@@ -1432,40 +1432,40 @@ function handleInputBlur() {
 function scheduleEnhanceTooltip() {
   clearTimeout(enhanceTooltipTimer);
   enhanceTooltipTimer = window.setTimeout(() => {
-    console.log("[Prompanion Bolt] scheduleEnhanceTooltip - timeout fired");
+    console.log("[PromptProfile™ Bolt] scheduleEnhanceTooltip - timeout fired");
     if (!enhanceTooltipActiveTextarea) {
-      console.log("[Prompanion Bolt] scheduleEnhanceTooltip - no active textarea, returning");
+      console.log("[PromptProfile™ Bolt] scheduleEnhanceTooltip - no active textarea, returning");
       return;
     }
     const wordCount = extractInputText().trim().split(/\s+/).filter(Boolean).length;
-    console.log("[Prompanion Bolt] scheduleEnhanceTooltip - wordCount:", wordCount, "dismissed:", enhanceTooltipDismissed);
+    console.log("[PromptProfile™ Bolt] scheduleEnhanceTooltip - wordCount:", wordCount, "dismissed:", enhanceTooltipDismissed);
     if (wordCount >= 3 && !enhanceTooltipDismissed) {
-      console.log("[Prompanion Bolt] scheduleEnhanceTooltip - calling showEnhanceTooltip()");
+      console.log("[PromptProfile™ Bolt] scheduleEnhanceTooltip - calling showEnhanceTooltip()");
       showEnhanceTooltip();
     } else {
-      console.log("[Prompanion Bolt] scheduleEnhanceTooltip - not showing (wordCount < 3 or dismissed)");
+      console.log("[PromptProfile™ Bolt] scheduleEnhanceTooltip - not showing (wordCount < 3 or dismissed)");
     }
   }, 1000);
 }
 
 function showEnhanceTooltip() {
-  console.log("[Prompanion Bolt] showEnhanceTooltip() called");
+  console.log("[PromptProfile™ Bolt] showEnhanceTooltip() called");
   if (!enhanceTooltipElement) {
-    console.log("[Prompanion Bolt] showEnhanceTooltip - creating tooltip element");
+    console.log("[PromptProfile™ Bolt] showEnhanceTooltip - creating tooltip element");
     ensureEnhanceTooltipElement();
     if (!enhanceTooltipElement) {
-      console.warn("[Prompanion Bolt] showEnhanceTooltip - failed to create tooltip element");
+      console.warn("[PromptProfile™ Bolt] showEnhanceTooltip - failed to create tooltip element");
       return;
     }
   }
   
   // Ensure tooltip is in the DOM
   if (!enhanceTooltipElement.isConnected) {
-    console.log("[Prompanion Bolt] showEnhanceTooltip - appending tooltip to body");
+    console.log("[PromptProfile™ Bolt] showEnhanceTooltip - appending tooltip to body");
     document.body.append(enhanceTooltipElement);
   }
   
-  console.log("[Prompanion Bolt] showEnhanceTooltip - positioning tooltip");
+  console.log("[PromptProfile™ Bolt] showEnhanceTooltip - positioning tooltip");
   positionEnhanceTooltip();
   
   // Make sure tooltip is visible
@@ -1476,7 +1476,7 @@ function showEnhanceTooltip() {
   enhanceTooltipElement.style.pointerEvents = "auto";
   
   const computedStyle = getComputedStyle(enhanceTooltipElement);
-  console.log("[Prompanion Bolt] showEnhanceTooltip - tooltip made visible", {
+  console.log("[PromptProfile™ Bolt] showEnhanceTooltip - tooltip made visible", {
     classList: enhanceTooltipElement.classList.toString(),
     isConnected: enhanceTooltipElement.isConnected,
     display: computedStyle.display,
@@ -1508,7 +1508,7 @@ function hideEnhanceTooltip() {
   enhanceTooltipElement.style.opacity = "0";
   enhanceTooltipElement.style.pointerEvents = "none";
   detachTooltipResizeHandler();
-  console.log("[Prompanion Bolt] hideEnhanceTooltip - tooltip hidden");
+  console.log("[PromptProfile™ Bolt] hideEnhanceTooltip - tooltip hidden");
 }
 
 function showUpgradeButtonInTooltip() {
@@ -1517,7 +1517,7 @@ function showUpgradeButtonInTooltip() {
     ensureEnhanceTooltipElement();
   }
   if (!enhanceTooltipElement) {
-    console.error("[Prompanion] Cannot show upgrade button - tooltip element not found");
+    console.error("[PromptProfile™] Cannot show upgrade button - tooltip element not found");
     return;
   }
   
@@ -1529,7 +1529,7 @@ function showUpgradeButtonInTooltip() {
   }
   
   // Remove existing dismiss button if it exists (we'll add a new one)
-  const oldDismiss = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__dismiss");
+  const oldDismiss = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__dismiss");
   if (oldDismiss) {
     oldDismiss.remove();
   }
@@ -1537,7 +1537,7 @@ function showUpgradeButtonInTooltip() {
   // Add dismiss button (X) for closing the upgrade tooltip
   const dismiss = document.createElement("button");
   dismiss.type = "button";
-  dismiss.className = "prompanion-enhance-tooltip__dismiss";
+  dismiss.className = "promptprofile-enhance-tooltip__dismiss";
   dismiss.textContent = "×";
   dismiss.setAttribute("aria-label", "Dismiss upgrade prompt");
   dismiss.addEventListener("click", (e) => {
@@ -1550,21 +1550,21 @@ function showUpgradeButtonInTooltip() {
   });
   
   // Change action button to upgrade button
-  const action = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
+  const action = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
   if (action) {
     // Remove old click handlers by cloning
     const newAction = action.cloneNode(true);
     action.replaceWith(newAction);
     
     // Update the new button
-    newAction.className = "prompanion-enhance-tooltip__action prompanion-enhance-tooltip__upgrade";
+    newAction.className = "promptprofile-enhance-tooltip__action promptprofile-enhance-tooltip__upgrade";
     AdapterBase.setButtonTextContent(newAction, "Upgrade for more uses!");
     
     // Add upgrade click handler
     newAction.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log("[Prompanion] Upgrade button clicked - placeholder for Stripe integration");
+      console.log("[PromptProfile™] Upgrade button clicked - placeholder for Stripe integration");
       // TODO: Navigate to Stripe upgrade page
       // window.open("https://stripe.com/upgrade", "_blank");
     });
@@ -1580,7 +1580,7 @@ function showUpgradeButtonInTooltip() {
 
 function positionEnhanceTooltip() {
   if (!enhanceTooltipElement || !enhanceTooltipActiveTextarea) {
-    console.warn("[Prompanion Bolt] positionEnhanceTooltip - missing element or textarea");
+    console.warn("[PromptProfile™ Bolt] positionEnhanceTooltip - missing element or textarea");
     return;
   }
   
@@ -1636,7 +1636,7 @@ function positionEnhanceTooltip() {
   enhanceTooltipElement.style.opacity = "1";
   enhanceTooltipElement.style.pointerEvents = "auto";
   
-  console.log("[Prompanion Bolt] positionEnhanceTooltip - positioned at:", { 
+  console.log("[PromptProfile™ Bolt] positionEnhanceTooltip - positioned at:", { 
     top, 
     left, 
     isEditingMode,
@@ -1665,36 +1665,36 @@ function detachTooltipResizeHandler() {
 
 // Backup message listener registration (IIFE to ensure it runs immediately)
 (function registerInsertTextListener() {
-  console.log("[Prompanion] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
-  console.log("[Prompanion] Current time:", new Date().toISOString());
+  console.log("[PromptProfile™] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
+  console.log("[PromptProfile™] Current time:", new Date().toISOString());
   
   if (typeof chrome === "undefined") {
-    console.error("[Prompanion] chrome is undefined in backup registration");
+    console.error("[PromptProfile™] chrome is undefined in backup registration");
     return;
   }
   
   if (!chrome.runtime || !chrome.runtime.onMessage) {
-    console.error("[Prompanion] chrome.runtime.onMessage not available in backup registration");
+    console.error("[PromptProfile™] chrome.runtime.onMessage not available in backup registration");
     return;
   }
   
   try {
     chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       if (message && message.type === "PROMPANION_INSERT_TEXT") {
-        console.log("[Prompanion] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
+        console.log("[PromptProfile™] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
         if (typeof handleInsertTextMessage === "function") {
           handleInsertTextMessage(message, sender, sendResponse);
         } else {
-          console.error("[Prompanion] handleInsertTextMessage is not a function!");
+          console.error("[PromptProfile™] handleInsertTextMessage is not a function!");
           sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
         }
         return true;
       }
       return false;
     });
-    console.log("[Prompanion] ✓ Backup listener registered successfully");
+    console.log("[PromptProfile™] ✓ Backup listener registered successfully");
   } catch (error) {
-    console.error("[Prompanion] ✗ Backup listener registration failed:", error);
+    console.error("[PromptProfile™] ✗ Backup listener registration failed:", error);
   }
 })();
 
@@ -1710,13 +1710,13 @@ if (readyState === "complete" || readyState === "interactive") {
 // AdapterBase will handle selection changes efficiently
 
 // Verify message listener is registered
-console.log("[Prompanion] ========== VERIFYING MESSAGE LISTENER ==========");
+console.log("[PromptProfile™] ========== VERIFYING MESSAGE LISTENER ==========");
 if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
-  console.log("[Prompanion] chrome.runtime.onMessage is available");
-  console.log("[Prompanion] chrome.runtime.id:", chrome.runtime.id);
-  console.log("[Prompanion] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
+  console.log("[PromptProfile™] chrome.runtime.onMessage is available");
+  console.log("[PromptProfile™] chrome.runtime.id:", chrome.runtime.id);
+  console.log("[PromptProfile™] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
 } else {
-  console.error("[Prompanion] chrome.runtime.onMessage is NOT available at this point!");
+  console.error("[PromptProfile™] chrome.runtime.onMessage is NOT available at this point!");
 }
 
 /**
@@ -1772,31 +1772,31 @@ function applyBoltContainerPush(shouldPush) {
     const currentWidth = computedStyle.width;
     const currentMaxWidth = computedStyle.maxWidth;
     
-    if (!container.dataset.prompanionOriginalWidth) {
-      container.dataset.prompanionOriginalWidth = currentWidth || '';
+    if (!container.dataset.promptprofileOriginalWidth) {
+      container.dataset.promptprofileOriginalWidth = currentWidth || '';
     }
-    if (!container.dataset.prompanionOriginalMaxWidth) {
-      container.dataset.prompanionOriginalMaxWidth = currentMaxWidth || '';
+    if (!container.dataset.promptprofileOriginalMaxWidth) {
+      container.dataset.promptprofileOriginalMaxWidth = currentMaxWidth || '';
     }
     
     // Override width directly to force the container to shrink
     // The w-full class sets width: 100%, so we need to override it with !important
     const currentBoxSizing = computedStyle.boxSizing;
-    if (!container.dataset.prompanionOriginalBoxSizing) {
-      container.dataset.prompanionOriginalBoxSizing = currentBoxSizing || 'border-box';
+    if (!container.dataset.promptprofileOriginalBoxSizing) {
+      container.dataset.promptprofileOriginalBoxSizing = currentBoxSizing || 'border-box';
     }
     
     container.style.setProperty('width', `calc(100% - ${panelWidthCalc})`, 'important');
     container.style.setProperty('max-width', `calc(100% - ${panelWidthCalc})`, 'important');
     container.style.setProperty('flex-basis', `calc(100% - ${panelWidthCalc})`, 'important');
     container.style.setProperty('box-sizing', 'border-box', 'important');
-    container.dataset.prompanionPushed = 'true';
+    container.dataset.promptprofilePushed = 'true';
   } else {
     // Restore original styles
-    if (container.dataset.prompanionPushed === 'true') {
-      const originalWidth = container.dataset.prompanionOriginalWidth;
-      const originalMaxWidth = container.dataset.prompanionOriginalMaxWidth;
-      const originalBoxSizing = container.dataset.prompanionOriginalBoxSizing;
+    if (container.dataset.promptprofilePushed === 'true') {
+      const originalWidth = container.dataset.promptprofileOriginalWidth;
+      const originalMaxWidth = container.dataset.promptprofileOriginalMaxWidth;
+      const originalBoxSizing = container.dataset.promptprofileOriginalBoxSizing;
       
       if (originalWidth) {
         container.style.setProperty('width', originalWidth, 'important');
@@ -1820,42 +1820,42 @@ function applyBoltContainerPush(shouldPush) {
       }
       
       container.style.removeProperty('transition');
-      delete container.dataset.prompanionPushed;
-      delete container.dataset.prompanionOriginalWidth;
-      delete container.dataset.prompanionOriginalMaxWidth;
-      delete container.dataset.prompanionOriginalBoxSizing;
+      delete container.dataset.promptprofilePushed;
+      delete container.dataset.promptprofileOriginalWidth;
+      delete container.dataset.promptprofileOriginalMaxWidth;
+      delete container.dataset.promptprofileOriginalBoxSizing;
     }
   }
 }
 
 
 // Expose push function globally so injector.js can call it
-window.__prompanionApplyBoltPush = applyBoltContainerPush;
+window.__promptprofileApplyBoltPush = applyBoltContainerPush;
 
 // Listen for panel resize events
-window.addEventListener("prompanion-panel-resize", () => {
+window.addEventListener("promptprofile-panel-resize", () => {
   // Sticky button doesn't need position refresh
-  const panelContainer = document.getElementById('prompanion-sidepanel-container');
-  const isVisible = panelContainer && panelContainer.classList.contains('prompanion-sidepanel-visible');
+  const panelContainer = document.getElementById('promptprofile-sidepanel-container');
+  const isVisible = panelContainer && panelContainer.classList.contains('promptprofile-sidepanel-visible');
   applyBoltContainerPush(isVisible);
 });
 
 document.addEventListener("mousedown", (e) => {
   if (enhanceTooltipElement?.classList.contains("is-visible")) {
-    const button = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
-    const clickedButton = e.target.closest(".prompanion-enhance-tooltip__action");
+    const button = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
+    const clickedButton = e.target.closest(".promptprofile-enhance-tooltip__action");
     if (clickedButton || button === e.target) {
-      console.log("[Prompanion] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
-      console.log("[Prompanion] Setting tooltipClickInProgress flag");
+      console.log("[PromptProfile™] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
+      console.log("[PromptProfile™] Setting tooltipClickInProgress flag");
       tooltipClickInProgress = true;
       const buttonRef = button;
       const mousedownTime = Date.now();
       
       const clickHandler = (clickEvent) => {
         const timeSinceMousedown = Date.now() - mousedownTime;
-        console.log("[Prompanion] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
-        console.log("[Prompanion] Time since mousedown:", timeSinceMousedown, "ms");
-        console.log("[Prompanion] Click target:", clickEvent.target);
+        console.log("[PromptProfile™] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
+        console.log("[PromptProfile™] Time since mousedown:", timeSinceMousedown, "ms");
+        console.log("[PromptProfile™] Click target:", clickEvent.target);
         if (typeof handleRefineButtonClick === "function") {
           handleRefineButtonClick(clickEvent);
         }
@@ -1866,7 +1866,7 @@ document.addEventListener("mousedown", (e) => {
       
       setTimeout(() => {
         tooltipClickInProgress = false;
-        console.log("[Prompanion] tooltipClickInProgress flag cleared");
+        console.log("[PromptProfile™] tooltipClickInProgress flag cleared");
         document.removeEventListener("click", clickHandler, true);
       }, 300);
     }

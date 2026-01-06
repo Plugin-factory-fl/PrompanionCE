@@ -5,13 +5,13 @@
 // This eliminates duplicate listener registrations and provides unified message handling.
 // ============================================================================
 
-console.log("[Prompanion] ========== GEMINI ADAPTER LOADING ==========");
-console.log("[Prompanion] Timestamp:", new Date().toISOString());
-console.log("[Prompanion] Location:", window.location.href);
+console.log("[PromptProfile™] ========== GEMINI ADAPTER LOADING ==========");
+console.log("[PromptProfile™] Timestamp:", new Date().toISOString());
+console.log("[PromptProfile™] Location:", window.location.href);
 
 // Import constants from AdapterBase
 if (typeof AdapterBase === "undefined") {
-  console.error("[Prompanion] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
+  console.error("[PromptProfile™] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
   throw new Error("AdapterBase must be loaded before adapter.js");
 }
 
@@ -22,7 +22,7 @@ const SELECTION_TOOLBAR_VISIBLE_CLASS = AdapterBase.SELECTION_TOOLBAR_VISIBLE_CL
 const HIGHLIGHT_BUTTON_SELECTORS = AdapterBase.HIGHLIGHT_BUTTON_SELECTORS;
 const BUTTON_SIZE = AdapterBase.BUTTON_SIZE;
 
-console.log("[Prompanion] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
+console.log("[PromptProfile™] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
 let domObserverStarted = false;
 
 let enhanceTooltipElement = null;
@@ -51,7 +51,7 @@ let bootstrapObserver = null;
 
 function ensureStyle() {
   // Load generic adapter styles from external CSS file
-  const styleId = "prompanion-adapter-styles";
+  const styleId = "promptprofile-adapter-styles";
   let styleElement = document.getElementById(styleId);
   
   if (!styleElement) {
@@ -155,8 +155,8 @@ function initSelectionToolbar() {
 // Old manual functions removed - AdapterBase handles everything internally
 
 function captureGeminiChatHistory(maxMessages = 20) {
-  console.log("%c[Prompanion Gemini] ========== captureGeminiChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("[Prompanion Gemini] Current URL:", window.location.href);
+  console.log("%c[PromptProfile™ Gemini] ========== captureGeminiChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("[PromptProfile™ Gemini] Current URL:", window.location.href);
   
   const messages = [];
   
@@ -185,12 +185,12 @@ function captureGeminiChatHistory(maxMessages = 20) {
       try {
         const found = Array.from(document.querySelectorAll(selector));
         if (found.length > 0) {
-          console.log(`[Prompanion Gemini] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
+          console.log(`[PromptProfile™ Gemini] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
           assistantElements = found;
           break;
         }
       } catch (e) {
-        console.warn(`[Prompanion Gemini] Selector failed: ${selector}`, e);
+        console.warn(`[PromptProfile™ Gemini] Selector failed: ${selector}`, e);
       }
     }
     
@@ -198,12 +198,12 @@ function captureGeminiChatHistory(maxMessages = 20) {
       try {
         const found = Array.from(document.querySelectorAll(selector));
         if (found.length > 0) {
-          console.log(`[Prompanion Gemini] ✓ Found ${found.length} user messages with selector: ${selector}`);
+          console.log(`[PromptProfile™ Gemini] ✓ Found ${found.length} user messages with selector: ${selector}`);
           userElements = found;
           break;
         }
       } catch (e) {
-        console.warn(`[Prompanion Gemini] Selector failed: ${selector}`, e);
+        console.warn(`[PromptProfile™ Gemini] Selector failed: ${selector}`, e);
       }
     }
     
@@ -235,10 +235,10 @@ function captureGeminiChatHistory(maxMessages = 20) {
       }
     }
     
-    console.log(`[Prompanion Gemini] ✓ Captured ${messages.length} messages from Gemini conversation`);
+    console.log(`[PromptProfile™ Gemini] ✓ Captured ${messages.length} messages from Gemini conversation`);
     return messages;
   } catch (error) {
-    console.error("[Prompanion Gemini] ✗ Error capturing Gemini chat history:", error);
+    console.error("[PromptProfile™ Gemini] ✗ Error capturing Gemini chat history:", error);
     return [];
   }
 }
@@ -254,13 +254,13 @@ function getElementPosition(element) {
 }
 
 function submitSelectionToSideChat(text) {
-  console.log("%c[Prompanion Gemini] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Gemini] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
   
   const snippet = typeof text === "string" ? text.trim() : "";
-  console.log("[Prompanion Gemini] Snippet:", snippet?.substring(0, 50));
+  console.log("[PromptProfile™ Gemini] Snippet:", snippet?.substring(0, 50));
   
   if (!snippet || selectionAskInFlight) {
-    console.log("[Prompanion Gemini] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
+    console.log("[PromptProfile™ Gemini] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
     return;
   }
   selectionAskInFlight = true;
@@ -268,21 +268,21 @@ function submitSelectionToSideChat(text) {
   try {
     // Capture chat history from Gemini conversation for context
     let chatHistory = [];
-    console.log("%c[Prompanion Gemini] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
+    console.log("%c[PromptProfile™ Gemini] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
     try {
       chatHistory = captureGeminiChatHistory(20);
-      console.log(`%c[Prompanion Gemini] ✓ Captured ${chatHistory.length} messages`, 
+      console.log(`%c[PromptProfile™ Gemini] ✓ Captured ${chatHistory.length} messages`, 
         chatHistory.length > 0 ? "color: green; font-size: 14px; font-weight: bold;" : "color: red; font-size: 14px; font-weight: bold;");
       if (chatHistory.length === 0) {
-        console.warn("[Prompanion Gemini] ⚠️ No messages found in DOM");
+        console.warn("[PromptProfile™ Gemini] ⚠️ No messages found in DOM");
       }
     } catch (error) {
-      console.error("[Prompanion Gemini] ✗ Failed to capture chat history:", error);
+      console.error("[PromptProfile™ Gemini] ✗ Failed to capture chat history:", error);
       chatHistory = [];
     }
     
-    console.log("%c[Prompanion Gemini] Sending PROMPANION_SIDECHAT_REQUEST", "color: purple; font-size: 14px; font-weight: bold;");
-    console.log("[Prompanion Gemini] Request details:", {
+    console.log("%c[PromptProfile™ Gemini] Sending PROMPANION_SIDECHAT_REQUEST", "color: purple; font-size: 14px; font-weight: bold;");
+    console.log("[PromptProfile™ Gemini] Request details:", {
       textLength: snippet.length,
       chatHistoryLength: chatHistory.length
     });
@@ -293,15 +293,15 @@ function submitSelectionToSideChat(text) {
       chatHistory: chatHistory 
     }, (response) => {
       if (!response?.ok) {
-        console.warn("Prompanion: sidechat request rejected", response?.reason);
+        console.warn("PromptProfile™: sidechat request rejected", response?.reason);
       }
       selectionAskInFlight = false;
     }).catch((error) => {
-      console.warn("Prompanion: failed to request sidechat from selection", error);
+      console.warn("PromptProfile™: failed to request sidechat from selection", error);
       selectionAskInFlight = false;
     });
   } catch (error) {
-    console.error("Prompanion: sidechat request threw synchronously", error);
+    console.error("PromptProfile™: sidechat request threw synchronously", error);
     selectionAskInFlight = false;
   }
 }
@@ -324,7 +324,7 @@ function createIcon() {
 function requestPromptEnhancement(promptText) {
   return AdapterBase.sendMessage({ type: "PROMPANION_PREPARE_ENHANCEMENT", prompt: promptText, openPanel: false })
     .catch((error) => {
-      console.warn("Prompanion: enhancement request failed", error);
+      console.warn("PromptProfile™: enhancement request failed", error);
       return { ok: false };
     });
 }
@@ -380,9 +380,9 @@ function buildButton() {
   button.className = BUTTON_CLASS;
   button.append(createIcon());
   // Use AdapterBase for generic hover tooltip
-  AdapterBase.attachTooltip(button, "Open Prompanion to enhance your prompts for the best response.", BUTTON_ID);
+  AdapterBase.attachTooltip(button, "Open PromptProfile™ to enhance your prompts for the best response.", BUTTON_ID);
   button.addEventListener("click", () => AdapterBase.togglePanel()
-    .catch((e) => console.error("Prompanion: failed to open sidebar from Gemini adapter", e)));
+    .catch((e) => console.error("PromptProfile™: failed to open sidebar from Gemini adapter", e)));
   button.addEventListener("mouseenter", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("focus", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("mouseleave", () => AdapterBase.hideTooltip(button));
@@ -411,7 +411,7 @@ function ensureFloatingButton() {
   } else {
     // If wrapper already exists in DOM, remove it so positionFloatingButton can place it correctly
     if (floatingButtonWrapper.parentElement) {
-      console.log("[Prompanion Gemini] ensureFloatingButton: Removing existing wrapper from", floatingButtonWrapper.parentElement);
+      console.log("[PromptProfile™ Gemini] ensureFloatingButton: Removing existing wrapper from", floatingButtonWrapper.parentElement);
       floatingButtonWrapper.remove();
     }
   }
@@ -422,22 +422,22 @@ function ensureFloatingButton() {
 }
 
 function placeButton(targetContainer, inputNode) {
-  console.log("[Prompanion Gemini] placeButton called");
+  console.log("[PromptProfile™ Gemini] placeButton called");
   if (!inputNode) {
-    console.warn("[Prompanion Gemini] placeButton: no inputNode");
+    console.warn("[PromptProfile™ Gemini] placeButton: no inputNode");
     return;
   }
   ensureFloatingButton();
   floatingButtonTargetContainer = targetContainer ?? inputNode;
   floatingButtonTargetInput = inputNode;
-  console.log("[Prompanion Gemini] placeButton: calling positionFloatingButton");
+  console.log("[PromptProfile™ Gemini] placeButton: calling positionFloatingButton");
   positionFloatingButton(inputNode, null);
 }
 
 function positionFloatingButton(inputNode, containerNode = floatingButtonTargetContainer) {
-  console.log("[Prompanion Gemini] positionFloatingButton called");
+  console.log("[PromptProfile™ Gemini] positionFloatingButton called");
   if (!floatingButtonWrapper) {
-    console.warn("[Prompanion Gemini] positionFloatingButton: floatingButtonWrapper is null");
+    console.warn("[PromptProfile™ Gemini] positionFloatingButton: floatingButtonWrapper is null");
     return;
   }
   
@@ -455,10 +455,10 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     );
     modelButton = xpathResult.singleNodeValue;
     if (modelButton) {
-      console.log("[Prompanion Gemini] Model button found via XPath");
+      console.log("[PromptProfile™ Gemini] Model button found via XPath");
     }
   } catch (error) {
-    console.warn("[Prompanion Gemini] XPath error:", error);
+    console.warn("[PromptProfile™ Gemini] XPath error:", error);
   }
   
   // Fallback: querySelector
@@ -466,21 +466,21 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     modelButton = document.querySelector("bard-mode-switcher button") ||
                   document.querySelector("bard-mode-switcher div button");
     if (modelButton) {
-      console.log("[Prompanion Gemini] Model button found via querySelector");
+      console.log("[PromptProfile™ Gemini] Model button found via querySelector");
     }
   }
   
   if (!modelButton) {
-    console.warn("[Prompanion Gemini] Model button not found - cannot position logo");
+    console.warn("[PromptProfile™ Gemini] Model button not found - cannot position logo");
     return;
   }
   
   if (!modelButton.offsetParent) {
-    console.warn("[Prompanion Gemini] Model button found but not visible (no offsetParent)");
+    console.warn("[PromptProfile™ Gemini] Model button found but not visible (no offsetParent)");
     return;
   }
   
-  console.log("[Prompanion Gemini] Model button found and visible:", {
+  console.log("[PromptProfile™ Gemini] Model button found and visible:", {
     tagName: modelButton.tagName,
     className: modelButton.className,
     rect: modelButton.getBoundingClientRect()
@@ -500,10 +500,10 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     );
     container = xpathResult.singleNodeValue;
     if (container) {
-      console.log("[Prompanion Gemini] Container found via XPath");
+      console.log("[PromptProfile™ Gemini] Container found via XPath");
     }
   } catch (error) {
-    console.warn("[Prompanion Gemini] Container XPath error:", error);
+    console.warn("[PromptProfile™ Gemini] Container XPath error:", error);
   }
   
   // Fallback: try to find div[2] within input-area-v2
@@ -516,18 +516,18 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
         const secondDiv = firstDiv.querySelector('div');
         if (secondDiv && secondDiv.children.length >= 2) {
           container = secondDiv.children[1]; // div[2] (0-indexed, so [1])
-          console.log("[Prompanion Gemini] Container found via fallback");
+          console.log("[PromptProfile™ Gemini] Container found via fallback");
         }
       }
     }
   }
   
   if (!container || container === document.body) {
-    console.warn("[Prompanion Gemini] No suitable container found");
+    console.warn("[PromptProfile™ Gemini] No suitable container found");
     return;
   }
   
-  console.log("[Prompanion Gemini] Selected container:", {
+  console.log("[PromptProfile™ Gemini] Selected container:", {
     tagName: container.tagName,
     className: container.className,
     rect: container.getBoundingClientRect()
@@ -576,7 +576,7 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
   floatingButtonWrapper.style.display = "flex";
   floatingButtonWrapper.style.zIndex = "2147483000";
   
-  console.log("[Prompanion Gemini] Button positioned:", {
+  console.log("[PromptProfile™ Gemini] Button positioned:", {
     container: container.tagName,
     containerClass: container.className,
     rightPosition: spacing,
@@ -663,25 +663,25 @@ function locateComposer() {
 function init() {
   // Prevent concurrent calls
   if (initInProgress) {
-    console.log("[Prompanion Gemini] init() - already in progress, skipping");
+    console.log("[PromptProfile™ Gemini] init() - already in progress, skipping");
     return false;
   }
   
   initInProgress = true;
   try {
-    console.log("[Prompanion Gemini] init() called");
+    console.log("[PromptProfile™ Gemini] init() called");
     // Initialize sticky button (no injection logic needed)
     AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
     
     const composer = locateComposer();
-    console.log("[Prompanion Gemini] init() - composer found:", !!composer);
+    console.log("[PromptProfile™ Gemini] init() - composer found:", !!composer);
     AdapterBase.requestSelectionToolbarUpdate();
     if (composer) {
       setupEnhanceTooltip(composer.input, composer.container);
       ensureDomObserver();
       return true;
     }
-    console.log("[Prompanion Gemini] init() - no composer found, setting up observer");
+    console.log("[PromptProfile™ Gemini] init() - no composer found, setting up observer");
     ensureDomObserver();
     return false;
   } finally {
@@ -698,73 +698,73 @@ function init() {
 function handleInsertTextMessage(message, sender, sendResponse) {
   try {
     const textToInsert = typeof message.text === "string" ? message.text.trim() : "";
-    console.log("[Prompanion] ========== INSERT TEXT REQUEST ==========");
-    console.log("[Prompanion] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
-    console.log("[Prompanion] Text length:", textToInsert.length);
+    console.log("[PromptProfile™] ========== INSERT TEXT REQUEST ==========");
+    console.log("[PromptProfile™] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
+    console.log("[PromptProfile™] Text length:", textToInsert.length);
     
     if (!textToInsert) {
-      console.log("[Prompanion] Insert failed: EMPTY_TEXT");
+      console.log("[PromptProfile™] Insert failed: EMPTY_TEXT");
       sendResponse({ ok: false, reason: "EMPTY_TEXT" });
       return false; // sendResponse called synchronously, close channel
     }
 
-    console.log("[Prompanion] Searching for composer node...");
+    console.log("[PromptProfile™] Searching for composer node...");
     const composerNode = findComposerNode();
-    console.log("[Prompanion] Composer node found:", composerNode);
-    console.log("[Prompanion] Node type:", composerNode?.constructor?.name);
-    console.log("[Prompanion] Node isContentEditable:", composerNode?.isContentEditable);
-    console.log("[Prompanion] Node tagName:", composerNode?.tagName);
-    console.log("[Prompanion] Node className:", composerNode?.className);
-    console.log("[Prompanion] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
-    console.log("[Prompanion] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
+    console.log("[PromptProfile™] Composer node found:", composerNode);
+    console.log("[PromptProfile™] Node type:", composerNode?.constructor?.name);
+    console.log("[PromptProfile™] Node isContentEditable:", composerNode?.isContentEditable);
+    console.log("[PromptProfile™] Node tagName:", composerNode?.tagName);
+    console.log("[PromptProfile™] Node className:", composerNode?.className);
+    console.log("[PromptProfile™] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
+    console.log("[PromptProfile™] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
     
     if (!composerNode) {
-      console.log("[Prompanion] Insert failed: NO_COMPOSER_NODE");
+      console.log("[PromptProfile™] Insert failed: NO_COMPOSER_NODE");
       sendResponse({ ok: false, reason: "NO_COMPOSER_NODE" });
       return false; // sendResponse called synchronously, close channel
     }
 
-    console.log("[Prompanion] Calling setComposerText...");
+    console.log("[PromptProfile™] Calling setComposerText...");
     const success = setComposerText(composerNode, textToInsert);
-    console.log("[Prompanion] setComposerText returned:", success);
+    console.log("[PromptProfile™] setComposerText returned:", success);
     
     // Verify insertion
     const currentValue = composerNode.value || composerNode.textContent || "";
     const textInserted = currentValue.includes(textToInsert.substring(0, Math.min(20, textToInsert.length)));
-    console.log("[Prompanion] Verification - text appears in node:", textInserted);
-    console.log("[Prompanion] Current node value:", currentValue.substring(0, 100));
+    console.log("[PromptProfile™] Verification - text appears in node:", textInserted);
+    console.log("[PromptProfile™] Current node value:", currentValue.substring(0, 100));
     
     if (success && textInserted) {
-      console.log("[Prompanion] Insert succeeded!");
+      console.log("[PromptProfile™] Insert succeeded!");
       sendResponse({ ok: true });
     } else if (success && !textInserted) {
-      console.warn("[Prompanion] setComposerText returned true but text not verified in node");
+      console.warn("[PromptProfile™] setComposerText returned true but text not verified in node");
       sendResponse({ ok: false, reason: "INSERTION_NOT_VERIFIED" });
     } else {
-      console.log("[Prompanion] Insert failed: SET_TEXT_FAILED");
+      console.log("[PromptProfile™] Insert failed: SET_TEXT_FAILED");
       sendResponse({ ok: false, reason: "SET_TEXT_FAILED" });
     }
     return false; // sendResponse called synchronously, close channel
   } catch (error) {
-    console.error("[Prompanion] Insert text handler failed", error);
-    console.error("[Prompanion] Error stack:", error.stack);
+    console.error("[PromptProfile™] Insert text handler failed", error);
+    console.error("[PromptProfile™] Error stack:", error.stack);
     sendResponse({ ok: false, reason: error?.message ?? "UNKNOWN" });
     return false; // sendResponse called synchronously, close channel
   }
 }
 
 // Register message handler using AdapterBase (must be after handleInsertTextMessage is defined)
-console.log("[Prompanion] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
+console.log("[PromptProfile™] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
 AdapterBase.registerMessageHandler("PROMPANION_INSERT_TEXT", handleInsertTextMessage);
 
 function bootstrap() {
-  console.log("[Prompanion Gemini] bootstrap() called");
+  console.log("[PromptProfile™ Gemini] bootstrap() called");
   ensureHighlightObserver();
   initSelectionToolbar(); // Initialize the selection toolbar system
   const initResult = init();
-  console.log("[Prompanion Gemini] bootstrap() - init() returned:", initResult);
+  console.log("[PromptProfile™ Gemini] bootstrap() - init() returned:", initResult);
   if (!initResult) {
-    console.log("[Prompanion Gemini] bootstrap() - composer not found, setting up MutationObserver");
+    console.log("[PromptProfile™ Gemini] bootstrap() - composer not found, setting up MutationObserver");
     // Disconnect any existing observer first
     if (bootstrapObserver) {
       bootstrapObserver.disconnect();
@@ -782,7 +782,7 @@ function bootstrap() {
       lastInitTime = now;
       const retryResult = init();
       if (retryResult) {
-        console.log("[Prompanion Gemini] bootstrap() - composer found on retry, disconnecting observer");
+        console.log("[PromptProfile™ Gemini] bootstrap() - composer found on retry, disconnecting observer");
         if (bootstrapObserver) {
           bootstrapObserver.disconnect();
           bootstrapObserver = null;
@@ -822,12 +822,12 @@ function teardownEnhanceTooltip() {
 
 function ensureEnhanceTooltipElement() {
   if (!enhanceTooltipElement) {
-    console.log("[Prompanion] Creating enhance tooltip element");
+    console.log("[PromptProfile™] Creating enhance tooltip element");
     enhanceTooltipElement = document.createElement("div");
-    enhanceTooltipElement.className = "prompanion-enhance-tooltip";
+    enhanceTooltipElement.className = "promptprofile-enhance-tooltip";
     const dismiss = document.createElement("button");
     dismiss.type = "button";
-    dismiss.className = "prompanion-enhance-tooltip__dismiss";
+    dismiss.className = "promptprofile-enhance-tooltip__dismiss";
     dismiss.textContent = "×";
     dismiss.setAttribute("aria-label", "Dismiss prompt enhancement suggestion");
     dismiss.addEventListener("click", () => {
@@ -836,46 +836,46 @@ function ensureEnhanceTooltipElement() {
     });
     const action = document.createElement("button");
     action.type = "button";
-    action.className = "prompanion-enhance-tooltip__action";
+    action.className = "promptprofile-enhance-tooltip__action";
     AdapterBase.setButtonTextContent(action, "Refine");
-    console.log("[Prompanion] Attaching click handler to Refine button");
-    console.log("[Prompanion] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
+    console.log("[PromptProfile™] Attaching click handler to Refine button");
+    console.log("[PromptProfile™] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
     action.addEventListener("click", handleRefineButtonClick);
-    console.log("[Prompanion] Click handler attached, button:", action);
+    console.log("[PromptProfile™] Click handler attached, button:", action);
     enhanceTooltipElement.append(dismiss, action);
-    console.log("[Prompanion] Enhance tooltip element created");
+    console.log("[PromptProfile™] Enhance tooltip element created");
   }
   if (!enhanceTooltipElement.isConnected) {
-    console.log("[Prompanion] Appending enhance tooltip to body");
+    console.log("[PromptProfile™] Appending enhance tooltip to body");
     document.body.append(enhanceTooltipElement);
   }
   hideEnhanceTooltip();
 }
 
 function handleRefineButtonClick(e) {
-  console.log("[Prompanion] ========== REFINE BUTTON HANDLER FIRED ==========");
-  console.log("[Prompanion] Event type:", e.type);
-  console.log("[Prompanion] Event target:", e.target);
+  console.log("[PromptProfile™] ========== REFINE BUTTON HANDLER FIRED ==========");
+  console.log("[PromptProfile™] Event type:", e.type);
+  console.log("[PromptProfile™] Event target:", e.target);
   e.preventDefault();
   e.stopPropagation();
   if (enhanceActionInFlight) {
     return;
   }
   const composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
-  console.log("[Prompanion] Composer node:", composerNode);
+  console.log("[PromptProfile™] Composer node:", composerNode);
   if (!composerNode) {
-    console.error("[Prompanion] No composer node found!");
+    console.error("[PromptProfile™] No composer node found!");
     return;
   }
   const promptText = extractInputText().trim();
-  console.log("[Prompanion] Prompt text:", promptText);
+  console.log("[PromptProfile™] Prompt text:", promptText);
   if (!promptText) {
     return;
   }
   enhanceActionInFlight = true;
   enhanceTooltipDismissed = true;
   hideEnhanceTooltip();
-  console.log("[Prompanion] Requesting prompt enhancement...");
+  console.log("[PromptProfile™] Requesting prompt enhancement...");
   requestPromptEnhancement(promptText)
     .then((result) => {
       if (!result || !result.ok) {
@@ -889,7 +889,7 @@ function handleRefineButtonClick(e) {
       enhanceActionInFlight = false;
     })
     .catch((error) => {
-      console.error("Prompanion: refine request threw", error);
+      console.error("PromptProfile™: refine request threw", error);
       enhanceActionInFlight = false;
     });
 }
@@ -990,36 +990,36 @@ function detachTooltipResizeHandler() {
 
 // Backup message listener registration (IIFE to ensure it runs immediately)
 (function registerInsertTextListener() {
-  console.log("[Prompanion] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
-  console.log("[Prompanion] Current time:", new Date().toISOString());
+  console.log("[PromptProfile™] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
+  console.log("[PromptProfile™] Current time:", new Date().toISOString());
   
   if (typeof chrome === "undefined") {
-    console.error("[Prompanion] chrome is undefined in backup registration");
+    console.error("[PromptProfile™] chrome is undefined in backup registration");
     return;
   }
   
   if (!chrome.runtime || !chrome.runtime.onMessage) {
-    console.error("[Prompanion] chrome.runtime.onMessage not available in backup registration");
+    console.error("[PromptProfile™] chrome.runtime.onMessage not available in backup registration");
     return;
   }
   
   try {
     chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       if (message && message.type === "PROMPANION_INSERT_TEXT") {
-        console.log("[Prompanion] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
+        console.log("[PromptProfile™] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
         if (typeof handleInsertTextMessage === "function") {
           handleInsertTextMessage(message, sender, sendResponse);
         } else {
-          console.error("[Prompanion] handleInsertTextMessage is not a function!");
+          console.error("[PromptProfile™] handleInsertTextMessage is not a function!");
           sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
         }
         return true;
       }
       return false;
     });
-    console.log("[Prompanion] ✓ Backup listener registered successfully");
+    console.log("[PromptProfile™] ✓ Backup listener registered successfully");
   } catch (error) {
-    console.error("[Prompanion] ✗ Backup listener registration failed:", error);
+    console.error("[PromptProfile™] ✗ Backup listener registration failed:", error);
   }
 })();
 
@@ -1035,16 +1035,16 @@ if (readyState === "complete" || readyState === "interactive") {
 // AdapterBase will handle selection changes efficiently
 
 // Verify message listener is registered
-console.log("[Prompanion] ========== VERIFYING MESSAGE LISTENER ==========");
+console.log("[PromptProfile™] ========== VERIFYING MESSAGE LISTENER ==========");
 if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
-  console.log("[Prompanion] chrome.runtime.onMessage is available");
-  console.log("[Prompanion] chrome.runtime.id:", chrome.runtime.id);
-  console.log("[Prompanion] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
+  console.log("[PromptProfile™] chrome.runtime.onMessage is available");
+  console.log("[PromptProfile™] chrome.runtime.id:", chrome.runtime.id);
+  console.log("[PromptProfile™] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
 } else {
-  console.error("[Prompanion] chrome.runtime.onMessage is NOT available at this point!");
+  console.error("[PromptProfile™] chrome.runtime.onMessage is NOT available at this point!");
 }
 
-window.addEventListener("prompanion-panel-resize", () => {
+window.addEventListener("promptprofile-panel-resize", () => {
   // Sticky button doesn't need position refresh
 });
 
@@ -1057,20 +1057,20 @@ window.addEventListener("resize", () => {
 
 document.addEventListener("mousedown", (e) => {
   if (enhanceTooltipElement?.classList.contains("is-visible")) {
-    const button = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
-    const clickedButton = e.target.closest(".prompanion-enhance-tooltip__action");
+    const button = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
+    const clickedButton = e.target.closest(".promptprofile-enhance-tooltip__action");
     if (clickedButton || button === e.target) {
-      console.log("[Prompanion] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
-      console.log("[Prompanion] Setting tooltipClickInProgress flag");
+      console.log("[PromptProfile™] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
+      console.log("[PromptProfile™] Setting tooltipClickInProgress flag");
       tooltipClickInProgress = true;
       const buttonRef = button;
       const mousedownTime = Date.now();
       
       const clickHandler = (clickEvent) => {
         const timeSinceMousedown = Date.now() - mousedownTime;
-        console.log("[Prompanion] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
-        console.log("[Prompanion] Time since mousedown:", timeSinceMousedown, "ms");
-        console.log("[Prompanion] Click target:", clickEvent.target);
+        console.log("[PromptProfile™] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
+        console.log("[PromptProfile™] Time since mousedown:", timeSinceMousedown, "ms");
+        console.log("[PromptProfile™] Click target:", clickEvent.target);
         if (typeof handleRefineButtonClick === "function") {
           handleRefineButtonClick(clickEvent);
         }
@@ -1081,7 +1081,7 @@ document.addEventListener("mousedown", (e) => {
       
       setTimeout(() => {
         tooltipClickInProgress = false;
-        console.log("[Prompanion] tooltipClickInProgress flag cleared");
+        console.log("[PromptProfile™] tooltipClickInProgress flag cleared");
         document.removeEventListener("click", clickHandler, true);
       }, 300);
     }

@@ -5,13 +5,13 @@
 // This eliminates duplicate listener registrations and provides unified message handling.
 // ============================================================================
 
-console.log("[Prompanion Sora] ========== ADAPTER.JS LOADING ==========");
-console.log("[Prompanion Sora] Timestamp:", new Date().toISOString());
-console.log("[Prompanion Sora] Location:", window.location.href);
+console.log("[PromptProfile™ Sora] ========== ADAPTER.JS LOADING ==========");
+console.log("[PromptProfile™ Sora] Timestamp:", new Date().toISOString());
+console.log("[PromptProfile™ Sora] Location:", window.location.href);
 
 // Import constants from AdapterBase
 if (typeof AdapterBase === "undefined") {
-  console.error("[Prompanion Sora] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
+  console.error("[PromptProfile™ Sora] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
   throw new Error("AdapterBase must be loaded before adapter.js");
 }
 
@@ -21,7 +21,7 @@ const SELECTION_TOOLBAR_ID = AdapterBase.SELECTION_TOOLBAR_ID;
 const SELECTION_TOOLBAR_VISIBLE_CLASS = AdapterBase.SELECTION_TOOLBAR_VISIBLE_CLASS;
 const BUTTON_SIZE = AdapterBase.BUTTON_SIZE;
 
-console.log("[Prompanion Sora] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
+console.log("[PromptProfile™ Sora] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
 let domObserverStarted = false;
 
 let enhanceTooltipElement = null;
@@ -39,7 +39,7 @@ let highlightObserver = null;
 
 function ensureStyle() {
   // Load generic adapter styles from external CSS file
-  const styleId = "prompanion-adapter-styles";
+  const styleId = "promptprofile-adapter-styles";
   let styleElement = document.getElementById(styleId);
   
   if (!styleElement) {
@@ -90,9 +90,9 @@ function initSelectionToolbar() {
 
 // Global click handler to ensure Refine button always works
 document.addEventListener("mousedown", (e) => {
-  const refineButton = e.target.closest(".prompanion-enhance-tooltip__action");
-  if (refineButton && !refineButton.classList.contains("prompanion-enhance-tooltip__upgrade")) {
-    console.log("[Prompanion Sora] Global capture: Refine button mousedown detected");
+  const refineButton = e.target.closest(".promptprofile-enhance-tooltip__action");
+  if (refineButton && !refineButton.classList.contains("promptprofile-enhance-tooltip__upgrade")) {
+    console.log("[PromptProfile™ Sora] Global capture: Refine button mousedown detected");
     // Trigger refinement on mousedown to beat any blur/render issues
     handleRefineButtonClick(e);
   }
@@ -100,7 +100,7 @@ document.addEventListener("mousedown", (e) => {
 
 // Keep click listener just to prevent default actions if needed
 document.addEventListener("click", (e) => {
-  const refineButton = e.target.closest(".prompanion-enhance-tooltip__action");
+  const refineButton = e.target.closest(".promptprofile-enhance-tooltip__action");
   if (refineButton) {
     e.preventDefault();
     e.stopPropagation();
@@ -108,38 +108,38 @@ document.addEventListener("click", (e) => {
 }, true);
 
 async function submitSelectionToSideChat(text) {
-  console.log("[Prompanion Sora] ========== submitSelectionToSideChat CALLED ==========");
+  console.log("[PromptProfile™ Sora] ========== submitSelectionToSideChat CALLED ==========");
   
   const snippet = typeof text === "string" ? text.trim() : "";
-  console.log("[Prompanion Sora] Snippet:", snippet?.substring(0, 50));
+  console.log("[PromptProfile™ Sora] Snippet:", snippet?.substring(0, 50));
   
   if (!snippet) {
     return;
   }
 
   try {
-    console.log("[Prompanion Sora] ========== SENDING PROMPANION_SIDECHAT_REQUEST ==========");
+    console.log("[PromptProfile™ Sora] ========== SENDING PROMPANION_SIDECHAT_REQUEST ==========");
     
     AdapterBase.sendMessage({ 
       type: "PROMPANION_SIDECHAT_REQUEST", 
       text: snippet,
       chatHistory: [] // Sora explore page may not have chat history
     }, (response) => {
-      console.log("[Prompanion Sora] ========== PROMPANION_SIDECHAT_REQUEST RESPONSE ==========");
-      console.log("[Prompanion Sora] Response:", response);
+      console.log("[PromptProfile™ Sora] ========== PROMPANION_SIDECHAT_REQUEST RESPONSE ==========");
+      console.log("[PromptProfile™ Sora] Response:", response);
       if (!response?.ok) {
-        console.warn("Prompanion: sidechat request rejected", response?.reason);
+        console.warn("PromptProfile™: sidechat request rejected", response?.reason);
       }
     }).catch((error) => {
-      console.warn("Prompanion: failed to request sidechat from selection", error);
+      console.warn("PromptProfile™: failed to request sidechat from selection", error);
     });
   } catch (error) {
-    console.error("Prompanion: sidechat request threw synchronously", error);
+    console.error("PromptProfile™: sidechat request threw synchronously", error);
   }
 }
 
 function handleSelectionChange() {
-  console.log("[Prompanion Sora] handleSelectionChange fired");
+  console.log("[PromptProfile™ Sora] handleSelectionChange fired");
   AdapterBase.requestSelectionToolbarUpdate();
 }
 
@@ -158,9 +158,9 @@ function requestPromptEnhancement(promptText) {
     .catch((error) => {
       const errorMessage = error?.message || "";
       if (errorMessage.includes("Extension context invalidated")) {
-        console.error("[Prompanion Sora] Extension context invalidated - user should reload page");
+        console.error("[PromptProfile™ Sora] Extension context invalidated - user should reload page");
       } else {
-        console.warn("[Prompanion Sora] Enhancement request failed:", error);
+        console.warn("[PromptProfile™ Sora] Enhancement request failed:", error);
       }
       return { ok: false, reason: errorMessage || "UNKNOWN_ERROR" };
     });
@@ -214,18 +214,18 @@ function showSoraTooltip(button) {
   const container = document.getElementById(`${BUTTON_ID}-tooltip-layer`);
   if (!data || !container) return;
   
-  let tooltip = button._prompanionTooltip;
+  let tooltip = button._promptprofileTooltip;
   if (!tooltip) {
     tooltip = document.createElement("div");
-    tooltip.className = "prompanion-tooltip";
+    tooltip.className = "promptprofile-tooltip";
     tooltip.setAttribute("role", "tooltip");
     const text = document.createElement("span");
     text.textContent = data.text;
     const hidden = document.createElement("span");
-    hidden.className = "prompanion-visually-hidden";
+    hidden.className = "promptprofile-visually-hidden";
     hidden.textContent = data.text;
     tooltip.append(text, hidden);
-    button._prompanionTooltip = tooltip;
+    button._promptprofileTooltip = tooltip;
     container.append(tooltip);
   }
   
@@ -245,9 +245,9 @@ function buildButton() {
   button.className = BUTTON_CLASS;
   button.append(createIcon());
   // Use AdapterBase for tooltip attachment, but custom show handler for positioning
-  AdapterBase.attachTooltip(button, "Open Prompanion to enhance your prompts for the best response.", BUTTON_ID);
+  AdapterBase.attachTooltip(button, "Open PromptProfile™ to enhance your prompts for the best response.", BUTTON_ID);
   button.addEventListener("click", () => AdapterBase.togglePanel()
-    .catch((e) => console.error("Prompanion: failed to open sidebar from Sora adapter", e)));
+    .catch((e) => console.error("PromptProfile™: failed to open sidebar from Sora adapter", e)));
   button.addEventListener("mouseenter", () => showSoraTooltip(button));
   button.addEventListener("focus", () => showSoraTooltip(button));
   button.addEventListener("mouseleave", () => AdapterBase.hideTooltip(button));
@@ -303,11 +303,11 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
       targetContainer = referenceElement.parentElement;
     }
   } catch (error) {
-    console.warn("[Prompanion Sora] XPath error:", error);
+    console.warn("[PromptProfile™ Sora] XPath error:", error);
   }
   
   if (!targetContainer || !referenceElement) {
-    console.warn("[Prompanion Sora] Target container or reference element not found, will retry...");
+    console.warn("[PromptProfile™ Sora] Target container or reference element not found, will retry...");
     if (inputNode && floatingButtonElement) {
       setTimeout(() => {
         positionFloatingButton(inputNode, null);
@@ -425,7 +425,7 @@ function ensureDomObserver() {
 }
 
 function locateComposer() {
-  console.log("[Prompanion Sora] locateComposer called");
+  console.log("[PromptProfile™ Sora] locateComposer called");
   
   // Sora-specific selectors - adjust based on actual DOM structure
   const selectors = [
@@ -440,13 +440,13 @@ function locateComposer() {
     const element = document.querySelector(selector);
     if (element instanceof HTMLElement) {
       input = element;
-      console.log("[Prompanion Sora] Found input with selector:", selector);
+      console.log("[PromptProfile™ Sora] Found input with selector:", selector);
       break;
     }
   }
 
   if (!input) {
-    console.warn("[Prompanion Sora] No input found in locateComposer");
+    console.warn("[PromptProfile™ Sora] No input found in locateComposer");
     return null;
   }
 
@@ -455,12 +455,12 @@ function locateComposer() {
                     input.parentElement || 
                     document.body;
   
-  console.log("[Prompanion Sora] Composer located:", { input, container });
+  console.log("[PromptProfile™ Sora] Composer located:", { input, container });
   return { input, container };
 }
 
 function init() {
-  console.log("[Prompanion Sora] init() called");
+  console.log("[PromptProfile™ Sora] init() called");
   // Initialize sticky button (no injection logic needed)
   AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
   
@@ -468,12 +468,12 @@ function init() {
   AdapterBase.requestSelectionToolbarUpdate();
   
   if (composer) {
-    console.log("[Prompanion Sora] Composer found, setting up enhance tooltip");
+    console.log("[PromptProfile™ Sora] Composer found, setting up enhance tooltip");
     setupEnhanceTooltip(composer.input, composer.container);
     ensureDomObserver();
     return true;
   }
-  console.warn("[Prompanion Sora] Composer not found in init()");
+  console.warn("[PromptProfile™ Sora] Composer not found in init()");
   ensureDomObserver();
   return false;
 }
@@ -487,54 +487,54 @@ function init() {
 function handleInsertTextMessage(message, sender, sendResponse) {
   try {
     const textToInsert = typeof message.text === "string" ? message.text.trim() : "";
-    console.log("[Prompanion Sora] ========== INSERT TEXT REQUEST ==========");
-    console.log("[Prompanion Sora] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
+    console.log("[PromptProfile™ Sora] ========== INSERT TEXT REQUEST ==========");
+    console.log("[PromptProfile™ Sora] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
     
     if (!textToInsert) {
-      console.log("[Prompanion Sora] Insert failed: EMPTY_TEXT");
+      console.log("[PromptProfile™ Sora] Insert failed: EMPTY_TEXT");
       sendResponse({ ok: false, reason: "EMPTY_TEXT" });
       return false;
     }
 
-    console.log("[Prompanion Sora] Searching for composer node...");
+    console.log("[PromptProfile™ Sora] Searching for composer node...");
     const composerNode = findComposerNode();
-    console.log("[Prompanion Sora] Composer node found:", !!composerNode);
+    console.log("[PromptProfile™ Sora] Composer node found:", !!composerNode);
     
     if (!composerNode) {
-      console.log("[Prompanion Sora] Insert failed: NO_COMPOSER_NODE");
+      console.log("[PromptProfile™ Sora] Insert failed: NO_COMPOSER_NODE");
       sendResponse({ ok: false, reason: "NO_COMPOSER_NODE" });
       return false;
     }
 
-    console.log("[Prompanion Sora] Calling setComposerText...");
+    console.log("[PromptProfile™ Sora] Calling setComposerText...");
     const success = setComposerText(composerNode, textToInsert);
-    console.log("[Prompanion Sora] setComposerText returned:", success);
+    console.log("[PromptProfile™ Sora] setComposerText returned:", success);
     
     // Verify insertion
     const currentValue = composerNode.value || composerNode.textContent || "";
     const textInserted = currentValue.includes(textToInsert.substring(0, Math.min(20, textToInsert.length)));
-    console.log("[Prompanion Sora] Verification - text appears in node:", textInserted);
+    console.log("[PromptProfile™ Sora] Verification - text appears in node:", textInserted);
     
     if (success && textInserted) {
-      console.log("[Prompanion Sora] Insert succeeded!");
+      console.log("[PromptProfile™ Sora] Insert succeeded!");
       sendResponse({ ok: true });
     } else if (success && !textInserted) {
-      console.warn("[Prompanion Sora] setComposerText returned true but text not verified in node");
+      console.warn("[PromptProfile™ Sora] setComposerText returned true but text not verified in node");
       sendResponse({ ok: false, reason: "INSERTION_NOT_VERIFIED" });
     } else {
-      console.log("[Prompanion Sora] Insert failed: SET_TEXT_FAILED");
+      console.log("[PromptProfile™ Sora] Insert failed: SET_TEXT_FAILED");
       sendResponse({ ok: false, reason: "SET_TEXT_FAILED" });
     }
     return false;
   } catch (error) {
-    console.error("[Prompanion Sora] Insert text handler failed", error);
+    console.error("[PromptProfile™ Sora] Insert text handler failed", error);
     sendResponse({ ok: false, reason: error?.message ?? "UNKNOWN" });
     return false;
   }
 }
 
 // Register message handler using AdapterBase
-console.log("[Prompanion Sora] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
+console.log("[PromptProfile™ Sora] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
 AdapterBase.registerMessageHandler("PROMPANION_INSERT_TEXT", handleInsertTextMessage);
 
 function bootstrap() {
@@ -587,13 +587,13 @@ function ensureEnhanceTooltipElement() {
     return;
   }
 
-  console.log("[Prompanion Sora] Creating enhance tooltip element");
+  console.log("[PromptProfile™ Sora] Creating enhance tooltip element");
   enhanceTooltipElement = document.createElement("div");
-  enhanceTooltipElement.className = "prompanion-enhance-tooltip";
+  enhanceTooltipElement.className = "promptprofile-enhance-tooltip";
   
   const dismiss = document.createElement("button");
   dismiss.type = "button";
-  dismiss.className = "prompanion-enhance-tooltip__dismiss";
+  dismiss.className = "promptprofile-enhance-tooltip__dismiss";
   dismiss.textContent = "×";
   dismiss.setAttribute("aria-label", "Dismiss prompt enhancement suggestion");
   dismiss.addEventListener("click", (e) => {
@@ -605,7 +605,7 @@ function ensureEnhanceTooltipElement() {
 
   const action = document.createElement("button");
   action.type = "button";
-  action.className = "prompanion-enhance-tooltip__action";
+  action.className = "promptprofile-enhance-tooltip__action";
   AdapterBase.setButtonTextContent(action, "Refine");
   
   // Handled via global mousedown listener for reliability
@@ -615,7 +615,7 @@ function ensureEnhanceTooltipElement() {
 }
 
 async function handleRefineButtonClick(e) {
-  console.log("[Prompanion Sora] ========== REFINE BUTTON HANDLER STARTING ==========");
+  console.log("[PromptProfile™ Sora] ========== REFINE BUTTON HANDLER STARTING ==========");
   
   if (e && e.preventDefault) {
     e.preventDefault();
@@ -626,7 +626,7 @@ async function handleRefineButtonClick(e) {
   }
 
   if (enhanceActionInFlight) {
-    console.log("[Prompanion Sora] Refine ignored: Action already in flight");
+    console.log("[PromptProfile™ Sora] Refine ignored: Action already in flight");
     return false;
   }
 
@@ -635,21 +635,21 @@ async function handleRefineButtonClick(e) {
   let composerNode = composer?.input || enhanceTooltipActiveTextarea || floatingButtonTargetInput;
   
   if (!composerNode) {
-    console.error("[Prompanion Sora] Refine failed: No composer node found");
+    console.error("[PromptProfile™ Sora] Refine failed: No composer node found");
     return false;
   }
 
   const promptText = (composerNode.value || composerNode.textContent || "").trim();
   if (!promptText) {
-    console.warn("[Prompanion Sora] Refine ignored: Text is empty");
+    console.warn("[PromptProfile™ Sora] Refine ignored: Text is empty");
     return false;
   }
 
-  console.log("[Prompanion Sora] Text to refine:", promptText.substring(0, 50));
+  console.log("[PromptProfile™ Sora] Text to refine:", promptText.substring(0, 50));
   enhanceActionInFlight = true;
   
   // Update UI immediately
-  const actionButton = enhanceTooltipElement?.querySelector(".prompanion-enhance-tooltip__action");
+  const actionButton = enhanceTooltipElement?.querySelector(".promptprofile-enhance-tooltip__action");
   if (actionButton) {
     actionButton.disabled = true;
     AdapterBase.setButtonTextContent(actionButton, "Refining...");
@@ -658,7 +658,7 @@ async function handleRefineButtonClick(e) {
 
   try {
     const result = await requestPromptEnhancement(promptText);
-    console.log("[Prompanion Sora] Enhancement result received:", result);
+    console.log("[PromptProfile™ Sora] Enhancement result received:", result);
 
     if (result && result.ok) {
       const refinedText = (result.optionA && typeof result.optionA === "string") ? result.optionA.trim() : promptText;
@@ -667,7 +667,7 @@ async function handleRefineButtonClick(e) {
       enhanceActionInFlight = false;
       
       const success = setComposerText(composerNode, refinedText);
-      console.log("[Prompanion Sora] Insertion success:", success);
+      console.log("[PromptProfile™ Sora] Insertion success:", success);
       
       hideEnhanceTooltip();
       enhanceTooltipDismissed = true;
@@ -678,7 +678,7 @@ async function handleRefineButtonClick(e) {
         composerNode.dispatchEvent(new Event("change", { bubbles: true }));
       }, 50);
     } else {
-      console.error("[Prompanion Sora] Enhancement failed:", result?.reason || "Unknown error");
+      console.error("[PromptProfile™ Sora] Enhancement failed:", result?.reason || "Unknown error");
       enhanceActionInFlight = false;
       if (result?.error === "LIMIT_REACHED") {
         showUpgradeButtonInTooltip();
@@ -688,7 +688,7 @@ async function handleRefineButtonClick(e) {
       }
     }
   } catch (err) {
-    console.error("[Prompanion Sora] Refine process error:", err);
+    console.error("[PromptProfile™ Sora] Refine process error:", err);
     enhanceActionInFlight = false;
     if (actionButton) {
       actionButton.disabled = false;
@@ -748,7 +748,7 @@ function handleInputChange() {
 function handleInputBlur() {
   // If an action is in flight, don't hide the tooltip
   if (enhanceActionInFlight) {
-    console.log("[Prompanion Sora] handleInputBlur: ignoring due to action in flight");
+    console.log("[PromptProfile™ Sora] handleInputBlur: ignoring due to action in flight");
     return;
   }
   clearTimeout(enhanceTooltipTimer);
@@ -758,16 +758,16 @@ function handleInputBlur() {
 
 function scheduleEnhanceTooltip() {
   clearTimeout(enhanceTooltipTimer);
-  console.log("[Prompanion Sora] scheduleEnhanceTooltip: setting timeout");
+  console.log("[PromptProfile™ Sora] scheduleEnhanceTooltip: setting timeout");
   enhanceTooltipTimer = window.setTimeout(() => {
     if (!enhanceTooltipActiveTextarea) {
-      console.log("[Prompanion Sora] scheduleEnhanceTooltip: timeout fired but no active textarea");
+      console.log("[PromptProfile™ Sora] scheduleEnhanceTooltip: timeout fired but no active textarea");
       return;
     }
     const wordCount = extractInputText().trim().split(/\s+/).filter(Boolean).length;
-    console.log("[Prompanion Sora] scheduleEnhanceTooltip: timeout fired, word count:", wordCount, "dismissed:", enhanceTooltipDismissed);
+    console.log("[PromptProfile™ Sora] scheduleEnhanceTooltip: timeout fired, word count:", wordCount, "dismissed:", enhanceTooltipDismissed);
     if (wordCount >= 3 && !enhanceTooltipDismissed) {
-      console.log("[Prompanion Sora] scheduleEnhanceTooltip: calling showEnhanceTooltip");
+      console.log("[PromptProfile™ Sora] scheduleEnhanceTooltip: calling showEnhanceTooltip");
       showEnhanceTooltip();
     }
   }, 1000);
@@ -784,7 +784,7 @@ function showEnhanceTooltip() {
     return;
   }
 
-  console.log("[Prompanion Sora] Showing enhance tooltip");
+  console.log("[PromptProfile™ Sora] Showing enhance tooltip");
   positionEnhanceTooltip();
   enhanceTooltipElement.classList.add("is-visible");
   attachTooltipResizeHandler();
@@ -804,7 +804,7 @@ function showUpgradeButtonInTooltip() {
     ensureEnhanceTooltipElement();
   }
   if (!enhanceTooltipElement) {
-    console.error("[Prompanion Sora] Cannot show upgrade button - tooltip element not found");
+    console.error("[PromptProfile™ Sora] Cannot show upgrade button - tooltip element not found");
     return;
   }
   
@@ -814,14 +814,14 @@ function showUpgradeButtonInTooltip() {
     attachTooltipResizeHandler();
   }
   
-  const oldDismiss = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__dismiss");
+  const oldDismiss = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__dismiss");
   if (oldDismiss) {
     oldDismiss.remove();
   }
   
   const dismiss = document.createElement("button");
   dismiss.type = "button";
-  dismiss.className = "prompanion-enhance-tooltip__dismiss";
+  dismiss.className = "promptprofile-enhance-tooltip__dismiss";
   dismiss.textContent = "×";
   dismiss.setAttribute("aria-label", "Dismiss upgrade prompt");
   dismiss.addEventListener("click", (e) => {
@@ -832,16 +832,16 @@ function showUpgradeButtonInTooltip() {
     hideEnhanceTooltip();
   });
   
-  const action = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
+  const action = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
   if (action) {
     const newAction = action.cloneNode(true);
     action.replaceWith(newAction);
-    newAction.className = "prompanion-enhance-tooltip__action prompanion-enhance-tooltip__upgrade";
+    newAction.className = "promptprofile-enhance-tooltip__action promptprofile-enhance-tooltip__upgrade";
     AdapterBase.setButtonTextContent(newAction, "Upgrade for more uses!");
     newAction.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log("[Prompanion Sora] Upgrade button clicked - placeholder for Stripe integration");
+      console.log("[PromptProfile™ Sora] Upgrade button clicked - placeholder for Stripe integration");
     });
     newAction.parentNode.insertBefore(dismiss, newAction);
   } else {
@@ -876,35 +876,35 @@ function detachTooltipResizeHandler() {
 
 // Backup message listener registration (IIFE to ensure it runs immediately)
 (function registerInsertTextListener() {
-  console.log("[Prompanion Sora] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
+  console.log("[PromptProfile™ Sora] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
   
   if (typeof chrome === "undefined") {
-    console.error("[Prompanion Sora] chrome is undefined in backup registration");
+    console.error("[PromptProfile™ Sora] chrome is undefined in backup registration");
     return;
   }
   
   if (!chrome.runtime || !chrome.runtime.onMessage) {
-    console.error("[Prompanion Sora] chrome.runtime.onMessage not available in backup registration");
+    console.error("[PromptProfile™ Sora] chrome.runtime.onMessage not available in backup registration");
     return;
   }
   
   try {
     chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       if (message && message.type === "PROMPANION_INSERT_TEXT") {
-        console.log("[Prompanion Sora] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
+        console.log("[PromptProfile™ Sora] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
         if (typeof handleInsertTextMessage === "function") {
           handleInsertTextMessage(message, sender, sendResponse);
         } else {
-          console.error("[Prompanion Sora] handleInsertTextMessage is not a function!");
+          console.error("[PromptProfile™ Sora] handleInsertTextMessage is not a function!");
           sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
         }
         return true;
       }
       return false;
     });
-    console.log("[Prompanion Sora] ✓ Backup listener registered successfully");
+    console.log("[PromptProfile™ Sora] ✓ Backup listener registered successfully");
   } catch (error) {
-    console.error("[Prompanion Sora] ✗ Backup listener registration failed:", error);
+    console.error("[PromptProfile™ Sora] ✗ Backup listener registration failed:", error);
   }
 })();
 
@@ -915,21 +915,21 @@ if (readyState === "complete" || readyState === "interactive") {
   document.addEventListener("DOMContentLoaded", bootstrap);
 }
 
-console.log("[Prompanion Sora] Registering selection change event listeners");
+console.log("[PromptProfile™ Sora] Registering selection change event listeners");
 document.addEventListener("selectionchange", handleSelectionChange);
 window.addEventListener("scroll", handleSelectionChange, true);
 window.addEventListener("resize", handleSelectionChange);
-console.log("[Prompanion Sora] Selection change event listeners registered");
+console.log("[PromptProfile™ Sora] Selection change event listeners registered");
 
 // Verify message listener is registered
-console.log("[Prompanion Sora] ========== VERIFYING MESSAGE LISTENER ==========");
+console.log("[PromptProfile™ Sora] ========== VERIFYING MESSAGE LISTENER ==========");
 if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
-  console.log("[Prompanion Sora] chrome.runtime.onMessage is available");
+  console.log("[PromptProfile™ Sora] chrome.runtime.onMessage is available");
 } else {
-  console.error("[Prompanion Sora] chrome.runtime.onMessage is NOT available at this point!");
+  console.error("[PromptProfile™ Sora] chrome.runtime.onMessage is NOT available at this point!");
 }
 
-window.addEventListener("prompanion-panel-resize", () => {
+window.addEventListener("promptprofile-panel-resize", () => {
   refreshFloatingButtonPosition();
 });
 

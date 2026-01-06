@@ -5,13 +5,13 @@
 // This eliminates duplicate listener registrations and provides unified message handling.
 // ============================================================================
 
-console.log("[Prompanion Deepseek] ========== DEEPSEEK ADAPTER LOADING ==========");
-console.log("[Prompanion Deepseek] Timestamp:", new Date().toISOString());
-console.log("[Prompanion Deepseek] Location:", window.location.href);
+console.log("[PromptProfile™ Deepseek] ========== DEEPSEEK ADAPTER LOADING ==========");
+console.log("[PromptProfile™ Deepseek] Timestamp:", new Date().toISOString());
+console.log("[PromptProfile™ Deepseek] Location:", window.location.href);
 
 // Import constants from AdapterBase
 if (typeof AdapterBase === "undefined") {
-  console.error("[Prompanion] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
+  console.error("[PromptProfile™] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
   throw new Error("AdapterBase must be loaded before adapter.js");
 }
 
@@ -22,7 +22,7 @@ const SELECTION_TOOLBAR_VISIBLE_CLASS = AdapterBase.SELECTION_TOOLBAR_VISIBLE_CL
 const HIGHLIGHT_BUTTON_SELECTORS = AdapterBase.HIGHLIGHT_BUTTON_SELECTORS;
 const BUTTON_SIZE = AdapterBase.BUTTON_SIZE;
 
-console.log("[Prompanion Deepseek] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
+console.log("[PromptProfile™ Deepseek] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
 let domObserverStarted = false;
 
 let enhanceTooltipElement = null;
@@ -49,7 +49,7 @@ let highlightObserver = null;
 
 function ensureStyle() {
   // Load generic adapter styles from external CSS file
-  const styleId = "prompanion-adapter-styles";
+  const styleId = "promptprofile-adapter-styles";
   let styleElement = document.getElementById(styleId);
   
   if (!styleElement) {
@@ -110,7 +110,7 @@ function nodeInAssistantMessage(node) {
   
   // Debug logging
   if (isAssistant) {
-    console.log("[Prompanion Deepseek] nodeInAssistantMessage: TRUE", {
+    console.log("[PromptProfile™ Deepseek] nodeInAssistantMessage: TRUE", {
       element: element.tagName,
       className: element.className,
       closestAssistant: element.closest("[data-role='assistant'], [class*='assistant']")?.className
@@ -122,20 +122,20 @@ function nodeInAssistantMessage(node) {
 
 function selectionTargetsAssistant(selection) {
   if (!selection) {
-    console.log("[Prompanion Deepseek] selectionTargetsAssistant: no selection");
+    console.log("[PromptProfile™ Deepseek] selectionTargetsAssistant: no selection");
     return false;
   }
   
   const text = selection.toString().trim();
   if (!text) {
-    console.log("[Prompanion Deepseek] selectionTargetsAssistant: no text");
+    console.log("[PromptProfile™ Deepseek] selectionTargetsAssistant: no text");
     return false;
   }
   
   const anchorInAssistant = nodeInAssistantMessage(selection.anchorNode);
   const focusInAssistant = nodeInAssistantMessage(selection.focusNode);
   
-  console.log("[Prompanion Deepseek] selectionTargetsAssistant check:", {
+  console.log("[PromptProfile™ Deepseek] selectionTargetsAssistant check:", {
     hasSelection: !!selection,
     textLength: text.length,
     anchorInAssistant: anchorInAssistant,
@@ -145,7 +145,7 @@ function selectionTargetsAssistant(selection) {
   });
   
   if (anchorInAssistant || focusInAssistant) {
-    console.log("[Prompanion Deepseek] selectionTargetsAssistant: TRUE (anchor or focus in assistant)");
+    console.log("[PromptProfile™ Deepseek] selectionTargetsAssistant: TRUE (anchor or focus in assistant)");
     return true;
   }
   
@@ -153,14 +153,14 @@ function selectionTargetsAssistant(selection) {
     const range = selection.rangeCount ? selection.getRangeAt(0) : null;
     if (range) {
       const commonAncestorInAssistant = nodeInAssistantMessage(range.commonAncestorContainer);
-      console.log("[Prompanion Deepseek] selectionTargetsAssistant check (common ancestor):", {
+      console.log("[PromptProfile™ Deepseek] selectionTargetsAssistant check (common ancestor):", {
         commonAncestorInAssistant: commonAncestorInAssistant,
         commonAncestor: range.commonAncestorContainer?.nodeName
       });
       return commonAncestorInAssistant;
     }
   } catch (error) {
-    console.warn("[Prompanion Deepseek] selectionTargetsAssistant error:", error);
+    console.warn("[PromptProfile™ Deepseek] selectionTargetsAssistant error:", error);
   }
   
   return false;
@@ -197,7 +197,7 @@ function selectionWithinComposer(selection) {
 // Selection Toolbar system moved to AdapterBase
 // Initialize it with Deepseek-specific condition functions
 function initSelectionToolbar() {
-  console.log("[Prompanion Deepseek] Initializing selection toolbar");
+  console.log("[PromptProfile™ Deepseek] Initializing selection toolbar");
   AdapterBase.initSelectionToolbar({
     shouldShowToolbar: (selection) => {
       const text = selection?.toString().trim();
@@ -209,7 +209,7 @@ function initSelectionToolbar() {
                             !inComposer && 
                             targetsAssistant);
       
-      console.log("[Prompanion Deepseek] shouldShowToolbar check:", {
+      console.log("[PromptProfile™ Deepseek] shouldShowToolbar check:", {
         hasSelection: !!selection,
         isCollapsed: isCollapsed,
         hasText: !!text,
@@ -222,44 +222,44 @@ function initSelectionToolbar() {
       return shouldShow;
     },
     onAction: (text) => {
-      console.log("[Prompanion Deepseek] Selection toolbar action triggered with text:", text?.substring(0, 50));
+      console.log("[PromptProfile™ Deepseek] Selection toolbar action triggered with text:", text?.substring(0, 50));
       submitSelectionToSideChat(text);
     },
     buttonText: "Elaborate",
     toolbarId: SELECTION_TOOLBAR_ID,
     visibleClass: SELECTION_TOOLBAR_VISIBLE_CLASS
   });
-  console.log("[Prompanion Deepseek] Selection toolbar initialized");
+  console.log("[PromptProfile™ Deepseek] Selection toolbar initialized");
 }
 
 function captureDeepseekChatHistory(maxMessages = 20) {
   // Make these logs VERY visible
-  console.log("%c[Prompanion Deepseek] ========== captureDeepseekChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion Deepseek] ========== captureDeepseekChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion Deepseek] ========== captureDeepseekChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("[Prompanion Deepseek] Current URL:", window.location.href);
-  console.log("[Prompanion Deepseek] Document ready state:", document.readyState);
-  console.log("[Prompanion Deepseek] Timestamp:", new Date().toISOString());
+  console.log("%c[PromptProfile™ Deepseek] ========== captureDeepseekChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Deepseek] ========== captureDeepseekChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Deepseek] ========== captureDeepseekChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("[PromptProfile™ Deepseek] Current URL:", window.location.href);
+  console.log("[PromptProfile™ Deepseek] Document ready state:", document.readyState);
+  console.log("[PromptProfile™ Deepseek] Timestamp:", new Date().toISOString());
   
   // Check if we're on a conversation page
   const isConversationPage = window.location.href.includes("/c/") || 
                             window.location.href.includes("/chat") ||
                             document.querySelector("main, [role='main']");
-  console.log("[Prompanion Deepseek] Is conversation page:", isConversationPage);
+  console.log("[PromptProfile™ Deepseek] Is conversation page:", isConversationPage);
   
   const messages = [];
   
   try {
     // First, try to find the main conversation container
     const mainContainer = document.querySelector("main") || document.querySelector("[role='main']");
-    console.log("[Prompanion Deepseek] Main container found:", !!mainContainer);
+    console.log("[PromptProfile™ Deepseek] Main container found:", !!mainContainer);
     
     // Determine the best search root - prefer main container, then document
     let searchRoot = document;
     if (mainContainer) {
       searchRoot = mainContainer;
-      console.log("[Prompanion Deepseek] Using main container as search root");
-      console.log("[Prompanion Deepseek] Main container details:", {
+      console.log("[PromptProfile™ Deepseek] Using main container as search root");
+      console.log("[PromptProfile™ Deepseek] Main container details:", {
         tagName: mainContainer.tagName,
         className: mainContainer.className,
         childCount: mainContainer.children.length,
@@ -267,7 +267,7 @@ function captureDeepseekChatHistory(maxMessages = 20) {
         hasText: (mainContainer.innerText || mainContainer.textContent || "").trim().length > 0
       });
     } else {
-      console.warn("[Prompanion Deepseek] ⚠️ Main container not found - searching entire document");
+      console.warn("[PromptProfile™ Deepseek] ⚠️ Main container not found - searching entire document");
     }
     
     // Deepseek-specific selectors - try multiple patterns to handle DOM changes
@@ -300,7 +300,7 @@ function captureDeepseekChatHistory(maxMessages = 20) {
       "[class*='human']"
     ];
     
-    console.log("[Prompanion Deepseek] Searching for messages with multiple selector strategies");
+    console.log("[PromptProfile™ Deepseek] Searching for messages with multiple selector strategies");
     
     // Try each selector pattern and combine results
     let assistantElements = [];
@@ -310,12 +310,12 @@ function captureDeepseekChatHistory(maxMessages = 20) {
       try {
         const found = Array.from(searchRoot.querySelectorAll(selector));
         if (found.length > 0) {
-          console.log(`[Prompanion Deepseek] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
+          console.log(`[PromptProfile™ Deepseek] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
           assistantElements = found;
           break; // Use first selector that finds elements
         }
       } catch (e) {
-        console.warn(`[Prompanion Deepseek] Selector failed: ${selector}`, e);
+        console.warn(`[PromptProfile™ Deepseek] Selector failed: ${selector}`, e);
       }
     }
     
@@ -323,16 +323,16 @@ function captureDeepseekChatHistory(maxMessages = 20) {
       try {
         const found = Array.from(searchRoot.querySelectorAll(selector));
         if (found.length > 0) {
-          console.log(`[Prompanion Deepseek] ✓ Found ${found.length} user messages with selector: ${selector}`);
+          console.log(`[PromptProfile™ Deepseek] ✓ Found ${found.length} user messages with selector: ${selector}`);
           userElements = found;
           break; // Use first selector that finds elements
         }
       } catch (e) {
-        console.warn(`[Prompanion Deepseek] Selector failed: ${selector}`, e);
+        console.warn(`[PromptProfile™ Deepseek] Selector failed: ${selector}`, e);
       }
     }
     
-    console.log("[Prompanion Deepseek] Final element counts after standard selectors:", {
+    console.log("[PromptProfile™ Deepseek] Final element counts after standard selectors:", {
       assistantCount: assistantElements.length,
       userCount: userElements.length,
       totalElements: assistantElements.length + userElements.length
@@ -340,11 +340,11 @@ function captureDeepseekChatHistory(maxMessages = 20) {
     
     // If no elements found with standard selectors, try searching within main container
     if (assistantElements.length === 0 && userElements.length === 0 && mainContainer) {
-      console.warn("[Prompanion Deepseek] ⚠️ No messages found with standard selectors, searching within main container...");
+      console.warn("[PromptProfile™ Deepseek] ⚠️ No messages found with standard selectors, searching within main container...");
       
       // Look for all divs within main that might be messages
       const allDivsInMain = mainContainer.querySelectorAll("div");
-      console.log(`[Prompanion Deepseek] Found ${allDivsInMain.length} divs within main container`);
+      console.log(`[PromptProfile™ Deepseek] Found ${allDivsInMain.length} divs within main container`);
       
       // Look for message-like structures
       const potentialMessages = Array.from(allDivsInMain).filter(div => {
@@ -360,7 +360,7 @@ function captureDeepseekChatHistory(maxMessages = 20) {
                div.children.length > 0;
       });
       
-      console.log(`[Prompanion Deepseek] Found ${potentialMessages.length} potential message divs in main`);
+      console.log(`[PromptProfile™ Deepseek] Found ${potentialMessages.length} potential message divs in main`);
       
       // Sort potential messages by their position in the DOM (top to bottom)
       const sortedMessages = potentialMessages.sort((a, b) => {
@@ -396,41 +396,41 @@ function captureDeepseekChatHistory(maxMessages = 20) {
           // If we have clear markers, use them
           if (hasAssistantMarker && assistantElements.length < maxMessages) {
             assistantElements.push(msg);
-            console.log(`[Prompanion Deepseek] Added assistant message from main search (${text.substring(0, 50)}...)`);
+            console.log(`[PromptProfile™ Deepseek] Added assistant message from main search (${text.substring(0, 50)}...)`);
           } else if (hasUserMarker && userElements.length < maxMessages) {
             userElements.push(msg);
-            console.log(`[Prompanion Deepseek] Added user message from main search (${text.substring(0, 50)}...)`);
+            console.log(`[PromptProfile™ Deepseek] Added user message from main search (${text.substring(0, 50)}...)`);
           } else {
             // No clear markers - use alternating pattern
             const totalFound = assistantElements.length + userElements.length;
             if (totalFound % 2 === 0 && userElements.length < maxMessages) {
               // Even index (0, 2, 4...) = user message
               userElements.push(msg);
-              console.log(`[Prompanion Deepseek] Added user message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
+              console.log(`[PromptProfile™ Deepseek] Added user message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
             } else if (assistantElements.length < maxMessages) {
               // Odd index (1, 3, 5...) = assistant message
               assistantElements.push(msg);
-              console.log(`[Prompanion Deepseek] Added assistant message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
+              console.log(`[PromptProfile™ Deepseek] Added assistant message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
             }
           }
         }
       }
       
-      console.log(`[Prompanion Deepseek] After main search: ${assistantElements.length} assistant, ${userElements.length} user messages`);
+      console.log(`[PromptProfile™ Deepseek] After main search: ${assistantElements.length} assistant, ${userElements.length} user messages`);
     }
     
     // If still no elements found, try alternative approach with other containers
     if (assistantElements.length === 0 && userElements.length === 0) {
-      console.warn("[Prompanion Deepseek] ⚠️ Still no messages found, trying broader search...");
+      console.warn("[PromptProfile™ Deepseek] ⚠️ Still no messages found, trying broader search...");
       
       // Try finding messages by looking for conversation containers
       const conversationContainers = document.querySelectorAll("main, [role='main'], [class*='conversation'], [class*='chat'], [id*='conversation'], [id*='chat']");
-      console.log("[Prompanion Deepseek] Found conversation containers:", conversationContainers.length);
+      console.log("[PromptProfile™ Deepseek] Found conversation containers:", conversationContainers.length);
       
       // Log container structure for debugging
       if (conversationContainers.length > 0) {
         const firstContainer = conversationContainers[0];
-        console.log("[Prompanion Deepseek] First container structure:", {
+        console.log("[PromptProfile™ Deepseek] First container structure:", {
           tagName: firstContainer.tagName,
           className: firstContainer.className,
           id: firstContainer.id,
@@ -442,7 +442,7 @@ function captureDeepseekChatHistory(maxMessages = 20) {
       // Look for message-like structures within containers
       for (const container of conversationContainers) {
         const potentialMessages = container.querySelectorAll("div[class*='message'], div[class*='turn'], article, [class*='group'], [class*='item']");
-        console.log(`[Prompanion Deepseek] Found ${potentialMessages.length} potential message elements in container`);
+        console.log(`[PromptProfile™ Deepseek] Found ${potentialMessages.length} potential message elements in container`);
         
         // Try to identify role by looking for common patterns
         for (const msg of potentialMessages) {
@@ -459,10 +459,10 @@ function captureDeepseekChatHistory(maxMessages = 20) {
             
             if (isLikelyAssistant && assistantElements.length < maxMessages) {
               assistantElements.push(msg);
-              console.log(`[Prompanion Deepseek] Added assistant element from fallback search`);
+              console.log(`[PromptProfile™ Deepseek] Added assistant element from fallback search`);
             } else if (!isLikelyAssistant && userElements.length < maxMessages) {
               userElements.push(msg);
-              console.log(`[Prompanion Deepseek] Added user element from fallback search`);
+              console.log(`[PromptProfile™ Deepseek] Added user element from fallback search`);
             }
           }
         }
@@ -471,7 +471,7 @@ function captureDeepseekChatHistory(maxMessages = 20) {
     
     // Last resort: search for any divs with substantial text that might be messages
     if (assistantElements.length === 0 && userElements.length === 0) {
-      console.warn("[Prompanion Deepseek] ⚠️ Still no messages found, trying last-resort search...");
+      console.warn("[PromptProfile™ Deepseek] ⚠️ Still no messages found, trying last-resort search...");
       const allDivs = document.querySelectorAll("div");
       let foundCount = 0;
       for (const div of allDivs) {
@@ -504,11 +504,11 @@ function captureDeepseekChatHistory(maxMessages = 20) {
           if (foundCount >= maxMessages * 2) break;
         }
       }
-      console.log(`[Prompanion Deepseek] Last-resort search found ${foundCount} potential messages`);
+      console.log(`[PromptProfile™ Deepseek] Last-resort search found ${foundCount} potential messages`);
       
       // If still nothing found, try one more aggressive search
       if (foundCount === 0) {
-        console.warn("[Prompanion Deepseek] Attempting final aggressive search for message-like content...");
+        console.warn("[PromptProfile™ Deepseek] Attempting final aggressive search for message-like content...");
         const allTextDivs = Array.from(document.querySelectorAll("div")).filter(div => {
           const text = (div.innerText || div.textContent || "").trim();
           return text.length > 20 && text.length < 10000 && 
@@ -521,7 +521,7 @@ function captureDeepseekChatHistory(maxMessages = 20) {
                  div.children.length > 0;
         });
         
-        console.warn(`[Prompanion Deepseek] Found ${allTextDivs.length} potential message divs in final search`);
+        console.warn(`[PromptProfile™ Deepseek] Found ${allTextDivs.length} potential message divs in final search`);
         if (allTextDivs.length > 0) {
           // Sort by position and use alternating pattern
           const sortedDivs = allTextDivs.sort((a, b) => {
@@ -546,7 +546,7 @@ function captureDeepseekChatHistory(maxMessages = 20) {
               }
             }
           }
-          console.log(`[Prompanion Deepseek] Final aggressive search added ${foundCount} messages`);
+          console.log(`[PromptProfile™ Deepseek] Final aggressive search added ${foundCount} messages`);
         }
       }
     }
@@ -567,7 +567,7 @@ function captureDeepseekChatHistory(maxMessages = 20) {
     // Sort by position in document (top to bottom)
     allElements.sort((a, b) => a.position - b.position);
     
-    console.log("[Prompanion Deepseek] Processing", allElements.length, "message elements");
+    console.log("[PromptProfile™ Deepseek] Processing", allElements.length, "message elements");
     
     for (const { el, role } of allElements) {
       if (messages.length >= maxMessages) break;
@@ -593,7 +593,7 @@ function captureDeepseekChatHistory(maxMessages = 20) {
           const extracted = (contentEl.innerText || contentEl.textContent)?.trim();
           if (extracted && extracted.length > 0) {
             content = extracted;
-            console.log(`[Prompanion Deepseek] Extracted content using selector "${selector}": ${content.substring(0, 50)}...`);
+            console.log(`[PromptProfile™ Deepseek] Extracted content using selector "${selector}": ${content.substring(0, 50)}...`);
             break;
           }
         }
@@ -650,12 +650,12 @@ function captureDeepseekChatHistory(maxMessages = 20) {
             content: content,
             timestamp: Date.now()
           });
-          console.log(`[Prompanion Deepseek] Added ${role} message (${content.length} chars): ${content.substring(0, 50)}...`);
+          console.log(`[PromptProfile™ Deepseek] Added ${role} message (${content.length} chars): ${content.substring(0, 50)}...`);
         } else {
-          console.log(`[Prompanion Deepseek] Skipped ${role} message - too short or UI-only: "${content.substring(0, 30)}"`);
+          console.log(`[PromptProfile™ Deepseek] Skipped ${role} message - too short or UI-only: "${content.substring(0, 30)}"`);
         }
       } else {
-        console.warn(`[Prompanion Deepseek] Could not extract content from ${role} message element:`, {
+        console.warn(`[PromptProfile™ Deepseek] Could not extract content from ${role} message element:`, {
           tagName: el.tagName,
           className: el.className,
           hasChildren: el.children.length > 0,
@@ -667,11 +667,11 @@ function captureDeepseekChatHistory(maxMessages = 20) {
     
     // If still no messages, try ultra-aggressive search: look for ANY divs with substantial text
     if (messages.length === 0) {
-      console.warn("[Prompanion Deepseek] ⚠️ No messages found with all strategies, trying ultra-aggressive search...");
+      console.warn("[PromptProfile™ Deepseek] ⚠️ No messages found with all strategies, trying ultra-aggressive search...");
       
       // Get all divs in the document
       const allDivs = Array.from(document.querySelectorAll("div"));
-      console.log(`[Prompanion Deepseek] Scanning ${allDivs.length} divs for message-like content...`);
+      console.log(`[PromptProfile™ Deepseek] Scanning ${allDivs.length} divs for message-like content...`);
       
       // Filter for divs that might be messages
       const candidateDivs = allDivs.filter(div => {
@@ -704,7 +704,7 @@ function captureDeepseekChatHistory(maxMessages = 20) {
         return hasSubstantialText && hasChildren && isVisible && hasTextNodes;
       });
       
-      console.log(`[Prompanion Deepseek] Found ${candidateDivs.length} candidate message divs`);
+      console.log(`[PromptProfile™ Deepseek] Found ${candidateDivs.length} candidate message divs`);
       
       if (candidateDivs.length > 0) {
         // Sort by position in DOM
@@ -797,17 +797,17 @@ function captureDeepseekChatHistory(maxMessages = 20) {
                 content: content.replace(/\s+/g, " ").trim(),
                 timestamp: Date.now()
               });
-              console.log(`[Prompanion Deepseek] Added ${role} message from ultra-aggressive search (${content.length} chars): ${content.substring(0, 50)}...`);
+              console.log(`[PromptProfile™ Deepseek] Added ${role} message from ultra-aggressive search (${content.length} chars): ${content.substring(0, 50)}...`);
             }
           }
         }
       }
     }
     
-    console.log(`[Prompanion Deepseek] ✓ Captured ${messages.length} messages from Deepseek conversation`);
+    console.log(`[PromptProfile™ Deepseek] ✓ Captured ${messages.length} messages from Deepseek conversation`);
     if (messages.length === 0) {
-      console.warn("[Prompanion Deepseek] ⚠️ No messages captured - check if conversation elements exist in DOM");
-      console.warn("[Prompanion Deepseek] DOM Diagnostic Info:", {
+      console.warn("[PromptProfile™ Deepseek] ⚠️ No messages captured - check if conversation elements exist in DOM");
+      console.warn("[PromptProfile™ Deepseek] DOM Diagnostic Info:", {
         bodyChildren: document.body?.children?.length || 0,
         mainElements: document.querySelectorAll("main").length,
         articles: document.querySelectorAll("article").length,
@@ -824,8 +824,8 @@ function captureDeepseekChatHistory(maxMessages = 20) {
     }
     return messages;
   } catch (error) {
-    console.error("[Prompanion Deepseek] ✗ Error capturing Deepseek chat history:", error);
-    console.error("[Prompanion Deepseek] Error details:", {
+    console.error("[PromptProfile™ Deepseek] ✗ Error capturing Deepseek chat history:", error);
+    console.error("[PromptProfile™ Deepseek] Error details:", {
       message: error.message,
       stack: error.stack,
       name: error.name
@@ -846,16 +846,16 @@ function getElementPosition(element) {
 
 async function submitSelectionToSideChat(text) {
   // Make these logs VERY visible
-  console.log("%c[Prompanion Deepseek] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion Deepseek] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion Deepseek] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Deepseek] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Deepseek] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Deepseek] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
   
   const snippet = typeof text === "string" ? text.trim() : "";
-  console.log("[Prompanion Deepseek] Snippet:", snippet?.substring(0, 50));
-  console.log("[Prompanion Deepseek] selectionAskInFlight:", selectionAskInFlight);
+  console.log("[PromptProfile™ Deepseek] Snippet:", snippet?.substring(0, 50));
+  console.log("[PromptProfile™ Deepseek] selectionAskInFlight:", selectionAskInFlight);
   
   if (!snippet || selectionAskInFlight) {
-    console.log("[Prompanion Deepseek] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
+    console.log("[PromptProfile™ Deepseek] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
     return;
   }
   selectionAskInFlight = true;
@@ -863,15 +863,15 @@ async function submitSelectionToSideChat(text) {
   try {
     // Capture chat history from Deepseek conversation for context
     let chatHistory = [];
-    console.log("%c[Prompanion Deepseek] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
+    console.log("%c[PromptProfile™ Deepseek] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
     try {
       chatHistory = captureDeepseekChatHistory(20);
-      console.log(`%c[Prompanion Deepseek] ✓ Captured ${chatHistory.length} messages from conversation for SideChat context`, 
+      console.log(`%c[PromptProfile™ Deepseek] ✓ Captured ${chatHistory.length} messages from conversation for SideChat context`, 
         chatHistory.length > 0 ? "color: green; font-size: 14px; font-weight: bold;" : "color: red; font-size: 14px; font-weight: bold;");
       
       // Log sample of captured history for debugging
       if (chatHistory.length > 0) {
-        console.log("[Prompanion Deepseek] Sample captured messages:", {
+        console.log("[PromptProfile™ Deepseek] Sample captured messages:", {
           firstMessage: {
             role: chatHistory[0].role,
             contentPreview: chatHistory[0].content?.substring(0, 50) + "..."
@@ -883,17 +883,17 @@ async function submitSelectionToSideChat(text) {
           totalMessages: chatHistory.length
         });
       } else {
-        console.warn("[Prompanion Deepseek] ⚠️ captureDeepseekChatHistory returned empty array - no messages found in DOM");
+        console.warn("[PromptProfile™ Deepseek] ⚠️ captureDeepseekChatHistory returned empty array - no messages found in DOM");
       }
     } catch (error) {
-      console.error("[Prompanion Deepseek] ✗ Failed to capture chat history:", error);
-      console.error("[Prompanion Deepseek] Error stack:", error.stack);
+      console.error("[PromptProfile™ Deepseek] ✗ Failed to capture chat history:", error);
+      console.error("[PromptProfile™ Deepseek] Error stack:", error.stack);
       // Continue with empty array - better than failing completely
       chatHistory = [];
     }
     
-    console.log("[Prompanion Deepseek] ========== SENDING PROMPANION_SIDECHAT_REQUEST ==========");
-    console.log("[Prompanion Deepseek] Sending PROMPANION_SIDECHAT_REQUEST with:", {
+    console.log("[PromptProfile™ Deepseek] ========== SENDING PROMPANION_SIDECHAT_REQUEST ==========");
+    console.log("[PromptProfile™ Deepseek] Sending PROMPANION_SIDECHAT_REQUEST with:", {
       textLength: snippet.length,
       textPreview: snippet.substring(0, 50),
       chatHistoryLength: chatHistory.length,
@@ -915,18 +915,18 @@ async function submitSelectionToSideChat(text) {
       text: snippet,
       chatHistory: chatHistory 
     }, (response) => {
-      console.log("[Prompanion Deepseek] ========== PROMPANION_SIDECHAT_REQUEST RESPONSE ==========");
-      console.log("[Prompanion Deepseek] Response:", response);
+      console.log("[PromptProfile™ Deepseek] ========== PROMPANION_SIDECHAT_REQUEST RESPONSE ==========");
+      console.log("[PromptProfile™ Deepseek] Response:", response);
       if (!response?.ok) {
-        console.warn("Prompanion: sidechat request rejected", response?.reason);
+        console.warn("PromptProfile™: sidechat request rejected", response?.reason);
       }
       selectionAskInFlight = false;
     }).catch((error) => {
-      console.warn("Prompanion: failed to request sidechat from selection", error);
+      console.warn("PromptProfile™: failed to request sidechat from selection", error);
       selectionAskInFlight = false;
     });
   } catch (error) {
-    console.error("Prompanion Deepseek: sidechat request threw synchronously", error);
+    console.error("PromptProfile™ Deepseek: sidechat request threw synchronously", error);
     selectionAskInFlight = false;
   }
 }
@@ -951,10 +951,10 @@ function requestPromptEnhancement(promptText) {
     .catch((error) => {
       const errorMessage = error?.message || "";
       if (errorMessage.includes("Extension context invalidated")) {
-        console.error("[Prompanion Deepseek] Extension context invalidated - user should reload page");
+        console.error("[PromptProfile™ Deepseek] Extension context invalidated - user should reload page");
         // The notification is already shown by AdapterBase._showContextInvalidatedNotification()
       } else {
-        console.warn("[Prompanion Deepseek] Enhancement request failed:", error);
+        console.warn("[PromptProfile™ Deepseek] Enhancement request failed:", error);
       }
       return { ok: false, reason: errorMessage || "UNKNOWN_ERROR" };
     });
@@ -1009,9 +1009,9 @@ function buildButton() {
   button.className = BUTTON_CLASS;
   button.append(createIcon());
   // Use AdapterBase for generic hover tooltip
-  AdapterBase.attachTooltip(button, "Open Prompanion to enhance your prompts for the best response.", BUTTON_ID);
+  AdapterBase.attachTooltip(button, "Open PromptProfile™ to enhance your prompts for the best response.", BUTTON_ID);
   button.addEventListener("click", () => AdapterBase.togglePanel()
-    .catch((e) => console.error("Prompanion: failed to open sidebar from Deepseek adapter", e)));
+    .catch((e) => console.error("PromptProfile™: failed to open sidebar from Deepseek adapter", e)));
   button.addEventListener("mouseenter", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("focus", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("mouseleave", () => AdapterBase.hideTooltip(button));
@@ -1055,7 +1055,7 @@ function placeButton(targetContainer, inputNode) {
 function positionFloatingButton(inputNode, containerNode = floatingButtonTargetContainer) {
   if (!floatingButtonWrapper) return;
   
-  console.log("[Prompanion Deepseek] positionFloatingButton called");
+  console.log("[PromptProfile™ Deepseek] positionFloatingButton called");
   
   // Use XPath to find the target container
   // XPath: //*[@id="root"]/div/div/div[2]/div[3]/div/div/div[2]/div[2]/div/div/div[2]/div[3]
@@ -1071,10 +1071,10 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     );
     targetContainer = xpathResult.singleNodeValue;
     if (targetContainer) {
-      console.log("[Prompanion Deepseek] Target container found via XPath");
+      console.log("[PromptProfile™ Deepseek] Target container found via XPath");
     }
   } catch (error) {
-    console.warn("[Prompanion Deepseek] Container XPath error:", error);
+    console.warn("[PromptProfile™ Deepseek] Container XPath error:", error);
   }
   
   // Find the reference element (10px to the left of this)
@@ -1091,10 +1091,10 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     );
     referenceElement = xpathResult.singleNodeValue;
     if (referenceElement) {
-      console.log("[Prompanion Deepseek] Reference element found via XPath");
+      console.log("[PromptProfile™ Deepseek] Reference element found via XPath");
     }
   } catch (error) {
-    console.warn("[Prompanion Deepseek] Reference element XPath error:", error);
+    console.warn("[PromptProfile™ Deepseek] Reference element XPath error:", error);
   }
   
   // Fallback: if XPath doesn't work, try to find container from input node
@@ -1111,7 +1111,7 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
   }
   
   if (!targetContainer) {
-    console.warn("[Prompanion Deepseek] Target container not found, will retry...");
+    console.warn("[PromptProfile™ Deepseek] Target container not found, will retry...");
     if (inputNode && floatingButtonWrapper) {
       setTimeout(() => {
         positionFloatingButton(inputNode, null);
@@ -1146,14 +1146,14 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
       spacing = 8;
     }
     
-    console.log("[Prompanion Deepseek] Reference element found, positioning relative to it:", {
+    console.log("[PromptProfile™ Deepseek] Reference element found, positioning relative to it:", {
       referenceLeftFromContainer: referenceLeftFromContainer,
       spacingBetween: spacingBetween,
       calculatedSpacing: spacing,
       referenceElement: referenceElement
     });
   } else {
-    console.warn("[Prompanion Deepseek] Reference element not found or not visible, using default spacing");
+    console.warn("[PromptProfile™ Deepseek] Reference element not found or not visible, using default spacing");
   }
   
   // Get reference element's vertical center for alignment
@@ -1204,7 +1204,7 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
     floatingButtonWrapper.style.margin = "0";
   });
   
-  console.log("[Prompanion Deepseek] Button positioned in container:", {
+  console.log("[PromptProfile™ Deepseek] Button positioned in container:", {
     containerWidth: targetContainer.getBoundingClientRect().width,
     containerHeight: targetContainer.getBoundingClientRect().height,
     buttonRight: spacing,
@@ -1234,7 +1234,7 @@ function ensureDomObserver() {
 }
 
 function locateComposer() {
-  console.log("[Prompanion Deepseek] locateComposer called");
+  console.log("[PromptProfile™ Deepseek] locateComposer called");
   
   // Deepseek uses contenteditable divs - try multiple strategies
   // Strategy 1: Look for contenteditable divs in common locations
@@ -1251,7 +1251,7 @@ function locateComposer() {
                       form.querySelector("input[type='text']");
       if (editable instanceof HTMLElement) {
         input = editable;
-        console.log("[Prompanion Deepseek] Found input in form:", input);
+        console.log("[PromptProfile™ Deepseek] Found input in form:", input);
         break;
       }
     }
@@ -1266,7 +1266,7 @@ function locateComposer() {
           !textarea.disabled &&
           textarea.offsetParent !== null) {
         input = textarea;
-        console.log("[Prompanion Deepseek] Found textarea:", input);
+        console.log("[PromptProfile™ Deepseek] Found textarea:", input);
         break;
       }
     }
@@ -1281,14 +1281,14 @@ function locateComposer() {
           !inp.disabled &&
           inp.offsetParent !== null) {
         input = inp;
-        console.log("[Prompanion Deepseek] Found input:", input);
+        console.log("[PromptProfile™ Deepseek] Found input:", input);
         break;
       }
     }
   }
   
   if (!input) {
-    console.warn("[Prompanion Deepseek] No input found in locateComposer");
+    console.warn("[PromptProfile™ Deepseek] No input found in locateComposer");
     return null;
   }
   
@@ -1304,10 +1304,10 @@ function locateComposer() {
     );
     container = xpathResult.singleNodeValue;
     if (container) {
-      console.log("[Prompanion Deepseek] Found container via XPath");
+      console.log("[PromptProfile™ Deepseek] Found container via XPath");
     }
   } catch (error) {
-    console.warn("[Prompanion Deepseek] XPath error:", error);
+    console.warn("[PromptProfile™ Deepseek] XPath error:", error);
   }
   
   // Fallback: find container from input
@@ -1318,24 +1318,24 @@ function locateComposer() {
                 input.parentElement;
   }
   
-  console.log("[Prompanion Deepseek] Composer located:", { input, container });
+  console.log("[PromptProfile™ Deepseek] Composer located:", { input, container });
   return { input, container: container || document.body };
 }
 
 function init() {
-  console.log("[Prompanion Deepseek] init() called");
+  console.log("[PromptProfile™ Deepseek] init() called");
   // Initialize sticky button (no injection logic needed)
   AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
   
   const composer = locateComposer();
   AdapterBase.requestSelectionToolbarUpdate();
   if (composer) {
-    console.log("[Prompanion Deepseek] Composer found, setting up enhance tooltip");
+    console.log("[PromptProfile™ Deepseek] Composer found, setting up enhance tooltip");
     setupEnhanceTooltip(composer.input, composer.container);
     ensureDomObserver();
     return true;
   }
-  console.warn("[Prompanion Deepseek] Composer not found in init()");
+  console.warn("[PromptProfile™ Deepseek] Composer not found in init()");
   ensureDomObserver();
   return false;
 }
@@ -1384,63 +1384,63 @@ function findComposerNode() {
 function handleInsertTextMessage(message, sender, sendResponse) {
   try {
     const textToInsert = typeof message.text === "string" ? message.text.trim() : "";
-    console.log("[Prompanion Deepseek] ========== INSERT TEXT REQUEST ==========");
-    console.log("[Prompanion Deepseek] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
-    console.log("[Prompanion Deepseek] Text length:", textToInsert.length);
+    console.log("[PromptProfile™ Deepseek] ========== INSERT TEXT REQUEST ==========");
+    console.log("[PromptProfile™ Deepseek] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
+    console.log("[PromptProfile™ Deepseek] Text length:", textToInsert.length);
     
     if (!textToInsert) {
-      console.log("[Prompanion Deepseek] Insert failed: EMPTY_TEXT");
+      console.log("[PromptProfile™ Deepseek] Insert failed: EMPTY_TEXT");
       sendResponse({ ok: false, reason: "EMPTY_TEXT" });
       return false; // sendResponse called synchronously, close channel
     }
 
-    console.log("[Prompanion Deepseek] Searching for composer node...");
+    console.log("[PromptProfile™ Deepseek] Searching for composer node...");
     const composerNode = findComposerNode();
-    console.log("[Prompanion Deepseek] Composer node found:", composerNode);
-    console.log("[Prompanion Deepseek] Node type:", composerNode?.constructor?.name);
-    console.log("[Prompanion Deepseek] Node isContentEditable:", composerNode?.isContentEditable);
-    console.log("[Prompanion Deepseek] Node tagName:", composerNode?.tagName);
-    console.log("[Prompanion Deepseek] Node className:", composerNode?.className);
-    console.log("[Prompanion Deepseek] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
-    console.log("[Prompanion Deepseek] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
+    console.log("[PromptProfile™ Deepseek] Composer node found:", composerNode);
+    console.log("[PromptProfile™ Deepseek] Node type:", composerNode?.constructor?.name);
+    console.log("[PromptProfile™ Deepseek] Node isContentEditable:", composerNode?.isContentEditable);
+    console.log("[PromptProfile™ Deepseek] Node tagName:", composerNode?.tagName);
+    console.log("[PromptProfile™ Deepseek] Node className:", composerNode?.className);
+    console.log("[PromptProfile™ Deepseek] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
+    console.log("[PromptProfile™ Deepseek] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
     
     if (!composerNode) {
-      console.log("[Prompanion Deepseek] Insert failed: NO_COMPOSER_NODE");
+      console.log("[PromptProfile™ Deepseek] Insert failed: NO_COMPOSER_NODE");
       sendResponse({ ok: false, reason: "NO_COMPOSER_NODE" });
       return false; // sendResponse called synchronously, close channel
     }
 
-    console.log("[Prompanion Deepseek] Calling setComposerText...");
+    console.log("[PromptProfile™ Deepseek] Calling setComposerText...");
     const success = setComposerText(composerNode, textToInsert);
-    console.log("[Prompanion Deepseek] setComposerText returned:", success);
+    console.log("[PromptProfile™ Deepseek] setComposerText returned:", success);
     
     // Verify insertion
     const currentValue = composerNode.value || composerNode.textContent || "";
     const textInserted = currentValue.includes(textToInsert.substring(0, Math.min(20, textToInsert.length)));
-    console.log("[Prompanion Deepseek] Verification - text appears in node:", textInserted);
-    console.log("[Prompanion Deepseek] Current node value:", currentValue.substring(0, 100));
+    console.log("[PromptProfile™ Deepseek] Verification - text appears in node:", textInserted);
+    console.log("[PromptProfile™ Deepseek] Current node value:", currentValue.substring(0, 100));
     
     if (success && textInserted) {
-      console.log("[Prompanion Deepseek] Insert succeeded!");
+      console.log("[PromptProfile™ Deepseek] Insert succeeded!");
       sendResponse({ ok: true });
     } else if (success && !textInserted) {
-      console.warn("[Prompanion Deepseek] setComposerText returned true but text not verified in node");
+      console.warn("[PromptProfile™ Deepseek] setComposerText returned true but text not verified in node");
       sendResponse({ ok: false, reason: "INSERTION_NOT_VERIFIED" });
     } else {
-      console.log("[Prompanion Deepseek] Insert failed: SET_TEXT_FAILED");
+      console.log("[PromptProfile™ Deepseek] Insert failed: SET_TEXT_FAILED");
       sendResponse({ ok: false, reason: "SET_TEXT_FAILED" });
     }
     return false; // sendResponse called synchronously, close channel
   } catch (error) {
-    console.error("[Prompanion Deepseek] Insert text handler failed", error);
-    console.error("[Prompanion Deepseek] Error stack:", error.stack);
+    console.error("[PromptProfile™ Deepseek] Insert text handler failed", error);
+    console.error("[PromptProfile™ Deepseek] Error stack:", error.stack);
     sendResponse({ ok: false, reason: error?.message ?? "UNKNOWN" });
     return false; // sendResponse called synchronously, close channel
   }
 }
 
 // Register message handler using AdapterBase (must be after handleInsertTextMessage is defined)
-console.log("[Prompanion Deepseek] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
+console.log("[PromptProfile™ Deepseek] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
 AdapterBase.registerMessageHandler("PROMPANION_INSERT_TEXT", handleInsertTextMessage);
 
 function bootstrap() {
@@ -1485,12 +1485,12 @@ function teardownEnhanceTooltip() {
 
 function ensureEnhanceTooltipElement() {
   if (!enhanceTooltipElement) {
-    console.log("[Prompanion Deepseek] Creating enhance tooltip element");
+    console.log("[PromptProfile™ Deepseek] Creating enhance tooltip element");
     enhanceTooltipElement = document.createElement("div");
-    enhanceTooltipElement.className = "prompanion-enhance-tooltip";
+    enhanceTooltipElement.className = "promptprofile-enhance-tooltip";
     const dismiss = document.createElement("button");
     dismiss.type = "button";
-    dismiss.className = "prompanion-enhance-tooltip__dismiss";
+    dismiss.className = "promptprofile-enhance-tooltip__dismiss";
     dismiss.textContent = "×";
     dismiss.setAttribute("aria-label", "Dismiss prompt enhancement suggestion");
     dismiss.addEventListener("click", () => {
@@ -1499,56 +1499,56 @@ function ensureEnhanceTooltipElement() {
     });
     const action = document.createElement("button");
     action.type = "button";
-    action.className = "prompanion-enhance-tooltip__action";
+    action.className = "promptprofile-enhance-tooltip__action";
     AdapterBase.setButtonTextContent(action, "Refine");
-    console.log("[Prompanion Deepseek] Attaching click handler to Refine button");
-    console.log("[Prompanion Deepseek] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
+    console.log("[PromptProfile™ Deepseek] Attaching click handler to Refine button");
+    console.log("[PromptProfile™ Deepseek] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
     action.addEventListener("click", handleRefineButtonClick);
-    console.log("[Prompanion Deepseek] Click handler attached, button:", action);
+    console.log("[PromptProfile™ Deepseek] Click handler attached, button:", action);
     enhanceTooltipElement.append(dismiss, action);
-    console.log("[Prompanion Deepseek] Enhance tooltip element created");
+    console.log("[PromptProfile™ Deepseek] Enhance tooltip element created");
   }
   if (!enhanceTooltipElement.isConnected) {
-    console.log("[Prompanion Deepseek] Appending enhance tooltip to body");
+    console.log("[PromptProfile™ Deepseek] Appending enhance tooltip to body");
     document.body.append(enhanceTooltipElement);
   }
   hideEnhanceTooltip();
 }
 
 function handleRefineButtonClick(e) {
-  console.log("[Prompanion Deepseek] ========== REFINE BUTTON HANDLER FIRED ==========");
-  console.log("[Prompanion Deepseek] Event type:", e.type);
-  console.log("[Prompanion Deepseek] Event target:", e.target);
+  console.log("[PromptProfile™ Deepseek] ========== REFINE BUTTON HANDLER FIRED ==========");
+  console.log("[PromptProfile™ Deepseek] Event type:", e.type);
+  console.log("[PromptProfile™ Deepseek] Event target:", e.target);
   e.preventDefault();
   e.stopPropagation();
   if (enhanceActionInFlight) {
     return;
   }
   const composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
-  console.log("[Prompanion Deepseek] Composer node:", composerNode);
+  console.log("[PromptProfile™ Deepseek] Composer node:", composerNode);
   if (!composerNode) {
-    console.error("[Prompanion Deepseek] No composer node found!");
+    console.error("[PromptProfile™ Deepseek] No composer node found!");
     return;
   }
   const promptText = extractInputText().trim();
-  console.log("[Prompanion Deepseek] Prompt text:", promptText);
+  console.log("[PromptProfile™ Deepseek] Prompt text:", promptText);
   if (!promptText) {
     return;
   }
   enhanceActionInFlight = true;
   // Don't hide tooltip yet - wait to see if there's a limit error
-  console.log("[Prompanion Deepseek] Requesting prompt enhancement...");
+  console.log("[PromptProfile™ Deepseek] Requesting prompt enhancement...");
   requestPromptEnhancement(promptText)
     .then((result) => {
       if (!result || !result.ok) {
         enhanceActionInFlight = false;
         if (result?.reason === "EXTENSION_CONTEXT_INVALIDATED") {
-          console.error("[Prompanion Deepseek] Cannot enhance prompt - extension context invalidated. Please reload the page.");
+          console.error("[PromptProfile™ Deepseek] Cannot enhance prompt - extension context invalidated. Please reload the page.");
           enhanceTooltipDismissed = true;
           hideEnhanceTooltip();
         } else if (result?.error === "LIMIT_REACHED") {
           // Show upgrade button in tooltip instead of hiding
-          console.log("[Prompanion Deepseek] Limit reached, showing upgrade button");
+          console.log("[PromptProfile™ Deepseek] Limit reached, showing upgrade button");
           showUpgradeButtonInTooltip();
         } else {
           // Other errors - hide tooltip normally
@@ -1570,7 +1570,7 @@ function handleRefineButtonClick(e) {
       enhanceActionInFlight = false;
     })
     .catch((error) => {
-      console.error("Prompanion Deepseek: refine request threw", error);
+      console.error("PromptProfile™ Deepseek: refine request threw", error);
       enhanceActionInFlight = false;
       enhanceTooltipDismissed = true;
       hideEnhanceTooltip();
@@ -1659,7 +1659,7 @@ function showUpgradeButtonInTooltip() {
     ensureEnhanceTooltipElement();
   }
   if (!enhanceTooltipElement) {
-    console.error("[Prompanion Deepseek] Cannot show upgrade button - tooltip element not found");
+    console.error("[PromptProfile™ Deepseek] Cannot show upgrade button - tooltip element not found");
     return;
   }
   
@@ -1671,7 +1671,7 @@ function showUpgradeButtonInTooltip() {
   }
   
   // Remove existing dismiss button if it exists (we'll add a new one)
-  const oldDismiss = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__dismiss");
+  const oldDismiss = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__dismiss");
   if (oldDismiss) {
     oldDismiss.remove();
   }
@@ -1679,7 +1679,7 @@ function showUpgradeButtonInTooltip() {
   // Add dismiss button (X) for closing the upgrade tooltip
   const dismiss = document.createElement("button");
   dismiss.type = "button";
-  dismiss.className = "prompanion-enhance-tooltip__dismiss";
+  dismiss.className = "promptprofile-enhance-tooltip__dismiss";
   dismiss.textContent = "×";
   dismiss.setAttribute("aria-label", "Dismiss upgrade prompt");
   dismiss.addEventListener("click", (e) => {
@@ -1691,21 +1691,21 @@ function showUpgradeButtonInTooltip() {
   });
   
   // Change action button to upgrade button
-  const action = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
+  const action = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
   if (action) {
     // Remove old click handlers by cloning
     const newAction = action.cloneNode(true);
     action.replaceWith(newAction);
     
     // Update the new button
-    newAction.className = "prompanion-enhance-tooltip__action prompanion-enhance-tooltip__upgrade";
+    newAction.className = "promptprofile-enhance-tooltip__action promptprofile-enhance-tooltip__upgrade";
     AdapterBase.setButtonTextContent(newAction, "Upgrade for more uses!");
     
     // Add upgrade click handler
     newAction.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log("[Prompanion Deepseek] Upgrade button clicked - placeholder for Stripe integration");
+      console.log("[PromptProfile™ Deepseek] Upgrade button clicked - placeholder for Stripe integration");
       // TODO: Navigate to Stripe upgrade page
       // window.open("https://stripe.com/upgrade", "_blank");
     });
@@ -1743,36 +1743,36 @@ function detachTooltipResizeHandler() {
 
 // Backup message listener registration (IIFE to ensure it runs immediately)
 (function registerInsertTextListener() {
-  console.log("[Prompanion Deepseek] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
-  console.log("[Prompanion Deepseek] Current time:", new Date().toISOString());
+  console.log("[PromptProfile™ Deepseek] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
+  console.log("[PromptProfile™ Deepseek] Current time:", new Date().toISOString());
   
   if (typeof chrome === "undefined") {
-    console.error("[Prompanion Deepseek] chrome is undefined in backup registration");
+    console.error("[PromptProfile™ Deepseek] chrome is undefined in backup registration");
     return;
   }
   
   if (!chrome.runtime || !chrome.runtime.onMessage) {
-    console.error("[Prompanion Deepseek] chrome.runtime.onMessage not available in backup registration");
+    console.error("[PromptProfile™ Deepseek] chrome.runtime.onMessage not available in backup registration");
     return;
   }
   
   try {
     chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       if (message && message.type === "PROMPANION_INSERT_TEXT") {
-        console.log("[Prompanion Deepseek] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
+        console.log("[PromptProfile™ Deepseek] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
         if (typeof handleInsertTextMessage === "function") {
           handleInsertTextMessage(message, sender, sendResponse);
         } else {
-          console.error("[Prompanion Deepseek] handleInsertTextMessage is not a function!");
+          console.error("[PromptProfile™ Deepseek] handleInsertTextMessage is not a function!");
           sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
         }
         return true;
       }
       return false;
     });
-    console.log("[Prompanion Deepseek] ✓ Backup listener registered successfully");
+    console.log("[PromptProfile™ Deepseek] ✓ Backup listener registered successfully");
   } catch (error) {
-    console.error("[Prompanion Deepseek] ✗ Backup listener registration failed:", error);
+    console.error("[PromptProfile™ Deepseek] ✗ Backup listener registration failed:", error);
   }
 })();
 
@@ -1788,16 +1788,16 @@ if (readyState === "complete" || readyState === "interactive") {
 // AdapterBase will handle selection changes efficiently
 
 // Verify message listener is registered
-console.log("[Prompanion Deepseek] ========== VERIFYING MESSAGE LISTENER ==========");
+console.log("[PromptProfile™ Deepseek] ========== VERIFYING MESSAGE LISTENER ==========");
 if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
-  console.log("[Prompanion Deepseek] chrome.runtime.onMessage is available");
-  console.log("[Prompanion Deepseek] chrome.runtime.id:", chrome.runtime.id);
-  console.log("[Prompanion Deepseek] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
+  console.log("[PromptProfile™ Deepseek] chrome.runtime.onMessage is available");
+  console.log("[PromptProfile™ Deepseek] chrome.runtime.id:", chrome.runtime.id);
+  console.log("[PromptProfile™ Deepseek] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
 } else {
-  console.error("[Prompanion Deepseek] chrome.runtime.onMessage is NOT available at this point!");
+  console.error("[PromptProfile™ Deepseek] chrome.runtime.onMessage is NOT available at this point!");
 }
 
-window.addEventListener("prompanion-panel-resize", () => {
+window.addEventListener("promptprofile-panel-resize", () => {
   refreshFloatingButtonPosition();
 });
 
@@ -1810,20 +1810,20 @@ window.addEventListener("resize", () => {
 
 document.addEventListener("mousedown", (e) => {
   if (enhanceTooltipElement?.classList.contains("is-visible")) {
-    const button = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
-      const clickedButton = e.target.closest(".prompanion-enhance-tooltip__action");
+    const button = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
+      const clickedButton = e.target.closest(".promptprofile-enhance-tooltip__action");
     if (clickedButton || button === e.target) {
-      console.log("[Prompanion Deepseek] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
-      console.log("[Prompanion Deepseek] Setting tooltipClickInProgress flag");
+      console.log("[PromptProfile™ Deepseek] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
+      console.log("[PromptProfile™ Deepseek] Setting tooltipClickInProgress flag");
       tooltipClickInProgress = true;
       const buttonRef = button;
       const mousedownTime = Date.now();
       
       const clickHandler = (clickEvent) => {
         const timeSinceMousedown = Date.now() - mousedownTime;
-        console.log("[Prompanion Deepseek] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
-        console.log("[Prompanion Deepseek] Time since mousedown:", timeSinceMousedown, "ms");
-        console.log("[Prompanion Deepseek] Click target:", clickEvent.target);
+        console.log("[PromptProfile™ Deepseek] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
+        console.log("[PromptProfile™ Deepseek] Time since mousedown:", timeSinceMousedown, "ms");
+        console.log("[PromptProfile™ Deepseek] Click target:", clickEvent.target);
         if (typeof handleRefineButtonClick === "function") {
           handleRefineButtonClick(clickEvent);
         }
@@ -1834,7 +1834,7 @@ document.addEventListener("mousedown", (e) => {
       
       setTimeout(() => {
         tooltipClickInProgress = false;
-        console.log("[Prompanion Deepseek] tooltipClickInProgress flag cleared");
+        console.log("[PromptProfile™ Deepseek] tooltipClickInProgress flag cleared");
         document.removeEventListener("click", clickHandler, true);
       }, 300);
     }

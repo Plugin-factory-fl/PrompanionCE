@@ -9,7 +9,7 @@
 
 // Import constants from AdapterBase
 if (typeof AdapterBase === "undefined") {
-  console.error("[Prompanion] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
+  console.error("[PromptProfile™] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
   throw new Error("AdapterBase must be loaded before adapter.js");
 }
 
@@ -122,43 +122,43 @@ function initSelectionToolbar() {
 }
 
 // Expose capture function to window for manual testing
-window.__prompanionTestCapture = function() {
-  console.log("[Prompanion ChatGPT] Manual test of captureGPTChatHistory");
+window.__promptprofileTestCapture = function() {
+  console.log("[PromptProfile™ ChatGPT] Manual test of captureGPTChatHistory");
   const result = captureGPTChatHistory(20);
-  console.log("[Prompanion ChatGPT] Test result:", result);
+  console.log("[PromptProfile™ ChatGPT] Test result:", result);
   return result;
 };
 
 function captureGPTChatHistory(maxMessages = 20) {
   // Make these logs VERY visible
-  console.log("%c[Prompanion ChatGPT] ========== captureGPTChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion ChatGPT] ========== captureGPTChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion ChatGPT] ========== captureGPTChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("[Prompanion ChatGPT] Current URL:", window.location.href);
-  console.log("[Prompanion ChatGPT] Document ready state:", document.readyState);
-  console.log("[Prompanion ChatGPT] Timestamp:", new Date().toISOString());
+  console.log("%c[PromptProfile™ ChatGPT] ========== captureGPTChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ ChatGPT] ========== captureGPTChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ ChatGPT] ========== captureGPTChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("[PromptProfile™ ChatGPT] Current URL:", window.location.href);
+  console.log("[PromptProfile™ ChatGPT] Document ready state:", document.readyState);
+  console.log("[PromptProfile™ ChatGPT] Timestamp:", new Date().toISOString());
   
   // Check if we're on a conversation page
   const isConversationPage = window.location.href.includes("/c/") || 
                             window.location.href.includes("/chat") ||
                             document.querySelector("main, [role='main']");
-  console.log("[Prompanion ChatGPT] Is conversation page:", isConversationPage);
+  console.log("[PromptProfile™ ChatGPT] Is conversation page:", isConversationPage);
   
   const messages = [];
   
   try {
     // First, try to find the thread container (ChatGPT uses id="thread")
     const threadContainer = document.getElementById("thread");
-    console.log("[Prompanion ChatGPT] Thread container found:", !!threadContainer);
+    console.log("[PromptProfile™ ChatGPT] Thread container found:", !!threadContainer);
     
     // Also check for the XPath container the user provided: //*[@id="thread"]/div/div[1]/div/div/div[2]
     let xpathContainer = null;
     try {
       const xpathResult = document.evaluate('//*[@id="thread"]/div/div[1]/div/div/div[2]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
       xpathContainer = xpathResult.singleNodeValue;
-      console.log("[Prompanion ChatGPT] XPath container found:", !!xpathContainer);
+      console.log("[PromptProfile™ ChatGPT] XPath container found:", !!xpathContainer);
       if (xpathContainer) {
-        console.log("[Prompanion ChatGPT] XPath container details:", {
+        console.log("[PromptProfile™ ChatGPT] XPath container details:", {
           tagName: xpathContainer.tagName,
           className: xpathContainer.className,
           childCount: xpathContainer.children.length,
@@ -167,10 +167,10 @@ function captureGPTChatHistory(maxMessages = 20) {
         });
       }
     } catch (xpathError) {
-      console.warn("[Prompanion ChatGPT] XPath evaluation failed:", xpathError);
+      console.warn("[PromptProfile™ ChatGPT] XPath evaluation failed:", xpathError);
     }
     if (threadContainer) {
-      console.log("[Prompanion ChatGPT] Thread container details:", {
+      console.log("[PromptProfile™ ChatGPT] Thread container details:", {
         id: threadContainer.id,
         className: threadContainer.className,
         childCount: threadContainer.children.length,
@@ -181,7 +181,7 @@ function captureGPTChatHistory(maxMessages = 20) {
       // Try to find messages using the XPath structure: //*[@id="thread"]/div/div[1]/div/div/div[2]
       // This suggests messages are in nested divs within thread
       const threadDivs = threadContainer.querySelectorAll("div");
-      console.log(`[Prompanion ChatGPT] Found ${threadDivs.length} divs within thread container`);
+      console.log(`[PromptProfile™ ChatGPT] Found ${threadDivs.length} divs within thread container`);
       
       // Look for divs that contain substantial text (likely messages)
       const potentialMessageDivs = Array.from(threadDivs).filter(div => {
@@ -196,9 +196,9 @@ function captureGPTChatHistory(maxMessages = 20) {
                div.children.length > 0;
       });
       
-      console.log(`[Prompanion ChatGPT] Found ${potentialMessageDivs.length} potential message divs in thread`);
+      console.log(`[PromptProfile™ ChatGPT] Found ${potentialMessageDivs.length} potential message divs in thread`);
       if (potentialMessageDivs.length > 0) {
-        console.log("[Prompanion ChatGPT] Sample potential messages:", potentialMessageDivs.slice(0, 3).map(div => ({
+        console.log("[PromptProfile™ ChatGPT] Sample potential messages:", potentialMessageDivs.slice(0, 3).map(div => ({
           textPreview: (div.innerText || div.textContent || "").substring(0, 100),
           className: div.className,
           id: div.id,
@@ -211,12 +211,12 @@ function captureGPTChatHistory(maxMessages = 20) {
     let searchRoot = document;
     if (xpathContainer) {
       searchRoot = xpathContainer;
-      console.log("[Prompanion ChatGPT] Using XPath container as search root");
+      console.log("[PromptProfile™ ChatGPT] Using XPath container as search root");
     } else if (threadContainer) {
       searchRoot = threadContainer;
-      console.log("[Prompanion ChatGPT] Using thread container as search root");
+      console.log("[PromptProfile™ ChatGPT] Using thread container as search root");
     } else {
-      console.warn("[Prompanion ChatGPT] ⚠️ Neither XPath container nor thread container found - searching entire document");
+      console.warn("[PromptProfile™ ChatGPT] ⚠️ Neither XPath container nor thread container found - searching entire document");
     }
     
     // ChatGPT-specific selectors - try multiple patterns to handle DOM changes
@@ -244,7 +244,7 @@ function captureGPTChatHistory(maxMessages = 20) {
       "div[class*='user-turn']"
     ];
     
-    console.log("[Prompanion ChatGPT] Searching for messages with multiple selector strategies");
+    console.log("[PromptProfile™ ChatGPT] Searching for messages with multiple selector strategies");
     
     // Try each selector pattern and combine results
     let assistantElements = [];
@@ -254,12 +254,12 @@ function captureGPTChatHistory(maxMessages = 20) {
       try {
         const found = Array.from(searchRoot.querySelectorAll(selector));
         if (found.length > 0) {
-          console.log(`[Prompanion ChatGPT] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
+          console.log(`[PromptProfile™ ChatGPT] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
           assistantElements = found;
           break; // Use first selector that finds elements
         }
       } catch (e) {
-        console.warn(`[Prompanion ChatGPT] Selector failed: ${selector}`, e);
+        console.warn(`[PromptProfile™ ChatGPT] Selector failed: ${selector}`, e);
       }
     }
     
@@ -267,16 +267,16 @@ function captureGPTChatHistory(maxMessages = 20) {
       try {
         const found = Array.from(searchRoot.querySelectorAll(selector));
         if (found.length > 0) {
-          console.log(`[Prompanion ChatGPT] ✓ Found ${found.length} user messages with selector: ${selector}`);
+          console.log(`[PromptProfile™ ChatGPT] ✓ Found ${found.length} user messages with selector: ${selector}`);
           userElements = found;
           break; // Use first selector that finds elements
         }
       } catch (e) {
-        console.warn(`[Prompanion ChatGPT] Selector failed: ${selector}`, e);
+        console.warn(`[PromptProfile™ ChatGPT] Selector failed: ${selector}`, e);
       }
     }
     
-    console.log("[Prompanion ChatGPT] Final element counts after standard selectors:", {
+    console.log("[PromptProfile™ ChatGPT] Final element counts after standard selectors:", {
       assistantCount: assistantElements.length,
       userCount: userElements.length,
       totalElements: assistantElements.length + userElements.length
@@ -284,12 +284,12 @@ function captureGPTChatHistory(maxMessages = 20) {
     
     // If no elements found with standard selectors, try searching within thread container
     if (assistantElements.length === 0 && userElements.length === 0 && threadContainer) {
-      console.warn("[Prompanion ChatGPT] ⚠️ No messages found with standard selectors, searching within thread container...");
+      console.warn("[PromptProfile™ ChatGPT] ⚠️ No messages found with standard selectors, searching within thread container...");
       
       // Look for all divs within thread that might be messages
       // ChatGPT typically structures messages as divs within the thread
       const allDivsInThread = threadContainer.querySelectorAll("div");
-      console.log(`[Prompanion ChatGPT] Found ${allDivsInThread.length} divs within thread container`);
+      console.log(`[PromptProfile™ ChatGPT] Found ${allDivsInThread.length} divs within thread container`);
       
       // Look for message-like structures - ChatGPT messages are typically in nested divs
       // Try to find divs that contain substantial text and aren't UI elements
@@ -305,7 +305,7 @@ function captureGPTChatHistory(maxMessages = 20) {
                div.children.length > 0;
       });
       
-      console.log(`[Prompanion ChatGPT] Found ${potentialMessages.length} potential message divs in thread`);
+      console.log(`[PromptProfile™ ChatGPT] Found ${potentialMessages.length} potential message divs in thread`);
       
       // Sort potential messages by their position in the DOM (top to bottom)
       const sortedMessages = potentialMessages.sort((a, b) => {
@@ -339,10 +339,10 @@ function captureGPTChatHistory(maxMessages = 20) {
           // If we have clear markers, use them
           if (hasAssistantMarker && assistantElements.length < maxMessages) {
             assistantElements.push(msg);
-            console.log(`[Prompanion ChatGPT] Added assistant message from thread search (${text.substring(0, 50)}...)`);
+            console.log(`[PromptProfile™ ChatGPT] Added assistant message from thread search (${text.substring(0, 50)}...)`);
           } else if (hasUserMarker && userElements.length < maxMessages) {
             userElements.push(msg);
-            console.log(`[Prompanion ChatGPT] Added user message from thread search (${text.substring(0, 50)}...)`);
+            console.log(`[PromptProfile™ ChatGPT] Added user message from thread search (${text.substring(0, 50)}...)`);
           } else {
             // No clear markers - use alternating pattern
             // ChatGPT conversations typically start with user, then assistant, then user, etc.
@@ -350,31 +350,31 @@ function captureGPTChatHistory(maxMessages = 20) {
             if (totalFound % 2 === 0 && userElements.length < maxMessages) {
               // Even index (0, 2, 4...) = user message
               userElements.push(msg);
-              console.log(`[Prompanion ChatGPT] Added user message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
+              console.log(`[PromptProfile™ ChatGPT] Added user message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
             } else if (assistantElements.length < maxMessages) {
               // Odd index (1, 3, 5...) = assistant message
               assistantElements.push(msg);
-              console.log(`[Prompanion ChatGPT] Added assistant message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
+              console.log(`[PromptProfile™ ChatGPT] Added assistant message (alternating pattern #${totalFound}, ${text.substring(0, 50)}...)`);
             }
           }
         }
       }
       
-      console.log(`[Prompanion ChatGPT] After thread search: ${assistantElements.length} assistant, ${userElements.length} user messages`);
+      console.log(`[PromptProfile™ ChatGPT] After thread search: ${assistantElements.length} assistant, ${userElements.length} user messages`);
     }
     
     // If still no elements found, try alternative approach with other containers
     if (assistantElements.length === 0 && userElements.length === 0) {
-      console.warn("[Prompanion ChatGPT] ⚠️ Still no messages found, trying broader search...");
+      console.warn("[PromptProfile™ ChatGPT] ⚠️ Still no messages found, trying broader search...");
       
       // Try finding messages by looking for conversation containers
       const conversationContainers = document.querySelectorAll("main, [role='main'], [class*='conversation'], [class*='chat'], [id*='conversation'], [id*='chat']");
-      console.log("[Prompanion ChatGPT] Found conversation containers:", conversationContainers.length);
+      console.log("[PromptProfile™ ChatGPT] Found conversation containers:", conversationContainers.length);
       
       // Log container structure for debugging
       if (conversationContainers.length > 0) {
         const firstContainer = conversationContainers[0];
-        console.log("[Prompanion ChatGPT] First container structure:", {
+        console.log("[PromptProfile™ ChatGPT] First container structure:", {
           tagName: firstContainer.tagName,
           className: firstContainer.className,
           id: firstContainer.id,
@@ -386,7 +386,7 @@ function captureGPTChatHistory(maxMessages = 20) {
       // Look for message-like structures within containers
       for (const container of conversationContainers) {
         const potentialMessages = container.querySelectorAll("div[class*='message'], div[class*='turn'], article, [class*='group'], [class*='item']");
-        console.log(`[Prompanion ChatGPT] Found ${potentialMessages.length} potential message elements in container`);
+        console.log(`[PromptProfile™ ChatGPT] Found ${potentialMessages.length} potential message elements in container`);
         
         // Try to identify role by looking for common patterns
         for (const msg of potentialMessages) {
@@ -401,10 +401,10 @@ function captureGPTChatHistory(maxMessages = 20) {
             
             if (isLikelyAssistant && assistantElements.length < maxMessages) {
               assistantElements.push(msg);
-              console.log(`[Prompanion ChatGPT] Added assistant element from fallback search`);
+              console.log(`[PromptProfile™ ChatGPT] Added assistant element from fallback search`);
             } else if (!isLikelyAssistant && userElements.length < maxMessages) {
               userElements.push(msg);
-              console.log(`[Prompanion ChatGPT] Added user element from fallback search`);
+              console.log(`[PromptProfile™ ChatGPT] Added user element from fallback search`);
             }
           }
         }
@@ -413,7 +413,7 @@ function captureGPTChatHistory(maxMessages = 20) {
     
     // Last resort: search for any divs with substantial text that might be messages
     if (assistantElements.length === 0 && userElements.length === 0) {
-      console.warn("[Prompanion ChatGPT] ⚠️ Still no messages found, trying last-resort search...");
+      console.warn("[PromptProfile™ ChatGPT] ⚠️ Still no messages found, trying last-resort search...");
       const allDivs = document.querySelectorAll("div");
       let foundCount = 0;
       for (const div of allDivs) {
@@ -442,7 +442,7 @@ function captureGPTChatHistory(maxMessages = 20) {
           if (foundCount >= maxMessages * 2) break;
         }
       }
-      console.log(`[Prompanion ChatGPT] Last-resort search found ${foundCount} potential messages`);
+      console.log(`[PromptProfile™ ChatGPT] Last-resort search found ${foundCount} potential messages`);
     }
     
     // Combine and sort by DOM position (maintain conversation order)
@@ -461,7 +461,7 @@ function captureGPTChatHistory(maxMessages = 20) {
     // Sort by position in document (top to bottom)
     allElements.sort((a, b) => a.position - b.position);
     
-    console.log("[Prompanion ChatGPT] Processing", allElements.length, "message elements");
+    console.log("[PromptProfile™ ChatGPT] Processing", allElements.length, "message elements");
     
     for (const { el, role } of allElements) {
       if (messages.length >= maxMessages) break;
@@ -487,7 +487,7 @@ function captureGPTChatHistory(maxMessages = 20) {
           const extracted = (contentEl.innerText || contentEl.textContent)?.trim();
           if (extracted && extracted.length > 0) {
             content = extracted;
-            console.log(`[Prompanion ChatGPT] Extracted content using selector "${selector}": ${content.substring(0, 50)}...`);
+            console.log(`[PromptProfile™ ChatGPT] Extracted content using selector "${selector}": ${content.substring(0, 50)}...`);
             break;
           }
         }
@@ -544,12 +544,12 @@ function captureGPTChatHistory(maxMessages = 20) {
             content: content,
             timestamp: Date.now()
           });
-          console.log(`[Prompanion ChatGPT] Added ${role} message (${content.length} chars): ${content.substring(0, 50)}...`);
+          console.log(`[PromptProfile™ ChatGPT] Added ${role} message (${content.length} chars): ${content.substring(0, 50)}...`);
         } else {
-          console.log(`[Prompanion ChatGPT] Skipped ${role} message - too short or UI-only: "${content.substring(0, 30)}"`);
+          console.log(`[PromptProfile™ ChatGPT] Skipped ${role} message - too short or UI-only: "${content.substring(0, 30)}"`);
         }
       } else {
-        console.warn(`[Prompanion ChatGPT] Could not extract content from ${role} message element:`, {
+        console.warn(`[PromptProfile™ ChatGPT] Could not extract content from ${role} message element:`, {
           tagName: el.tagName,
           className: el.className,
           hasChildren: el.children.length > 0,
@@ -559,10 +559,10 @@ function captureGPTChatHistory(maxMessages = 20) {
       }
     }
     
-    console.log(`[Prompanion ChatGPT] ✓ Captured ${messages.length} messages from ChatGPT conversation`);
+    console.log(`[PromptProfile™ ChatGPT] ✓ Captured ${messages.length} messages from ChatGPT conversation`);
     if (messages.length === 0) {
-      console.warn("[Prompanion ChatGPT] ⚠️ No messages captured - check if conversation elements exist in DOM");
-      console.warn("[Prompanion ChatGPT] DOM Diagnostic Info:", {
+      console.warn("[PromptProfile™ ChatGPT] ⚠️ No messages captured - check if conversation elements exist in DOM");
+      console.warn("[PromptProfile™ ChatGPT] DOM Diagnostic Info:", {
         bodyChildren: document.body?.children?.length || 0,
         mainElements: document.querySelectorAll("main").length,
         articles: document.querySelectorAll("article").length,
@@ -573,7 +573,7 @@ function captureGPTChatHistory(maxMessages = 20) {
       });
       
       // Try one more aggressive search: look for any divs with substantial text that might be messages
-      console.warn("[Prompanion ChatGPT] Attempting final aggressive search for message-like content...");
+      console.warn("[PromptProfile™ ChatGPT] Attempting final aggressive search for message-like content...");
       const allTextDivs = Array.from(document.querySelectorAll("div")).filter(div => {
         const text = (div.innerText || div.textContent || "").trim();
         return text.length > 20 && text.length < 10000 && 
@@ -585,9 +585,9 @@ function captureGPTChatHistory(maxMessages = 20) {
                div.children.length > 0;
       });
       
-      console.warn(`[Prompanion ChatGPT] Found ${allTextDivs.length} potential message divs in final search`);
+      console.warn(`[PromptProfile™ ChatGPT] Found ${allTextDivs.length} potential message divs in final search`);
       if (allTextDivs.length > 0) {
-        console.warn("[Prompanion ChatGPT] Sample divs found:", allTextDivs.slice(0, 5).map(div => ({
+        console.warn("[PromptProfile™ ChatGPT] Sample divs found:", allTextDivs.slice(0, 5).map(div => ({
           className: div.className,
           id: div.id,
           textPreview: (div.innerText || div.textContent || "").substring(0, 100),
@@ -597,8 +597,8 @@ function captureGPTChatHistory(maxMessages = 20) {
     }
     return messages;
   } catch (error) {
-    console.error("[Prompanion ChatGPT] ✗ Error capturing GPT chat history:", error);
-    console.error("[Prompanion ChatGPT] Error details:", {
+    console.error("[PromptProfile™ ChatGPT] ✗ Error capturing GPT chat history:", error);
+    console.error("[PromptProfile™ ChatGPT] Error details:", {
       message: error.message,
       stack: error.stack,
       name: error.name
@@ -618,7 +618,7 @@ function positionFloatingButton(inputNode, containerNode = null) {
   // Find the form container
   const form = document.querySelector('main form, form[data-testid="composer"]');
   if (!form) {
-    console.warn("[Prompanion ChatGPT] Form not found, will retry...");
+    console.warn("[PromptProfile™ ChatGPT] Form not found, will retry...");
     if (inputNode && floatingButtonWrapper) {
       setTimeout(() => {
         positionFloatingButton(inputNode, null);
@@ -924,16 +924,16 @@ function getElementPosition(element) {
 
 async function submitSelectionToSideChat(text) {
   // Make these logs VERY visible
-  console.log("%c[Prompanion ChatGPT] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion ChatGPT] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
-  console.log("%c[Prompanion ChatGPT] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ ChatGPT] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ ChatGPT] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ ChatGPT] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
   
   const snippet = typeof text === "string" ? text.trim() : "";
-  console.log("[Prompanion ChatGPT] Snippet:", snippet?.substring(0, 50));
-  console.log("[Prompanion ChatGPT] selectionAskInFlight:", selectionAskInFlight);
+  console.log("[PromptProfile™ ChatGPT] Snippet:", snippet?.substring(0, 50));
+  console.log("[PromptProfile™ ChatGPT] selectionAskInFlight:", selectionAskInFlight);
   
   if (!snippet || selectionAskInFlight) {
-    console.log("[Prompanion ChatGPT] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
+    console.log("[PromptProfile™ ChatGPT] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
     return;
   }
   selectionAskInFlight = true;
@@ -941,15 +941,15 @@ async function submitSelectionToSideChat(text) {
   try {
     // Capture chat history from ChatGPT conversation for context
     let chatHistory = [];
-    console.log("%c[Prompanion ChatGPT] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
+    console.log("%c[PromptProfile™ ChatGPT] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
     try {
       chatHistory = captureGPTChatHistory(20);
-      console.log(`%c[Prompanion ChatGPT] ✓ Captured ${chatHistory.length} messages from conversation for SideChat context`, 
+      console.log(`%c[PromptProfile™ ChatGPT] ✓ Captured ${chatHistory.length} messages from conversation for SideChat context`, 
         chatHistory.length > 0 ? "color: green; font-size: 14px; font-weight: bold;" : "color: red; font-size: 14px; font-weight: bold;");
       
       // Log sample of captured history for debugging
       if (chatHistory.length > 0) {
-        console.log("[Prompanion ChatGPT] Sample captured messages:", {
+        console.log("[PromptProfile™ ChatGPT] Sample captured messages:", {
           firstMessage: {
             role: chatHistory[0].role,
             contentPreview: chatHistory[0].content?.substring(0, 50) + "..."
@@ -961,17 +961,17 @@ async function submitSelectionToSideChat(text) {
           totalMessages: chatHistory.length
         });
       } else {
-        console.warn("[Prompanion ChatGPT] ⚠️ captureGPTChatHistory returned empty array - no messages found in DOM");
+        console.warn("[PromptProfile™ ChatGPT] ⚠️ captureGPTChatHistory returned empty array - no messages found in DOM");
       }
     } catch (error) {
-      console.error("[Prompanion ChatGPT] ✗ Failed to capture chat history:", error);
-      console.error("[Prompanion ChatGPT] Error stack:", error.stack);
+      console.error("[PromptProfile™ ChatGPT] ✗ Failed to capture chat history:", error);
+      console.error("[PromptProfile™ ChatGPT] Error stack:", error.stack);
       // Continue with empty array - better than failing completely
       chatHistory = [];
     }
     
-    console.log("[Prompanion ChatGPT] ========== SENDING PROMPANION_SIDECHAT_REQUEST ==========");
-    console.log("[Prompanion ChatGPT] Sending PROMPANION_SIDECHAT_REQUEST with:", {
+    console.log("[PromptProfile™ ChatGPT] ========== SENDING PROMPANION_SIDECHAT_REQUEST ==========");
+    console.log("[PromptProfile™ ChatGPT] Sending PROMPANION_SIDECHAT_REQUEST with:", {
       textLength: snippet.length,
       textPreview: snippet.substring(0, 50),
       chatHistoryLength: chatHistory.length,
@@ -993,34 +993,34 @@ async function submitSelectionToSideChat(text) {
       text: snippet,
       chatHistory: chatHistory 
     }, (response) => {
-      console.log("[Prompanion ChatGPT] ========== PROMPANION_SIDECHAT_REQUEST RESPONSE ==========");
-      console.log("[Prompanion ChatGPT] Response:", response);
+      console.log("[PromptProfile™ ChatGPT] ========== PROMPANION_SIDECHAT_REQUEST RESPONSE ==========");
+      console.log("[PromptProfile™ ChatGPT] Response:", response);
       if (!response?.ok) {
-        console.warn("Prompanion: sidechat request rejected", response?.reason);
+        console.warn("PromptProfile™: sidechat request rejected", response?.reason);
       }
       selectionAskInFlight = false;
     }).catch((error) => {
-      console.warn("Prompanion: failed to request sidechat from selection", error);
+      console.warn("PromptProfile™: failed to request sidechat from selection", error);
       selectionAskInFlight = false;
     });
   } catch (error) {
-    console.error("Prompanion: sidechat request threw synchronously", error);
+    console.error("PromptProfile™: sidechat request threw synchronously", error);
     selectionAskInFlight = false;
   }
 }
 
 function handleSelectionToolbarAction(event) {
-  console.log("[Prompanion ChatGPT] ========== ELABORATE BUTTON CLICKED ==========");
-  console.log("[Prompanion ChatGPT] Event:", event);
-  console.log("[Prompanion ChatGPT] Current URL:", window.location.href);
+  console.log("[PromptProfile™ ChatGPT] ========== ELABORATE BUTTON CLICKED ==========");
+  console.log("[PromptProfile™ ChatGPT] Event:", event);
+  console.log("[PromptProfile™ ChatGPT] Current URL:", window.location.href);
   event.preventDefault();
   event.stopPropagation();
   const text = selectionToolbarText;
-  console.log("[Prompanion ChatGPT] Selected text:", text?.substring(0, 50));
-  console.log("[Prompanion ChatGPT] About to call submitSelectionToSideChat...");
+  console.log("[PromptProfile™ ChatGPT] Selected text:", text?.substring(0, 50));
+  console.log("[PromptProfile™ ChatGPT] About to call submitSelectionToSideChat...");
   hideSelectionToolbar();
   submitSelectionToSideChat(text);
-  console.log("[Prompanion ChatGPT] submitSelectionToSideChat called");
+  console.log("[PromptProfile™ ChatGPT] submitSelectionToSideChat called");
 }
 
 function handleSelectionChange() {
@@ -1044,10 +1044,10 @@ function requestPromptEnhancement(promptText) {
     .catch((error) => {
       const errorMessage = error?.message || "";
       if (errorMessage.includes("Extension context invalidated")) {
-        console.error("[Prompanion ChatGPT] Extension context invalidated - user should reload page");
+        console.error("[PromptProfile™ ChatGPT] Extension context invalidated - user should reload page");
         // The notification is already shown by AdapterBase._showContextInvalidatedNotification()
       } else {
-        console.warn("[Prompanion ChatGPT] Enhancement request failed:", error);
+        console.warn("[PromptProfile™ ChatGPT] Enhancement request failed:", error);
       }
       return { ok: false, reason: errorMessage || "UNKNOWN_ERROR" };
     });
@@ -1214,56 +1214,56 @@ function findComposerNode() {
 function handleInsertTextMessage(message, sender, sendResponse) {
   try {
     const textToInsert = typeof message.text === "string" ? message.text.trim() : "";
-    console.log("[Prompanion] ========== INSERT TEXT REQUEST ==========");
-    console.log("[Prompanion] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
-    console.log("[Prompanion] Text length:", textToInsert.length);
+    console.log("[PromptProfile™] ========== INSERT TEXT REQUEST ==========");
+    console.log("[PromptProfile™] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
+    console.log("[PromptProfile™] Text length:", textToInsert.length);
     
     if (!textToInsert) {
-      console.log("[Prompanion] Insert failed: EMPTY_TEXT");
+      console.log("[PromptProfile™] Insert failed: EMPTY_TEXT");
       sendResponse({ ok: false, reason: "EMPTY_TEXT" });
       return false; // sendResponse called synchronously, close channel
     }
 
-    console.log("[Prompanion] Searching for composer node...");
+    console.log("[PromptProfile™] Searching for composer node...");
     const composerNode = findComposerNode();
-    console.log("[Prompanion] Composer node found:", composerNode);
-    console.log("[Prompanion] Node type:", composerNode?.constructor?.name);
-    console.log("[Prompanion] Node isContentEditable:", composerNode?.isContentEditable);
-    console.log("[Prompanion] Node tagName:", composerNode?.tagName);
-    console.log("[Prompanion] Node className:", composerNode?.className);
-    console.log("[Prompanion] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
-    console.log("[Prompanion] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
+    console.log("[PromptProfile™] Composer node found:", composerNode);
+    console.log("[PromptProfile™] Node type:", composerNode?.constructor?.name);
+    console.log("[PromptProfile™] Node isContentEditable:", composerNode?.isContentEditable);
+    console.log("[PromptProfile™] Node tagName:", composerNode?.tagName);
+    console.log("[PromptProfile™] Node className:", composerNode?.className);
+    console.log("[PromptProfile™] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
+    console.log("[PromptProfile™] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
     
     if (!composerNode) {
-      console.log("[Prompanion] Insert failed: NO_COMPOSER_NODE");
+      console.log("[PromptProfile™] Insert failed: NO_COMPOSER_NODE");
       sendResponse({ ok: false, reason: "NO_COMPOSER_NODE" });
       return false; // sendResponse called synchronously, close channel
     }
 
-    console.log("[Prompanion] Calling setComposerText...");
+    console.log("[PromptProfile™] Calling setComposerText...");
     const success = setComposerText(composerNode, textToInsert);
-    console.log("[Prompanion] setComposerText returned:", success);
+    console.log("[PromptProfile™] setComposerText returned:", success);
     
     // Verify insertion
     const currentValue = composerNode.value || composerNode.textContent || "";
     const textInserted = currentValue.includes(textToInsert.substring(0, Math.min(20, textToInsert.length)));
-    console.log("[Prompanion] Verification - text appears in node:", textInserted);
-    console.log("[Prompanion] Current node value:", currentValue.substring(0, 100));
+    console.log("[PromptProfile™] Verification - text appears in node:", textInserted);
+    console.log("[PromptProfile™] Current node value:", currentValue.substring(0, 100));
     
     if (success && textInserted) {
-      console.log("[Prompanion] Insert succeeded!");
+      console.log("[PromptProfile™] Insert succeeded!");
       sendResponse({ ok: true });
     } else if (success && !textInserted) {
-      console.warn("[Prompanion] setComposerText returned true but text not verified in node");
+      console.warn("[PromptProfile™] setComposerText returned true but text not verified in node");
       sendResponse({ ok: false, reason: "INSERTION_NOT_VERIFIED" });
     } else {
-      console.log("[Prompanion] Insert failed: SET_TEXT_FAILED");
+      console.log("[PromptProfile™] Insert failed: SET_TEXT_FAILED");
       sendResponse({ ok: false, reason: "SET_TEXT_FAILED" });
     }
     return false; // sendResponse called synchronously, close channel
   } catch (error) {
-    console.error("[Prompanion] Insert text handler failed", error);
-    console.error("[Prompanion] Error stack:", error.stack);
+    console.error("[PromptProfile™] Insert text handler failed", error);
+    console.error("[PromptProfile™] Error stack:", error.stack);
     sendResponse({ ok: false, reason: error?.message ?? "UNKNOWN" });
     return false; // sendResponse called synchronously, close channel
   }
@@ -1316,10 +1316,10 @@ function teardownEnhanceTooltip() {
 function ensureEnhanceTooltipElement() {
   if (!enhanceTooltipElement) {
     enhanceTooltipElement = document.createElement("div");
-    enhanceTooltipElement.className = "prompanion-enhance-tooltip";
+    enhanceTooltipElement.className = "promptprofile-enhance-tooltip";
     const dismiss = document.createElement("button");
     dismiss.type = "button";
-    dismiss.className = "prompanion-enhance-tooltip__dismiss";
+    dismiss.className = "promptprofile-enhance-tooltip__dismiss";
     dismiss.textContent = "×";
     dismiss.setAttribute("aria-label", "Dismiss prompt enhancement suggestion");
     dismiss.addEventListener("click", () => {
@@ -1328,9 +1328,9 @@ function ensureEnhanceTooltipElement() {
     });
     const action = document.createElement("button");
     action.type = "button";
-    action.className = "prompanion-enhance-tooltip__action";
+    action.className = "promptprofile-enhance-tooltip__action";
     AdapterBase.setButtonTextContent(action, "Refine");
-    console.log("[Prompanion] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
+    console.log("[PromptProfile™] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
     action.addEventListener("click", handleRefineButtonClick);
     enhanceTooltipElement.append(dismiss, action);
   }
@@ -1341,9 +1341,9 @@ function ensureEnhanceTooltipElement() {
 }
 
 function handleRefineButtonClick(e) {
-  console.log("[Prompanion] ========== REFINE BUTTON HANDLER FIRED ==========");
-  console.log("[Prompanion] Event type:", e.type);
-  console.log("[Prompanion] Event target:", e.target);
+  console.log("[PromptProfile™] ========== REFINE BUTTON HANDLER FIRED ==========");
+  console.log("[PromptProfile™] Event type:", e.type);
+  console.log("[PromptProfile™] Event target:", e.target);
   e.preventDefault();
   e.stopPropagation();
   if (enhanceActionInFlight) {
@@ -1351,7 +1351,7 @@ function handleRefineButtonClick(e) {
   }
   const composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
   if (!composerNode) {
-    console.error("[Prompanion] No composer node found!");
+    console.error("[PromptProfile™] No composer node found!");
     return;
   }
   const promptText = extractInputText().trim();
@@ -1365,12 +1365,12 @@ function handleRefineButtonClick(e) {
       if (!result || !result.ok) {
         enhanceActionInFlight = false;
         if (result?.reason === "EXTENSION_CONTEXT_INVALIDATED") {
-          console.error("[Prompanion ChatGPT] Cannot enhance prompt - extension context invalidated. Please reload the page.");
+          console.error("[PromptProfile™ ChatGPT] Cannot enhance prompt - extension context invalidated. Please reload the page.");
           enhanceTooltipDismissed = true;
           hideEnhanceTooltip();
         } else if (result?.error === "LIMIT_REACHED") {
           // Show upgrade button in tooltip instead of hiding
-          console.log("[Prompanion] Limit reached, showing upgrade button");
+          console.log("[PromptProfile™] Limit reached, showing upgrade button");
           showUpgradeButtonInTooltip();
         } else {
           // Other errors - hide tooltip normally
@@ -1392,7 +1392,7 @@ function handleRefineButtonClick(e) {
       enhanceActionInFlight = false;
     })
     .catch((error) => {
-      console.error("Prompanion: refine request threw", error);
+      console.error("PromptProfile™: refine request threw", error);
       enhanceActionInFlight = false;
       enhanceTooltipDismissed = true;
       hideEnhanceTooltip();
@@ -1481,7 +1481,7 @@ function showUpgradeButtonInTooltip() {
     ensureEnhanceTooltipElement();
   }
   if (!enhanceTooltipElement) {
-    console.error("[Prompanion] Cannot show upgrade button - tooltip element not found");
+    console.error("[PromptProfile™] Cannot show upgrade button - tooltip element not found");
     return;
   }
   
@@ -1493,7 +1493,7 @@ function showUpgradeButtonInTooltip() {
   }
   
   // Remove existing dismiss button if it exists (we'll add a new one)
-  const oldDismiss = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__dismiss");
+  const oldDismiss = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__dismiss");
   if (oldDismiss) {
     oldDismiss.remove();
   }
@@ -1501,7 +1501,7 @@ function showUpgradeButtonInTooltip() {
   // Add dismiss button (X) for closing the upgrade tooltip
   const dismiss = document.createElement("button");
   dismiss.type = "button";
-  dismiss.className = "prompanion-enhance-tooltip__dismiss";
+  dismiss.className = "promptprofile-enhance-tooltip__dismiss";
   dismiss.textContent = "×";
   dismiss.setAttribute("aria-label", "Dismiss upgrade prompt");
   dismiss.addEventListener("click", (e) => {
@@ -1513,21 +1513,21 @@ function showUpgradeButtonInTooltip() {
   });
   
   // Change action button to upgrade button
-  const action = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
+  const action = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
   if (action) {
     // Remove old click handlers by cloning
     const newAction = action.cloneNode(true);
     action.replaceWith(newAction);
     
     // Update the new button
-    newAction.className = "prompanion-enhance-tooltip__action prompanion-enhance-tooltip__upgrade";
+    newAction.className = "promptprofile-enhance-tooltip__action promptprofile-enhance-tooltip__upgrade";
     AdapterBase.setButtonTextContent(newAction, "Upgrade for more uses!");
     
     // Add upgrade click handler
     newAction.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log("[Prompanion] Upgrade button clicked - placeholder for Stripe integration");
+      console.log("[PromptProfile™] Upgrade button clicked - placeholder for Stripe integration");
       // TODO: Navigate to Stripe upgrade page
       // window.open("https://stripe.com/upgrade", "_blank");
     });
@@ -1578,7 +1578,7 @@ function detachTooltipResizeHandler() {
         if (typeof handleInsertTextMessage === "function") {
           handleInsertTextMessage(message, sender, sendResponse);
         } else {
-          console.error("[Prompanion] handleInsertTextMessage is not a function!");
+          console.error("[PromptProfile™] handleInsertTextMessage is not a function!");
           sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
         }
         return true;
@@ -1586,7 +1586,7 @@ function detachTooltipResizeHandler() {
       return false;
     });
   } catch (error) {
-    console.error("[Prompanion] Backup listener registration failed:", error);
+    console.error("[PromptProfile™] Backup listener registration failed:", error);
   }
 })();
 
@@ -1597,20 +1597,20 @@ if (readyState === "complete" || readyState === "interactive") {
   document.addEventListener("DOMContentLoaded", bootstrap);
 }
 
-console.log("[Prompanion] Registering selection change event listeners");
+console.log("[PromptProfile™] Registering selection change event listeners");
 document.addEventListener("selectionchange", handleSelectionChange);
 window.addEventListener("scroll", handleSelectionChange, true);
 window.addEventListener("resize", handleSelectionChange);
-console.log("[Prompanion] Selection change event listeners registered");
+console.log("[PromptProfile™] Selection change event listeners registered");
 
 // Verify message listener is registered
-console.log("[Prompanion] ========== VERIFYING MESSAGE LISTENER ==========");
+console.log("[PromptProfile™] ========== VERIFYING MESSAGE LISTENER ==========");
 if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
-  console.log("[Prompanion] chrome.runtime.onMessage is available");
-  console.log("[Prompanion] chrome.runtime.id:", chrome.runtime.id);
-  console.log("[Prompanion] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
+  console.log("[PromptProfile™] chrome.runtime.onMessage is available");
+  console.log("[PromptProfile™] chrome.runtime.id:", chrome.runtime.id);
+  console.log("[PromptProfile™] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
 } else {
-  console.error("[Prompanion] chrome.runtime.onMessage is NOT available at this point!");
+  console.error("[PromptProfile™] chrome.runtime.onMessage is NOT available at this point!");
 }
 
 // Window resize listeners removed - sticky button doesn't need position updates
@@ -1623,20 +1623,20 @@ window.addEventListener("beforeunload", () => {
 
 document.addEventListener("mousedown", (e) => {
   if (enhanceTooltipElement?.classList.contains("is-visible")) {
-    const button = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
-    const clickedButton = e.target.closest(".prompanion-enhance-tooltip__action");
+    const button = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
+    const clickedButton = e.target.closest(".promptprofile-enhance-tooltip__action");
     if (clickedButton || button === e.target) {
-      console.log("[Prompanion] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
-      console.log("[Prompanion] Setting tooltipClickInProgress flag");
+      console.log("[PromptProfile™] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
+      console.log("[PromptProfile™] Setting tooltipClickInProgress flag");
       tooltipClickInProgress = true;
       const buttonRef = button;
       const mousedownTime = Date.now();
       
       const clickHandler = (clickEvent) => {
         const timeSinceMousedown = Date.now() - mousedownTime;
-        console.log("[Prompanion] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
-        console.log("[Prompanion] Time since mousedown:", timeSinceMousedown, "ms");
-        console.log("[Prompanion] Click target:", clickEvent.target);
+        console.log("[PromptProfile™] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
+        console.log("[PromptProfile™] Time since mousedown:", timeSinceMousedown, "ms");
+        console.log("[PromptProfile™] Click target:", clickEvent.target);
         if (typeof handleRefineButtonClick === "function") {
           handleRefineButtonClick(clickEvent);
         }
@@ -1647,7 +1647,7 @@ document.addEventListener("mousedown", (e) => {
       
       setTimeout(() => {
         tooltipClickInProgress = false;
-        console.log("[Prompanion] tooltipClickInProgress flag cleared");
+        console.log("[PromptProfile™] tooltipClickInProgress flag cleared");
         document.removeEventListener("click", clickHandler, true);
       }, 300);
     }

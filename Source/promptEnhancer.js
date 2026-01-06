@@ -24,14 +24,14 @@ export function initPromptEnhancer(stateRef) {
   // Check if state has prompts before clearing
   const hasPrompts = stateRef && (stateRef.originalPrompt || stateRef.optionA);
   
-  console.log("[Prompanion] initPromptEnhancer called:", {
+  console.log("[PromptProfile™] initPromptEnhancer called:", {
     hasPrompts,
     hasOriginalPrompt: !!stateRef?.originalPrompt,
     hasOptionA: !!stateRef?.optionA
   });
   
   if (!hasPrompts) {
-    console.log("[Prompanion] No prompts in state, clearing fields");
+    console.log("[PromptProfile™] No prompts in state, clearing fields");
     stateRef.originalPrompt = "";
     stateRef.optionA = "";
     
@@ -40,7 +40,7 @@ export function initPromptEnhancer(stateRef) {
       clearTextField(document.getElementById("option-a"));
     });
   } else {
-    console.log("[Prompanion] Prompts exist in state, NOT clearing - will be rendered separately");
+    console.log("[PromptProfile™] Prompts exist in state, NOT clearing - will be rendered separately");
   }
 }
 
@@ -51,7 +51,7 @@ export function initPromptEnhancer(stateRef) {
 export function renderPrompts({ originalPrompt, optionA }) {
   // Wait for DOM to be ready if needed
   if (document.readyState === "loading") {
-    console.log("[Prompanion] DOM not ready, waiting...");
+    console.log("[PromptProfile™] DOM not ready, waiting...");
     document.addEventListener("DOMContentLoaded", () => renderPrompts({ originalPrompt, optionA }));
     return;
   }
@@ -63,7 +63,7 @@ export function renderPrompts({ originalPrompt, optionA }) {
   
   // If fields don't exist, try again after a short delay
   if (!originalField || !optionAField) {
-    console.warn("[Prompanion] DOM fields not found, retrying in 100ms...");
+    console.warn("[PromptProfile™] DOM fields not found, retrying in 100ms...");
     setTimeout(() => renderPrompts({ originalPrompt, optionA }), 100);
     return;
   }
@@ -86,7 +86,7 @@ export function renderPrompts({ originalPrompt, optionA }) {
     // Verify it stuck
     setTimeout(() => {
       if (optionAField.value !== valueToSet) {
-        console.error("[Prompanion] option-a value was lost! Re-setting...");
+        console.error("[PromptProfile™] option-a value was lost! Re-setting...");
         optionAField.value = valueToSet;
       }
     }, 10);
@@ -191,7 +191,7 @@ export async function handleEnhance(state, dependencies = {}) {
       openPanel: false
     });
 
-    console.log("[Prompanion] handleEnhance received response:", {
+    console.log("[PromptProfile™] handleEnhance received response:", {
       ok: response?.ok,
       hasOptionA: !!response?.optionA,
       error: response?.error,
@@ -204,7 +204,7 @@ export async function handleEnhance(state, dependencies = {}) {
 
     // Check for authentication errors
     if (response.error === "NO_AUTH_TOKEN" || response.error === "UNAUTHORIZED") {
-      alert("Please log in to your Prompanion account to use AI features. Click the account button in the header to log in.");
+      alert("Please log in to your PromptProfile™ account to use AI features. Click the account button in the header to log in.");
       return state;
     }
 
@@ -219,7 +219,7 @@ export async function handleEnhance(state, dependencies = {}) {
     state.optionA = response.optionA || basePrompt;
     // Don't increment locally - fetch from server to get accurate count after backend increment
 
-    console.log("[Prompanion] handleEnhance updating state:", {
+    console.log("[PromptProfile™] handleEnhance updating state:", {
       originalPrompt: state.originalPrompt?.substring(0, 50),
       optionA: state.optionA?.substring(0, 50),
       optionALength: state.optionA?.length
@@ -229,17 +229,17 @@ export async function handleEnhance(state, dependencies = {}) {
     const originalField = document.getElementById("original-prompt");
     const optionAField = document.getElementById("option-a");
     
-    console.log("[Prompanion] DOM elements found:", {
+    console.log("[PromptProfile™] DOM elements found:", {
       hasOriginalField: !!originalField,
       hasOptionAField: !!optionAField
     });
 
     if (!originalField || !optionAField) {
-      console.error("[Prompanion] Missing DOM elements for prompt display!");
+      console.error("[PromptProfile™] Missing DOM elements for prompt display!");
     }
 
     renderPrompts(state);
-    console.log("[Prompanion] renderPrompts called, checking values:", {
+    console.log("[PromptProfile™] renderPrompts called, checking values:", {
       originalFieldValue: originalField?.value?.substring(0, 50),
       optionAFieldValue: optionAField?.value?.substring(0, 50)
     });
@@ -257,7 +257,7 @@ export async function handleEnhance(state, dependencies = {}) {
     if (dependencies.updateEnhancementsDisplay) {
       // If the response includes updated usage data, use it directly
       if (response.enhancementsUsed !== undefined && response.enhancementsLimit !== undefined) {
-        console.log("[Prompanion] Using usage data from enhancement response:", {
+        console.log("[PromptProfile™] Using usage data from enhancement response:", {
           enhancementsUsed: response.enhancementsUsed,
           enhancementsLimit: response.enhancementsLimit
         });
@@ -270,7 +270,7 @@ export async function handleEnhance(state, dependencies = {}) {
         const limitEl = document.getElementById("enhancements-limit");
         if (countEl) {
           countEl.textContent = response.enhancementsUsed;
-          console.log("[Prompanion] Updated enhancements count to:", response.enhancementsUsed);
+          console.log("[PromptProfile™] Updated enhancements count to:", response.enhancementsUsed);
         }
         if (limitEl) {
           limitEl.textContent = response.enhancementsLimit;
@@ -285,7 +285,7 @@ export async function handleEnhance(state, dependencies = {}) {
         }
       } else {
         // Otherwise, fetch fresh data with a delay to ensure DB update completed
-        console.log("[Prompanion] No usage data in response, fetching fresh data...");
+        console.log("[PromptProfile™] No usage data in response, fetching fresh data...");
         await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms for DB update
         await dependencies.updateEnhancementsDisplay();
       }
@@ -376,31 +376,31 @@ export function registerCopyHandlers() {
     button.textContent = "Inserting...";
 
     try {
-      console.log("[Prompanion Sidepanel] ========== SENDING INSERT TEXT MESSAGE ==========");
-      console.log("[Prompanion Sidepanel] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
-      console.log("[Prompanion Sidepanel] Text length:", textToInsert.length);
+      console.log("[PromptProfile™ Sidepanel] ========== SENDING INSERT TEXT MESSAGE ==========");
+      console.log("[PromptProfile™ Sidepanel] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
+      console.log("[PromptProfile™ Sidepanel] Text length:", textToInsert.length);
       
       const response = await sendChromeMessage({
         type: "PROMPANION_INSERT_TEXT",
         text: textToInsert
       });
 
-      console.log("[Prompanion Sidepanel] Received response:", response);
+      console.log("[PromptProfile™ Sidepanel] Received response:", response);
 
       if (!response || !response.ok) {
-        console.error("[Prompanion Sidepanel] Insert failed:", response?.reason);
+        console.error("[PromptProfile™ Sidepanel] Insert failed:", response?.reason);
         throw new Error(response?.reason || "Failed to insert text into ChatGPT");
       }
 
-      console.log("[Prompanion Sidepanel] Insert succeeded!");
+      console.log("[PromptProfile™ Sidepanel] Insert succeeded!");
       button.textContent = "Inserted";
       setTimeout(() => {
         button.textContent = originalButtonText;
       }, 1200);
     } catch (error) {
-      console.error("[Prompanion Sidepanel] Insert failed with error:", error);
-      console.error("[Prompanion Sidepanel] Error message:", error.message);
-      console.error("[Prompanion Sidepanel] Error stack:", error.stack);
+      console.error("[PromptProfile™ Sidepanel] Insert failed with error:", error);
+      console.error("[PromptProfile™ Sidepanel] Error message:", error.message);
+      console.error("[PromptProfile™ Sidepanel] Error stack:", error.stack);
       const errorMessage = error.message || "Failed to insert text. Please make sure ChatGPT is open and try again.";
       alert(errorMessage);
       button.textContent = originalButtonText;
@@ -572,7 +572,7 @@ export function handleStatePush(stateRef, newState) {
     
     // Only render if we actually updated something
     if (shouldRender) {
-      console.log("[Prompanion] handleStatePush updating prompts:", {
+      console.log("[PromptProfile™] handleStatePush updating prompts:", {
         originalPrompt: stateRef.originalPrompt?.substring(0, 50),
         optionA: stateRef.optionA?.substring(0, 50)
       });
@@ -612,7 +612,7 @@ export function registerEnhanceButton(stateRef, dependencies) {
     
     // Prevent multiple clicks while processing
     if (isProcessing) {
-      console.log("[Prompanion] Enhancement already in progress, ignoring click");
+      console.log("[PromptProfile™] Enhancement already in progress, ignoring click");
       return;
     }
     

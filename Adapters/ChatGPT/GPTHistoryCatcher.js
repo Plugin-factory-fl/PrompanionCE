@@ -199,7 +199,7 @@ export class GPTHistoryCatcher extends ChatHistoryExtractor {
 
       return null;
     } catch (error) {
-      console.warn("[Prompanion GPT History] Failed to get conversation ID:", error);
+      console.warn("[PromptProfile™ GPT History] Failed to get conversation ID:", error);
       return null;
     }
   }
@@ -311,7 +311,7 @@ export class GPTHistoryCatcher extends ChatHistoryExtractor {
           }
         });
       } catch (error) {
-        console.warn("[Prompanion GPT History] Error finding assistant messages:", error);
+        console.warn("[PromptProfile™ GPT History] Error finding assistant messages:", error);
       }
     }
 
@@ -329,7 +329,7 @@ export class GPTHistoryCatcher extends ChatHistoryExtractor {
           }
         });
       } catch (error) {
-        console.warn("[Prompanion GPT History] Error finding user messages:", error);
+        console.warn("[PromptProfile™ GPT History] Error finding user messages:", error);
       }
     }
 
@@ -395,10 +395,10 @@ export class GPTHistoryCatcher extends ChatHistoryExtractor {
         return 0;
       });
 
-      console.log(`[Prompanion GPT History] Captured ${messages.length} messages for SideChat context`);
+      console.log(`[PromptProfile™ GPT History] Captured ${messages.length} messages for SideChat context`);
       return messages;
     } catch (error) {
-      console.error("[Prompanion GPT History] Error capturing current history:", error);
+      console.error("[PromptProfile™ GPT History] Error capturing current history:", error);
       return [];
     }
   }
@@ -427,7 +427,7 @@ export function captureGPTChatHistory(maxMessages = 20) {
     const catcher = GPTHistoryCatcher.getInstance();
     return catcher.captureCurrentHistory(maxMessages);
   } catch (error) {
-    console.error("[Prompanion GPT History] Error in standalone capture function:", error);
+    console.error("[PromptProfile™ GPT History] Error in standalone capture function:", error);
     // Fallback: try to capture directly without the class
     return captureGPTChatHistoryFallback(maxMessages);
   }
@@ -495,7 +495,7 @@ function captureGPTChatHistoryFallback(maxMessages = 20) {
     
     return messages;
   } catch (error) {
-    console.error("[Prompanion GPT History] Fallback capture failed:", error);
+    console.error("[PromptProfile™ GPT History] Fallback capture failed:", error);
     return [];
   }
 }

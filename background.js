@@ -23,7 +23,7 @@ async function getTabId(sender) {
     });
     return activeTab?.id;
   } catch (error) {
-    console.warn("Prompanion: failed to resolve active tab", error);
+    console.warn("PromptProfile™: failed to resolve active tab", error);
     return null;
   }
 }
@@ -53,28 +53,28 @@ async function writeState(nextState) {
   } catch (error) {
     // Don't throw - storage failures shouldn't break enhancements
     // Log the error but continue execution
-    console.error("[Prompanion Background] Failed to save state to storage:", error);
+    console.error("[PromptProfile™ Background] Failed to save state to storage:", error);
     
     // If it's a quota error, try to clean up and retry once
     if (error?.message?.includes("quota") || error?.message?.includes("QUOTA_BYTES")) {
-      console.warn("[Prompanion Background] Storage quota exceeded, attempting cleanup...");
+      console.warn("[PromptProfile™ Background] Storage quota exceeded, attempting cleanup...");
       try {
         // Import cleanup function dynamically
         const { cleanupStorage } = await import("./scripts/storageCleanup.js");
         const cleanupResult = await cleanupStorage();
         if (cleanupResult.cleaned) {
-          console.log("[Prompanion Background] Cleanup completed, retrying save...");
+          console.log("[PromptProfile™ Background] Cleanup completed, retrying save...");
           // Retry once after cleanup
           try {
             await storageArea.set({ [STATE_KEY]: nextState });
-            console.log("[Prompanion Background] State saved after cleanup");
+            console.log("[PromptProfile™ Background] State saved after cleanup");
           } catch (retryError) {
-            console.error("[Prompanion Background] Still can't save after cleanup:", retryError);
+            console.error("[PromptProfile™ Background] Still can't save after cleanup:", retryError);
             // Don't throw - enhancement should still work
           }
         }
       } catch (cleanupError) {
-        console.error("[Prompanion Background] Cleanup failed:", cleanupError);
+        console.error("[PromptProfile™ Background] Cleanup failed:", cleanupError);
         // Don't throw - enhancement should still work
       }
     }
@@ -113,7 +113,7 @@ async function sendMessageToTab(tabId, messageType) {
       await chrome.tabs.sendMessage(tabId, { type: messageType });
       return true;
     } catch (injectError) {
-      console.error(`Prompanion: unable to ${messageType.toLowerCase()} panel`, injectError);
+      console.error(`PromptProfile™: unable to ${messageType.toLowerCase()} panel`, injectError);
       return false;
     }
   }
@@ -288,7 +288,7 @@ async function getAuthToken() {
     const result = await chrome.storage.local.get("authToken");
     return result.authToken || null;
   } catch (error) {
-    console.error("Prompanion: failed to get auth token", error);
+    console.error("PromptProfile™: failed to get auth token", error);
     return null;
   }
 }
@@ -345,7 +345,7 @@ async function generateEnhancements(promptText, settings = {}) {
       enhancementsLimit: data.enhancementsLimit
     };
   } catch (error) {
-    console.error("Prompanion: enhancement generation failed", error);
+    console.error("PromptProfile™: enhancement generation failed", error);
     const errorMessage = error.message || String(error);
     return { optionA: promptText, error: "API_ERROR" };
   }
@@ -428,19 +428,19 @@ async function regenerateEnhancement(originalPrompt, currentEnhanced, settings =
     // Return optionA (only option now)
     return typeof data.optionA === "string" ? data.optionA.trim() : fallback;
   } catch (error) {
-    console.error("Prompanion: regeneration failed", error);
+    console.error("PromptProfile™: regeneration failed", error);
     return fallback;
   }
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("[Prompanion Background] ========== MESSAGE RECEIVED ==========");
-  console.log("[Prompanion Background] Message type:", message?.type);
-  console.log("[Prompanion Background] Message:", message);
-  console.log("[Prompanion Background] Sender:", sender);
+  console.log("[PromptProfile™ Background] ========== MESSAGE RECEIVED ==========");
+  console.log("[PromptProfile™ Background] Message type:", message?.type);
+  console.log("[PromptProfile™ Background] Message:", message);
+  console.log("[PromptProfile™ Background] Sender:", sender);
   
   if (!message || typeof message !== "object") {
-    console.log("[Prompanion Background] Invalid message, ignoring");
+    console.log("[PromptProfile™ Background] Invalid message, ignoring");
     return;
   }
 
@@ -448,7 +448,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Return true to keep the message channel open for async response
     (async () => {
       try {
-        console.log("[Prompanion Background] ========== PROMPANION_SIDECHAT_REQUEST RECEIVED ==========");
+        console.log("[PromptProfile™ Background] ========== PROMPANION_SIDECHAT_REQUEST RECEIVED ==========");
         const snippet =
           typeof message.text === "string" ? message.text.trim() : "";
         if (!snippet) {
@@ -458,7 +458,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         // Extract chat history from message (if provided) - don't store it, just pass it through
         const chatHistory = Array.isArray(message.chatHistory) ? message.chatHistory : [];
-        console.log("[Prompanion Background] Received chat history:", {
+        console.log("[PromptProfile™ Background] Received chat history:", {
           isArray: Array.isArray(message.chatHistory),
           length: chatHistory.length,
           hasChatHistory: chatHistory.length > 0,
@@ -480,11 +480,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               timestamp: Date.now()
             }
           };
-          console.log("[Prompanion Background] Storing pendingSideChat (text only, no chat history)");
+          console.log("[PromptProfile™ Background] Storing pendingSideChat (text only, no chat history)");
           await writeState(nextState);
         } catch (error) {
           // If storage fails (quota exceeded), continue anyway - we'll send the data directly
-          console.warn("[Prompanion Background] Failed to save state (storage may be full), continuing with direct message:", error.message);
+          console.warn("[PromptProfile™ Background] Failed to save state (storage may be full), continuing with direct message:", error.message);
           // Try to get current state for STATE_PUSH, but don't fail if it doesn't work
           try {
             nextState = await readState();
@@ -493,7 +493,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               timestamp: Date.now()
             };
           } catch (readError) {
-            console.warn("[Prompanion Background] Could not read state either, will skip STATE_PUSH:", readError.message);
+            console.warn("[PromptProfile™ Background] Could not read state either, will skip STATE_PUSH:", readError.message);
           }
         }
         
@@ -520,7 +520,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         
         sendResponse?.({ ok: true });
       } catch (error) {
-        console.error("[Prompanion Background] PROMPANION_SIDECHAT_REQUEST error:", error);
+        console.error("[PromptProfile™ Background] PROMPANION_SIDECHAT_REQUEST error:", error);
         sendResponse?.({ ok: false, reason: "ERROR", error: error.message });
       }
     })();
@@ -545,20 +545,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       try {
         const promptText =
           typeof message.prompt === "string" ? message.prompt : "";
-        console.log("[Prompanion Background] PROMPANION_PREPARE_ENHANCEMENT received, prompt:", promptText);
+        console.log("[PromptProfile™ Background] PROMPANION_PREPARE_ENHANCEMENT received, prompt:", promptText);
         const currentState = await readState();
         const settings = {
           model: currentState.settings?.model || "chatgpt",
           output: currentState.settings?.output || "text",
           complexity: currentState.settings?.complexity || 2
         };
-        console.log("[Prompanion Background] ========== ENHANCEMENT REQUEST ==========");
-        console.log("[Prompanion Background] Current state settings:", currentState.settings);
-        console.log("[Prompanion Background] Using settings for API call:", settings);
-        console.log("[Prompanion Background] Model selected:", settings.model);
+        console.log("[PromptProfile™ Background] ========== ENHANCEMENT REQUEST ==========");
+        console.log("[PromptProfile™ Background] Current state settings:", currentState.settings);
+        console.log("[PromptProfile™ Background] Using settings for API call:", settings);
+        console.log("[PromptProfile™ Background] Model selected:", settings.model);
         const result = await generateEnhancements(promptText, settings);
         const { optionA, error, enhancementsUsed, enhancementsLimit } = result;
-        console.log("[Prompanion Background] Enhancement result - optionA:", optionA, "error:", error, "usage:", { enhancementsUsed, enhancementsLimit });
+        console.log("[PromptProfile™ Background] Enhancement result - optionA:", optionA, "error:", error, "usage:", { enhancementsUsed, enhancementsLimit });
         
         // Only update state and open panel if there's no error
         if (!error) {
@@ -567,7 +567,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             originalPrompt: promptText,
             optionA
           };
-          console.log("[Prompanion Background] Next state prepared:", { 
+          console.log("[PromptProfile™ Background] Next state prepared:", { 
             originalPrompt: nextState.originalPrompt?.substring(0, 50), 
             optionA: nextState.optionA?.substring(0, 50)
           });
@@ -575,28 +575,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           // CRITICAL: Save state BEFORE sending response to ensure prompts are persisted
           try {
             await writeState(nextState);
-            console.log("[Prompanion Background] ========== STATE SAVED TO STORAGE ==========");
+            console.log("[PromptProfile™ Background] ========== STATE SAVED TO STORAGE ==========");
             
             // Verify the save by reading back from storage
             const verifyState = await readState();
             if (verifyState.originalPrompt === promptText && verifyState.optionA === optionA) {
-              console.log("[Prompanion Background] ✓ Storage save verified - prompts are persisted");
+              console.log("[PromptProfile™ Background] ✓ Storage save verified - prompts are persisted");
             } else {
-              console.warn("[Prompanion Background] ⚠️ Storage verification failed - prompts may not match");
+              console.warn("[PromptProfile™ Background] ⚠️ Storage verification failed - prompts may not match");
             }
           } catch (storageError) {
             // Log but don't throw - enhancement should still work
-            console.error("[Prompanion Background] Failed to save state, but enhancement completed:", storageError);
+            console.error("[PromptProfile™ Background] Failed to save state, but enhancement completed:", storageError);
           }
           
           // Send STATE_PUSH message to update sidepanel if it's open
-          console.log("[Prompanion Background] Sending PROMPANION_STATE_PUSH message");
+          console.log("[PromptProfile™ Background] Sending PROMPANION_STATE_PUSH message");
           chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState }, (response) => {
             if (chrome.runtime.lastError) {
               // This is normal if sidepanel isn't loaded yet - state is saved to storage
-              console.log("[Prompanion Background] STATE_PUSH message sent (sidepanel may not be loaded yet):", chrome.runtime.lastError.message);
+              console.log("[PromptProfile™ Background] STATE_PUSH message sent (sidepanel may not be loaded yet):", chrome.runtime.lastError.message);
             } else {
-              console.log("[Prompanion Background] ✓ STATE_PUSH message sent successfully - sidepanel updated");
+              console.log("[PromptProfile™ Background] ✓ STATE_PUSH message sent successfully - sidepanel updated");
             }
           });
           
@@ -608,9 +608,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               enhancementsLimit 
             }, (response) => {
               if (chrome.runtime.lastError) {
-                console.log("[Prompanion Background] Usage update message sent (sidepanel may not be open)");
+                console.log("[PromptProfile™ Background] Usage update message sent (sidepanel may not be open)");
               } else {
-                console.log("[Prompanion Background] Usage update message sent successfully");
+                console.log("[PromptProfile™ Background] Usage update message sent successfully");
               }
             });
           }
@@ -728,38 +728,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "PROMPANION_INSERT_TEXT") {
-    console.log("[Prompanion Background] ========== PROMPANION_INSERT_TEXT RECEIVED ==========");
-    console.log("[Prompanion Background] Text to insert:", typeof message.text === "string" ? message.text.substring(0, 50) + "..." : "invalid");
-    console.log("[Prompanion Background] Sender:", sender);
+    console.log("[PromptProfile™ Background] ========== PROMPANION_INSERT_TEXT RECEIVED ==========");
+    console.log("[PromptProfile™ Background] Text to insert:", typeof message.text === "string" ? message.text.substring(0, 50) + "..." : "invalid");
+    console.log("[PromptProfile™ Background] Sender:", sender);
     (async () => {
       try {
         const textToInsert = typeof message.text === "string" ? message.text.trim() : "";
         if (!textToInsert) {
-          console.log("[Prompanion Background] Empty text, returning error");
+          console.log("[PromptProfile™ Background] Empty text, returning error");
           sendResponse?.({ ok: false, reason: "EMPTY_TEXT" });
           return;
         }
 
         // Try to get tab from sender first (if message came from a tab)
         let targetTabId = sender?.tab?.id;
-        console.log("[Prompanion Background] Sender tab ID:", targetTabId);
+        console.log("[PromptProfile™ Background] Sender tab ID:", targetTabId);
         
         // If no tab from sender, find ChatGPT tab
         if (!targetTabId) {
           try {
-            console.log("[Prompanion Background] No sender tab, searching for ChatGPT tab...");
+            console.log("[PromptProfile™ Background] No sender tab, searching for ChatGPT tab...");
             // First try to find active ChatGPT tab
             const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            console.log("[Prompanion Background] Active tab:", activeTab?.url);
+            console.log("[PromptProfile™ Background] Active tab:", activeTab?.url);
             if (activeTab && activeTab.url && (
               activeTab.url.includes("chatgpt.com") || 
               activeTab.url.includes("chat.openai.com")
             )) {
               targetTabId = activeTab.id;
-              console.log("[Prompanion Background] Using active ChatGPT tab:", targetTabId);
+              console.log("[PromptProfile™ Background] Using active ChatGPT tab:", targetTabId);
             } else {
               // Fallback: find any ChatGPT tab
-              console.log("[Prompanion Background] Active tab is not ChatGPT, searching all tabs...");
+              console.log("[PromptProfile™ Background] Active tab is not ChatGPT, searching all tabs...");
               const tabs = await chrome.tabs.query({
                 url: [
                   "https://chatgpt.com/*",
@@ -768,34 +768,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   "https://*.chat.openai.com/*"
                 ]
               });
-              console.log("[Prompanion Background] Found ChatGPT tabs:", tabs.length);
+              console.log("[PromptProfile™ Background] Found ChatGPT tabs:", tabs.length);
               if (tabs.length > 0) {
                 // Prefer active tab, otherwise use first one
                 targetTabId = tabs.find(tab => tab.active)?.id || tabs[0].id;
-                console.log("[Prompanion Background] Selected tab ID:", targetTabId);
+                console.log("[PromptProfile™ Background] Selected tab ID:", targetTabId);
               }
             }
           } catch (queryError) {
-            console.error("[Prompanion Background] Failed to query tabs:", queryError);
+            console.error("[PromptProfile™ Background] Failed to query tabs:", queryError);
           }
         }
 
         if (!targetTabId) {
-          console.log("[Prompanion Background] No ChatGPT tab found, returning error");
+          console.log("[PromptProfile™ Background] No ChatGPT tab found, returning error");
           sendResponse?.({ ok: false, reason: "NO_CHATGPT_TAB" });
           return;
         }
 
         // Send message to adapter.js content script
-        console.log("[Prompanion Background] Sending message to tab:", targetTabId);
-        console.log("[Prompanion Background] Message payload:", { type: "PROMPANION_INSERT_TEXT", text: textToInsert.substring(0, 50) + "..." });
+        console.log("[PromptProfile™ Background] Sending message to tab:", targetTabId);
+        console.log("[PromptProfile™ Background] Message payload:", { type: "PROMPANION_INSERT_TEXT", text: textToInsert.substring(0, 50) + "..." });
         
         // Check if content script is loaded by trying to query the tab
         try {
           const tab = await chrome.tabs.get(targetTabId);
-          console.log("[Prompanion Background] Tab info:", { id: tab.id, url: tab.url, status: tab.status });
+          console.log("[PromptProfile™ Background] Tab info:", { id: tab.id, url: tab.url, status: tab.status });
         } catch (tabError) {
-          console.error("[Prompanion Background] Failed to get tab info:", tabError);
+          console.error("[PromptProfile™ Background] Failed to get tab info:", tabError);
         }
         
         try {
@@ -810,41 +810,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           });
           
           const response = await Promise.race([responsePromise, timeoutPromise]);
-          console.log("[Prompanion Background] Received response from adapter:", response);
-          console.log("[Prompanion Background] Response type:", typeof response);
-          console.log("[Prompanion Background] Response is null/undefined:", response === null || response === undefined);
+          console.log("[PromptProfile™ Background] Received response from adapter:", response);
+          console.log("[PromptProfile™ Background] Response type:", typeof response);
+          console.log("[PromptProfile™ Background] Response is null/undefined:", response === null || response === undefined);
           
           if (!response) {
-            console.error("[Prompanion Background] Adapter returned null/undefined response!");
+            console.error("[PromptProfile™ Background] Adapter returned null/undefined response!");
             sendResponse?.({ ok: false, reason: "NO_RESPONSE_FROM_ADAPTER" });
             return;
           }
           
           sendResponse?.(response);
         } catch (error) {
-          console.error("[Prompanion Background] Failed to send insert message to tab:", error);
-          console.error("[Prompanion Background] Error name:", error.name);
-          console.error("[Prompanion Background] Error message:", error.message);
-          console.error("[Prompanion Background] Error stack:", error.stack);
+          console.error("[PromptProfile™ Background] Failed to send insert message to tab:", error);
+          console.error("[PromptProfile™ Background] Error name:", error.name);
+          console.error("[PromptProfile™ Background] Error message:", error.message);
+          console.error("[PromptProfile™ Background] Error stack:", error.stack);
           
           // Check if error is because content script isn't ready
           if (error.message?.includes("Could not establish connection") || 
               error.message?.includes("Receiving end does not exist") ||
               error.message?.includes("Extension context invalidated") ||
               error.message?.includes("TIMEOUT")) {
-            console.log("[Prompanion Background] Adapter not ready - content script may not be loaded or not responding");
-            console.log("[Prompanion Background] This usually means:");
-            console.log("[Prompanion Background] 1. The content script hasn't loaded yet");
-            console.log("[Prompanion Background] 2. The content script's message listener isn't registered");
-            console.log("[Prompanion Background] 3. The content script is in a different frame/context");
+            console.log("[PromptProfile™ Background] Adapter not ready - content script may not be loaded or not responding");
+            console.log("[PromptProfile™ Background] This usually means:");
+            console.log("[PromptProfile™ Background] 1. The content script hasn't loaded yet");
+            console.log("[PromptProfile™ Background] 2. The content script's message listener isn't registered");
+            console.log("[PromptProfile™ Background] 3. The content script is in a different frame/context");
             sendResponse?.({ ok: false, reason: "ADAPTER_NOT_READY" });
           } else {
-            console.log("[Prompanion Background] Send failed with unexpected error:", error.message);
+            console.log("[PromptProfile™ Background] Send failed with unexpected error:", error.message);
             sendResponse?.({ ok: false, reason: error?.message ?? "SEND_FAILED" });
           }
         }
       } catch (error) {
-        console.error("[Prompanion Background] Insert text message failed:", error);
+        console.error("[PromptProfile™ Background] Insert text message failed:", error);
         sendResponse?.({ ok: false, reason: error?.message ?? "UNKNOWN" });
       }
     })();

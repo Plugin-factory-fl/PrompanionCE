@@ -1,6 +1,6 @@
-# Prompanion Backend Server
+# PromptProfile™ Backend Server
 
-Backend server for the Prompanion Chrome extension, handling authentication, API key management, and payment verification.
+Backend server for the PromptProfile™ Chrome extension, handling authentication, API key management, and payment verification.
 
 ## Features
 

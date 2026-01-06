@@ -1,5 +1,5 @@
 /**
- * Prompanion Backend Server
+ * PromptProfile™ Backend Server
  * Handles authentication, API key management, and payment verification
  */
 
@@ -91,7 +91,7 @@ app.use((req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`Prompanion backend server running on port ${PORT}`);
+  console.log(`PromptProfile™ backend server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 

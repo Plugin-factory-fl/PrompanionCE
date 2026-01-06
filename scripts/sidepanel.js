@@ -3,9 +3,9 @@
  * Initializes and coordinates all side panel functionality
  */
 
-console.log("[Prompanion Sidepanel] ========== SIDEPANEL.JS LOADING ==========");
-console.log("[Prompanion Sidepanel] Timestamp:", new Date().toISOString());
-console.log("[Prompanion Sidepanel] Document ready state:", document.readyState);
+console.log("[PromptProfile™ Sidepanel] ========== SIDEPANEL.JS LOADING ==========");
+console.log("[PromptProfile™ Sidepanel] Timestamp:", new Date().toISOString());
+console.log("[PromptProfile™ Sidepanel] Document ready state:", document.readyState);
 
 import {
   initPromptEnhancer,
@@ -50,7 +50,7 @@ const sideChatLoadPromise = import("../Source/sideChat.js")
     registerChatHandlers = module.registerChatHandlers || registerChatHandlers;
     isFreshConversation = module.isFreshConversation || isFreshConversation;
     openSideChatSection = module.openSideChatSection || openSideChatSection;
-    console.log("[Prompanion Sidepanel] sideChat.js loaded successfully");
+    console.log("[PromptProfile™ Sidepanel] sideChat.js loaded successfully");
     
     // Initialize side chat after module loads
     if (typeof window.initSideChat === 'function') {
@@ -60,13 +60,13 @@ const sideChatLoadPromise = import("../Source/sideChat.js")
     return module;
   })
   .catch((error) => {
-    console.error("[Prompanion Sidepanel] Failed to load sideChat.js:", error);
-    console.error("[Prompanion Sidepanel] Error details:", {
+    console.error("[PromptProfile™ Sidepanel] Failed to load sideChat.js:", error);
+    console.error("[PromptProfile™ Sidepanel] Error details:", {
       message: error.message,
       stack: error.stack,
       name: error.name
     });
-    console.log("[Prompanion Sidepanel] Continuing with stub functions - prompts should still work");
+    console.log("[PromptProfile™ Sidepanel] Continuing with stub functions - prompts should still work");
     return null;
   });
 import {
@@ -151,8 +151,8 @@ function showContextInvalidatedNotification() {
   `;
   
   notification.innerHTML = `
-    <div style="font-weight: 600; margin-bottom: 8px;">Prompanion Extension Reloaded</div>
-    <div style="opacity: 0.95;">Please reload this page to continue using Prompanion features.</div>
+    <div style="font-weight: 600; margin-bottom: 8px;">PromptProfile™ Extension Reloaded</div>
+    <div style="opacity: 0.95;">Please reload this page to continue using PromptProfile™ features.</div>
     <button id="prompanion-reload-page" style="
       margin-top: 12px;
       padding: 8px 16px;
@@ -197,7 +197,7 @@ const storage = {
   async get(key) {
     try {
       if (!isExtensionContextValid()) {
-        console.error("[Prompanion Sidepanel] Extension context invalidated - cannot access storage");
+        console.error("[PromptProfile™ Sidepanel] Extension context invalidated - cannot access storage");
         showContextInvalidatedNotification();
         return undefined; // Return undefined to allow fallback to defaults
       }
@@ -208,7 +208,7 @@ const storage = {
       if (error?.message?.includes("Extension context invalidated") || 
           error?.message?.includes("message port closed") ||
           !isExtensionContextValid()) {
-        console.error("[Prompanion Sidepanel] Extension context invalidated during storage.get:", error);
+        console.error("[PromptProfile™ Sidepanel] Extension context invalidated during storage.get:", error);
         showContextInvalidatedNotification();
         return undefined; // Return undefined to allow fallback to defaults
       }
@@ -219,7 +219,7 @@ const storage = {
   async set(key, value) {
     try {
       if (!isExtensionContextValid()) {
-        console.error("[Prompanion Sidepanel] Extension context invalidated - cannot save to storage");
+        console.error("[PromptProfile™ Sidepanel] Extension context invalidated - cannot save to storage");
         showContextInvalidatedNotification();
         return; // Silently fail - can't save if context is invalidated
       }
@@ -229,7 +229,7 @@ const storage = {
       if (error?.message?.includes("Extension context invalidated") || 
           error?.message?.includes("message port closed") ||
           !isExtensionContextValid()) {
-        console.error("[Prompanion Sidepanel] Extension context invalidated during storage.set:", error);
+        console.error("[PromptProfile™ Sidepanel] Extension context invalidated during storage.set:", error);
         showContextInvalidatedNotification();
         return; // Silently fail - can't save if context is invalidated
       }
@@ -292,10 +292,10 @@ async function readStorageSafely() {
       rawStored = await chrome.storage.sync.get(STATE_KEY);
       storedState = rawStored[STATE_KEY];
     } else {
-      console.warn("[Prompanion Sidepanel] Extension context invalidated, skipping storage read");
+      console.warn("[PromptProfile™ Sidepanel] Extension context invalidated, skipping storage read");
     }
   } catch (error) {
-    console.error("[Prompanion Sidepanel] Error reading storage:", error);
+    console.error("[PromptProfile™ Sidepanel] Error reading storage:", error);
   }
   return storedState;
 }
@@ -351,7 +351,7 @@ function filterExpiredConversations(conversations) {
 /**
  * Welcome message content for new conversations
  */
-const WELCOME_MESSAGE = "Welcome to the Side Chat! This is where you can ask me questions to elaborate on ideas you aren't clear on. I open up automatically when you highlight any text response from your LLM in the browser and click the \"Elaborate\" button. I'm here to help!";
+const WELCOME_MESSAGE = "Welcome to the Side Chat!\n\nThis is where you can ask me questions to elaborate on ideas you aren't clear on. I open up automatically when you highlight any text response from your LLM in the browser and click the \"Elaborate\" button. I'm here to help!";
 
 /**
  * Creates a new conversation with the welcome message
@@ -380,7 +380,7 @@ async function loadState() {
   try {
     stored = await storage.get(STATE_KEY);
   } catch (error) {
-    console.error("[Prompanion Sidepanel] Error loading state from storage:", error);
+    console.error("[PromptProfile™ Sidepanel] Error loading state from storage:", error);
     // If storage fails, use default state
     stored = null;
   }
@@ -467,11 +467,11 @@ async function saveState(nextState) {
   // Prevent rapid successive saves (rate limiting)
   const now = Date.now();
   if (isSaving) {
-    console.log("[Prompanion Sidepanel] Save already in progress, skipping...");
+    console.log("[PromptProfile™ Sidepanel] Save already in progress, skipping...");
     return;
   }
   if (now - lastSaveTime < SAVE_DEBOUNCE_MS) {
-    console.log("[Prompanion Sidepanel] Save debounced, too soon after last save");
+    console.log("[PromptProfile™ Sidepanel] Save debounced, too soon after last save");
     return;
   }
   
@@ -482,7 +482,7 @@ async function saveState(nextState) {
   } catch (error) {
     // Handle extension context invalidated
     if (error?.message?.includes("Extension context invalidated")) {
-      console.error("[Prompanion Sidepanel] Extension context invalidated during storage.set:", error);
+      console.error("[PromptProfile™ Sidepanel] Extension context invalidated during storage.set:", error);
       showContextInvalidatedNotification();
       isSaving = false;
       return; // Silently fail - can't save if context is invalidated
@@ -490,26 +490,26 @@ async function saveState(nextState) {
     
     // Handle quota exceeded errors
     if (error?.message?.includes("quota") || error?.message?.includes("QUOTA_BYTES")) {
-      console.warn("[Prompanion Sidepanel] Storage quota exceeded, running cleanup...");
+      console.warn("[PromptProfile™ Sidepanel] Storage quota exceeded, running cleanup...");
       try {
         const cleanupResult = await cleanupStorage();
         if (cleanupResult.cleaned) {
-          console.log("[Prompanion Sidepanel] Cleanup saved", cleanupResult.saved, "bytes, retrying save...");
+          console.log("[PromptProfile™ Sidepanel] Cleanup saved", cleanupResult.saved, "bytes, retrying save...");
           // Retry saving after cleanup
           try {
             await storage.set(STATE_KEY, nextState);
             lastSaveTime = Date.now();
-            console.log("[Prompanion Sidepanel] State saved after cleanup");
+            console.log("[PromptProfile™ Sidepanel] State saved after cleanup");
           } catch (retryError) {
-            console.error("[Prompanion Sidepanel] Still can't save after cleanup:", retryError);
+            console.error("[PromptProfile™ Sidepanel] Still can't save after cleanup:", retryError);
             // Don't clear prompts - just fail silently to prevent data loss
-            console.warn("[Prompanion Sidepanel] Save failed, but preserving prompts in memory");
+            console.warn("[PromptProfile™ Sidepanel] Save failed, but preserving prompts in memory");
           }
         } else {
-          console.error("[Prompanion Sidepanel] Cleanup failed or didn't free enough space");
+          console.error("[PromptProfile™ Sidepanel] Cleanup failed or didn't free enough space");
         }
       } catch (cleanupError) {
-        console.error("[Prompanion Sidepanel] Error during cleanup:", cleanupError);
+        console.error("[PromptProfile™ Sidepanel] Error during cleanup:", cleanupError);
       }
     } else {
       // Re-throw other errors
@@ -529,12 +529,12 @@ async function fetchUserUsage(retryCount = 0) {
   try {
     if (!isExtensionContextValid()) {
       if (retryCount < MAX_RETRIES) {
-        console.warn(`[Prompanion Sidepanel] Extension context invalidated, retrying fetch (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+        console.warn(`[PromptProfile™ Sidepanel] Extension context invalidated, retrying fetch (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
         // Retry after a delay
         await new Promise(resolve => setTimeout(resolve, 1000));
         return fetchUserUsage(retryCount + 1);
       } else {
-        console.warn("[Prompanion Sidepanel] Extension context invalidated after max retries, returning defaults");
+        console.warn("[PromptProfile™ Sidepanel] Extension context invalidated after max retries, returning defaults");
         return { enhancementsUsed: 0, enhancementsLimit: 10 }; // Return defaults
       }
     }
@@ -585,12 +585,12 @@ async function fetchUserUsage(retryCount = 0) {
           // Token invalid, return defaults
           return { enhancementsUsed: 0, enhancementsLimit: 10 };
         }
-        console.warn("[Prompanion Sidepanel] Failed to fetch usage:", response.status, response.statusText);
+        console.warn("[PromptProfile™ Sidepanel] Failed to fetch usage:", response.status, response.statusText);
         return null;
       }
 
       const data = await response.json();
-      console.log("[Prompanion Sidepanel] Fetched usage data from API:", {
+      console.log("[PromptProfile™ Sidepanel] Fetched usage data from API:", {
         enhancementsUsed: data.enhancementsUsed,
         enhancementsLimit: data.enhancementsLimit,
         fullResponse: data
@@ -602,14 +602,14 @@ async function fetchUserUsage(retryCount = 0) {
     } catch (fetchError) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
-        console.warn("[Prompanion Sidepanel] Usage fetch timed out");
+        console.warn("[PromptProfile™ Sidepanel] Usage fetch timed out");
         return null;
       } else {
         throw fetchError;
       }
     }
   } catch (error) {
-    console.error("[Prompanion Sidepanel] Error fetching user usage:", error);
+    console.error("[PromptProfile™ Sidepanel] Error fetching user usage:", error);
     return null;
   }
 }
@@ -623,7 +623,7 @@ let isUpdatingEnhancements = false;
 async function updateEnhancementsDisplay() {
   // Prevent multiple simultaneous calls
   if (isUpdatingEnhancements) {
-    console.log("[Prompanion Sidepanel] Enhancement display update already in progress, skipping");
+    console.log("[PromptProfile™ Sidepanel] Enhancement display update already in progress, skipping");
     return;
   }
   
@@ -641,7 +641,7 @@ async function updateEnhancementsDisplay() {
       const limitEl = document.getElementById("enhancements-limit");
       if (countEl) {
         countEl.textContent = usage.enhancementsUsed;
-        console.log("[Prompanion Sidepanel] Updated enhancements count display:", usage.enhancementsUsed);
+        console.log("[PromptProfile™ Sidepanel] Updated enhancements count display:", usage.enhancementsUsed);
       }
       if (limitEl) {
         limitEl.textContent = usage.enhancementsLimit;
@@ -681,7 +681,7 @@ async function updateUserStatus() {
   try {
     // Check if extension context is valid first
     if (!isExtensionContextValid()) {
-      console.warn("[Prompanion Sidepanel] Extension context invalidated, retrying updateUserStatus in 1 second");
+      console.warn("[PromptProfile™ Sidepanel] Extension context invalidated, retrying updateUserStatus in 1 second");
       setTimeout(() => updateUserStatus(), 1000);
       return;
     }
@@ -712,7 +712,7 @@ async function updateUserStatus() {
         )
       ]);
     } catch (error) {
-      console.warn("[Prompanion Sidepanel] Storage access failed:", error.message);
+      console.warn("[PromptProfile™ Sidepanel] Storage access failed:", error.message);
       // If context is invalidated, retry later
       if (error.message?.includes("Extension context invalidated") || 
           error.message?.includes("message port closed") ||
@@ -750,14 +750,14 @@ async function updateUserStatus() {
         if (response.status === 401) {
           try {
             chrome.storage.local.remove(["authToken"], () => {
-              console.log("[Prompanion Sidepanel] Auth token removed due to 401");
+              console.log("[PromptProfile™ Sidepanel] Auth token removed due to 401");
             });
           } catch (error) {
-            console.error("[Prompanion Sidepanel] Error removing auth token:", error);
+            console.error("[PromptProfile™ Sidepanel] Error removing auth token:", error);
           }
           userStatusEl.textContent = "Not Logged In";
         } else {
-          console.warn("[Prompanion Sidepanel] Failed to fetch user profile:", response.status, response.statusText);
+          console.warn("[PromptProfile™ Sidepanel] Failed to fetch user profile:", response.status, response.statusText);
           userStatusEl.textContent = "Not Logged In";
         }
         return;
@@ -775,14 +775,14 @@ async function updateUserStatus() {
     } catch (fetchError) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
-        console.warn("[Prompanion Sidepanel] User profile fetch timed out");
+        console.warn("[PromptProfile™ Sidepanel] User profile fetch timed out");
         userStatusEl.textContent = "Not Logged In";
       } else {
         throw fetchError;
       }
     }
   } catch (error) {
-    console.error("[Prompanion Sidepanel] Error updating user status:", error);
+    console.error("[PromptProfile™ Sidepanel] Error updating user status:", error);
     userStatusEl.textContent = "Not Logged In";
   }
 }
@@ -826,7 +826,7 @@ async function init() {
   try {
     const accountButton = document.getElementById("open-account");
     const accountDialog = document.getElementById("account-dialog");
-    console.log("[Prompanion Sidepanel] Account elements check:", { 
+    console.log("[PromptProfile™ Sidepanel] Account elements check:", { 
       hasButton: !!accountButton, 
       hasDialog: !!accountDialog,
       buttonId: accountButton?.id,
@@ -836,12 +836,12 @@ async function init() {
     if (accountButton && accountDialog) {
       // DON'T add handlers here - LoginMenu.js will handle the account button click
       // LoginMenu.js needs to check login status and show the correct view
-      console.log("[Prompanion Sidepanel] Account button found, LoginMenu.js will handle clicks");
+      console.log("[PromptProfile™ Sidepanel] Account button found, LoginMenu.js will handle clicks");
     } else {
-      console.error("[Prompanion Sidepanel] Account button or dialog missing! Button:", !!accountButton, "Dialog:", !!accountDialog);
+      console.error("[PromptProfile™ Sidepanel] Account button or dialog missing! Button:", !!accountButton, "Dialog:", !!accountDialog);
     }
   } catch (error) {
-    console.error("[Prompanion Sidepanel] Error setting up account button:", error);
+    console.error("[PromptProfile™ Sidepanel] Error setting up account button:", error);
   }
   
   currentState = await loadState();
@@ -850,7 +850,7 @@ async function init() {
   const storedState = await readStorageSafely();
   
   // Init start
-  console.log("[Prompanion Sidepanel] Raw stored state:", {
+  console.log("[PromptProfile™ Sidepanel] Raw stored state:", {
     hasStored: !!storedState,
     hasOriginalPrompt: !!storedState?.originalPrompt,
     hasOptionA: !!storedState?.optionA,
@@ -861,7 +861,7 @@ async function init() {
   // DIRECT: If storage has prompts, use them directly - NO MERGE LOGIC
   if (storedState && hasPrompts(storedState)) {
     // Found prompts in storage
-    console.log("[Prompanion Sidepanel] Stored prompts:", {
+    console.log("[PromptProfile™ Sidepanel] Stored prompts:", {
       originalPrompt: storedState.originalPrompt?.substring(0, 100),
       optionA: storedState.optionA?.substring(0, 100),
       originalPromptLength: storedState.originalPrompt?.length,
@@ -872,7 +872,7 @@ async function init() {
     currentState.originalPrompt = storedState.originalPrompt || "";
     currentState.optionA = storedState.optionA || "";
     
-    console.log("[Prompanion Sidepanel] Assigned to currentState:", {
+    console.log("[PromptProfile™ Sidepanel] Assigned to currentState:", {
       originalPrompt: currentState.originalPrompt?.substring(0, 50),
       optionA: currentState.optionA?.substring(0, 50)
     });
@@ -894,16 +894,16 @@ async function init() {
       }, delay);
     });
   } else {
-    console.log("[Prompanion Sidepanel] No prompts in storage, initializing empty");
+    console.log("[PromptProfile™ Sidepanel] No prompts in storage, initializing empty");
     initPromptEnhancer(currentState);
   }
   
   // Also check storage again after a short delay to catch any updates
   // This is important because enhancements might be generated while the side panel is loading
-  schedulePromptCheck(500, "[Prompanion Sidepanel] Found updated prompts in storage after delay, updating and rendering...");
+  schedulePromptCheck(500, "[PromptProfile™ Sidepanel] Found updated prompts in storage after delay, updating and rendering...");
   
   // One more check after 1 second to be absolutely sure
-  schedulePromptCheck(1000, "[Prompanion Sidepanel] Final delayed check - updating prompts...");
+  schedulePromptCheck(1000, "[PromptProfile™ Sidepanel] Final delayed check - updating prompts...");
 
   // Check if there's already a fresh conversation (only welcome message)
   const existingFreshConversation = currentState.conversations.find((conv) => 
@@ -940,7 +940,7 @@ async function init() {
   const latestStorage = await storage.get(STATE_KEY);
   if (latestStorage && hasPrompts(latestStorage)) {
     if (!currentState.originalPrompt && !currentState.optionA) {
-      console.log("[Prompanion Sidepanel] Storage has prompts we don't have, preserving them before save");
+      console.log("[PromptProfile™ Sidepanel] Storage has prompts we don't have, preserving them before save");
       currentState.originalPrompt = latestStorage.originalPrompt || "";
       currentState.optionA = latestStorage.optionA || "";
     }
@@ -975,7 +975,7 @@ async function init() {
   try {
     const storageInfo = await getStorageInfo();
     if (storageInfo) {
-      console.log("[Prompanion Sidepanel] Storage info:", {
+      console.log("[PromptProfile™ Sidepanel] Storage info:", {
         totalSize: storageInfo.totalSize,
         stateSize: storageInfo.stateSize,
         conversations: storageInfo.conversations,
@@ -984,20 +984,20 @@ async function init() {
       
       // Lower threshold - clean up at 70KB instead of 80KB
       if (storageInfo.totalSize > 70000) {
-        console.warn("[Prompanion Sidepanel] Storage approaching limit (" + storageInfo.totalSize + " bytes), running cleanup...");
+        console.warn("[PromptProfile™ Sidepanel] Storage approaching limit (" + storageInfo.totalSize + " bytes), running cleanup...");
         const cleanupResult = await cleanupStorage();
         if (cleanupResult.cleaned) {
-          console.log("[Prompanion Sidepanel] Storage cleaned:", cleanupResult.saved, "bytes saved");
+          console.log("[PromptProfile™ Sidepanel] Storage cleaned:", cleanupResult.saved, "bytes saved");
         }
       }
     }
   } catch (error) {
-    console.error("[Prompanion Sidepanel] Error during storage cleanup:", error);
+    console.error("[PromptProfile™ Sidepanel] Error during storage cleanup:", error);
     // Try cleanup anyway if we can't get info
     try {
       await cleanupStorage();
     } catch (cleanupError) {
-      console.error("[Prompanion Sidepanel] Cleanup also failed:", cleanupError);
+      console.error("[PromptProfile™ Sidepanel] Cleanup also failed:", cleanupError);
     }
   }
 
@@ -1014,7 +1014,7 @@ async function init() {
     const accountButton = document.getElementById("open-account");
     const accountDialog = document.getElementById("account-dialog");
     
-    console.log("[Prompanion Sidepanel] Elements found:", {
+    console.log("[PromptProfile™ Sidepanel] Elements found:", {
       hasButton: !!accountButton,
       hasDialog: !!accountDialog,
       button: accountButton,
@@ -1022,21 +1022,21 @@ async function init() {
     });
     
     if (!accountButton || !accountDialog) {
-      console.error("[Prompanion Sidepanel] Missing elements! Button:", !!accountButton, "Dialog:", !!accountDialog);
+      console.error("[PromptProfile™ Sidepanel] Missing elements! Button:", !!accountButton, "Dialog:", !!accountDialog);
       return false;
     }
     
     // DON'T add handlers here - let LoginMenu.js handle it
     // The LoginMenu.js handler will check login status and show the correct view
-    console.log("[Prompanion Sidepanel] Account button found, LoginMenu.js will handle clicks");
+    console.log("[PromptProfile™ Sidepanel] Account button found, LoginMenu.js will handle clicks");
     
-    console.log("[Prompanion Sidepanel] Account button handlers attached!");
+    console.log("[PromptProfile™ Sidepanel] Account button handlers attached!");
     return true;
   };
   
   // Try immediately
   if (!setupAccountButtonDirectly()) {
-    console.warn("[Prompanion Sidepanel] Initial setup failed, retrying...");
+    console.warn("[PromptProfile™ Sidepanel] Initial setup failed, retrying...");
     setTimeout(() => setupAccountButtonDirectly(), 100);
     setTimeout(() => setupAccountButtonDirectly(), 500);
     setTimeout(() => setupAccountButtonDirectly(), 1000);
@@ -1044,18 +1044,18 @@ async function init() {
   
   // Also try registerAccountHandlers (but don't depend on it)
   try {
-    console.log("[Prompanion Sidepanel] Calling registerAccountHandlers...");
+    console.log("[PromptProfile™ Sidepanel] Calling registerAccountHandlers...");
   registerAccountHandlers();
-    console.log("[Prompanion Sidepanel] registerAccountHandlers completed");
+    console.log("[PromptProfile™ Sidepanel] registerAccountHandlers completed");
   } catch (error) {
-    console.error("[Prompanion Sidepanel] Error in registerAccountHandlers (non-fatal):", error);
+    console.error("[PromptProfile™ Sidepanel] Error in registerAccountHandlers (non-fatal):", error);
   }
   initTabs();
   registerSectionActionGuards();
   
   // Initialize side chat after module loads (or immediately if already loaded)
   window.initSideChat = function() {
-    console.log("[Prompanion Sidepanel] Initializing side chat...");
+    console.log("[PromptProfile™ Sidepanel] Initializing side chat...");
     const activeConv = getActiveConversation(currentState);
     renderChat(activeConv?.history ?? []);
     renderChatTabs(currentState.conversations, currentState.activeConversationId);
@@ -1070,7 +1070,7 @@ async function init() {
   }
   
   processPendingSideChat(currentState, { saveState });
-    console.log("[Prompanion Sidepanel] Side chat initialized");
+    console.log("[PromptProfile™ Sidepanel] Side chat initialized");
   };
   
   // Wait for sideChat module to load, then initialize
@@ -1099,7 +1099,7 @@ async function init() {
 
   // Process any storage changes that happened before init completed
   if (pendingStorageChanges.length > 0) {
-    console.log("[Prompanion Sidepanel] Processing pending storage changes:", pendingStorageChanges.length);
+    console.log("[PromptProfile™ Sidepanel] Processing pending storage changes:", pendingStorageChanges.length);
     pendingStorageChanges.forEach((newState) => {
       if (hasPrompts(newState)) {
         updateAndRenderPrompts(currentState, newState);
@@ -1113,7 +1113,7 @@ async function init() {
   // Add a small delay to ensure any background script saves have completed
   await new Promise(resolve => setTimeout(resolve, 100));
   const finalState = await loadState();
-  console.log("[Prompanion Sidepanel] Final state check:", {
+  console.log("[PromptProfile™ Sidepanel] Final state check:", {
     hasOriginalPrompt: !!finalState?.originalPrompt,
     hasOptionA: !!finalState?.optionA,
     originalPrompt: finalState?.originalPrompt?.substring(0, 50),
@@ -1122,10 +1122,10 @@ async function init() {
   if (finalState && hasPrompts(finalState)) {
     // Always update prompts if they exist in storage, even if they match
     // This ensures we show the latest prompts even if currentState already has them
-    console.log("[Prompanion Sidepanel] Final state check - prompts found, ensuring they're displayed");
+    console.log("[PromptProfile™ Sidepanel] Final state check - prompts found, ensuring they're displayed");
     updateAndRenderPrompts(currentState, finalState);
   } else {
-    console.log("[Prompanion Sidepanel] Final state check - no prompts in storage");
+    console.log("[PromptProfile™ Sidepanel] Final state check - no prompts in storage");
   }
 
   if (chrome?.runtime?.sendMessage) {
@@ -1151,12 +1151,12 @@ function setupAccountButtonEarly() {
   const accountDialog = document.getElementById("account-dialog");
   
   if (accountButton && accountDialog) {
-    console.log("[Prompanion Sidepanel] Early setup: Found button and dialog");
+    console.log("[PromptProfile™ Sidepanel] Early setup: Found button and dialog");
     // DON'T add handlers here - LoginMenu.js will handle the account button click
     // LoginMenu.js needs to check login status and show the correct view
-    console.log("[Prompanion Sidepanel] Early setup complete, LoginMenu.js will handle clicks");
+    console.log("[PromptProfile™ Sidepanel] Early setup complete, LoginMenu.js will handle clicks");
   } else {
-    console.warn("[Prompanion Sidepanel] Early setup: Elements not found yet");
+    console.warn("[PromptProfile™ Sidepanel] Early setup: Elements not found yet");
   }
 }
 
@@ -1176,19 +1176,19 @@ document.addEventListener("DOMContentLoaded", init);
 // Also listen for visibility changes to refresh prompts when side panel becomes visible
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && currentState) {
-    console.log("[Prompanion Sidepanel] Side panel became visible, checking for updated prompts...");
+    console.log("[PromptProfile™ Sidepanel] Side panel became visible, checking for updated prompts...");
     // Re-read storage and update prompts
     loadState().then((latestState) => {
       if (hasPrompts(latestState)) {
         if (promptsNeedUpdate(currentState, latestState)) {
-          console.log("[Prompanion Sidepanel] Visibility change detected prompts update, rendering...");
+          console.log("[PromptProfile™ Sidepanel] Visibility change detected prompts update, rendering...");
           updateAndRenderPrompts(currentState, latestState);
         } else {
-          console.log("[Prompanion Sidepanel] Visibility change - prompts already up to date, re-rendering anyway");
+          console.log("[PromptProfile™ Sidepanel] Visibility change - prompts already up to date, re-rendering anyway");
           renderPrompts(currentState);
         }
       } else {
-        console.log("[Prompanion Sidepanel] Visibility change - no prompts found in storage");
+        console.log("[PromptProfile™ Sidepanel] Visibility change - no prompts found in storage");
       }
     });
     // Update user status when side panel becomes visible
@@ -1200,19 +1200,19 @@ document.addEventListener("visibilitychange", () => {
 
 // Expose cleanup function globally
 window.cleanupStorage = async function() {
-  console.log("[Prompanion Sidepanel] Manual storage cleanup triggered");
+  console.log("[PromptProfile™ Sidepanel] Manual storage cleanup triggered");
   try {
     const info = await getStorageInfo();
-    console.log("[Prompanion Sidepanel] Storage before cleanup:", info);
-    console.log("[Prompanion Sidepanel] Detailed breakdown:", JSON.stringify(info.breakdown, null, 2));
+    console.log("[PromptProfile™ Sidepanel] Storage before cleanup:", info);
+    console.log("[PromptProfile™ Sidepanel] Detailed breakdown:", JSON.stringify(info.breakdown, null, 2));
     const result = await cleanupStorage();
-    console.log("[Prompanion Sidepanel] Cleanup result:", result);
+    console.log("[PromptProfile™ Sidepanel] Cleanup result:", result);
     const infoAfter = await getStorageInfo();
-    console.log("[Prompanion Sidepanel] Storage after cleanup:", infoAfter);
-    console.log("[Prompanion Sidepanel] Detailed breakdown after:", JSON.stringify(infoAfter.breakdown, null, 2));
+    console.log("[PromptProfile™ Sidepanel] Storage after cleanup:", infoAfter);
+    console.log("[PromptProfile™ Sidepanel] Detailed breakdown after:", JSON.stringify(infoAfter.breakdown, null, 2));
     alert(`Storage cleaned! Saved ${result.saved} bytes.\n\nBefore: ${info.totalSize} bytes\nAfter: ${infoAfter.totalSize} bytes`);
   } catch (error) {
-    console.error("[Prompanion Sidepanel] Cleanup error:", error);
+    console.error("[PromptProfile™ Sidepanel] Cleanup error:", error);
     alert("Error during cleanup: " + error.message);
   }
 };
@@ -1221,19 +1221,19 @@ window.cleanupStorage = async function() {
 window.inspectStorage = async function() {
   try {
     const info = await getStorageInfo();
-    console.log("[Prompanion Sidepanel] ========== STORAGE INSPECTION ==========");
-    console.log("[Prompanion Sidepanel] Total size:", info.totalSize, "bytes");
-    console.log("[Prompanion Sidepanel] State size:", info.stateSize, "bytes");
-    console.log("[Prompanion Sidepanel] Detailed breakdown:", JSON.stringify(info.breakdown, null, 2));
-    console.log("[Prompanion Sidepanel] Conversations:", info.conversations);
-    console.log("[Prompanion Sidepanel] Library folders:", info.libraryFolders);
+    console.log("[PromptProfile™ Sidepanel] ========== STORAGE INSPECTION ==========");
+    console.log("[PromptProfile™ Sidepanel] Total size:", info.totalSize, "bytes");
+    console.log("[PromptProfile™ Sidepanel] State size:", info.stateSize, "bytes");
+    console.log("[PromptProfile™ Sidepanel] Detailed breakdown:", JSON.stringify(info.breakdown, null, 2));
+    console.log("[PromptProfile™ Sidepanel] Conversations:", info.conversations);
+    console.log("[PromptProfile™ Sidepanel] Library folders:", info.libraryFolders);
     
     // Get the actual state to see what's in it
     const result = await chrome.storage.sync.get(STATE_KEY);
     const state = result[STATE_KEY];
     if (state) {
-      console.log("[Prompanion Sidepanel] Full state object:", state);
-      console.log("[Prompanion Sidepanel] Conversations details:", state.conversations?.map(c => ({
+      console.log("[PromptProfile™ Sidepanel] Full state object:", state);
+      console.log("[PromptProfile™ Sidepanel] Conversations details:", state.conversations?.map(c => ({
         id: c.id,
         historyLength: c.history?.length || 0,
         historySize: JSON.stringify(c.history || []).length
@@ -1242,45 +1242,45 @@ window.inspectStorage = async function() {
     
     return info;
   } catch (error) {
-    console.error("[Prompanion Sidepanel] Inspection error:", error);
+    console.error("[PromptProfile™ Sidepanel] Inspection error:", error);
     return null;
   }
 };
 
 // Expose manual functions for debugging
 window.refreshPrompts = async function() {
-  console.log("[Prompanion Sidepanel] ========== MANUAL REFRESH TRIGGERED ==========");
+  console.log("[PromptProfile™ Sidepanel] ========== MANUAL REFRESH TRIGGERED ==========");
   const storedState = await readStorageSafely();
   if (!storedState) {
-    console.warn("[Prompanion Sidepanel] Extension context invalidated, cannot refresh prompts");
+    console.warn("[PromptProfile™ Sidepanel] Extension context invalidated, cannot refresh prompts");
     return;
   }
   
   if (storedState && hasPrompts(storedState)) {
     currentState.originalPrompt = storedState.originalPrompt || "";
     currentState.optionA = storedState.optionA || "";
-    console.log("[Prompanion Sidepanel] Updated currentState, calling renderPrompts");
+    console.log("[PromptProfile™ Sidepanel] Updated currentState, calling renderPrompts");
     renderPrompts({
       originalPrompt: currentState.originalPrompt,
       optionA: currentState.optionA
     });
-    console.log("[Prompanion Sidepanel] Manual refresh complete");
+    console.log("[PromptProfile™ Sidepanel] Manual refresh complete");
   } else {
-    console.log("[Prompanion Sidepanel] No prompts in storage");
+    console.log("[PromptProfile™ Sidepanel] No prompts in storage");
   }
 };
 
 window.testPrompts = function() {
-  console.log("[Prompanion Sidepanel] ========== TEST PROMPTS ==========");
+  console.log("[PromptProfile™ Sidepanel] ========== TEST PROMPTS ==========");
   const originalField = document.getElementById("original-prompt");
   const optionAField = document.getElementById("option-a");
-  console.log("[Prompanion Sidepanel] DOM elements:", {
+  console.log("[PromptProfile™ Sidepanel] DOM elements:", {
     hasOriginal: !!originalField,
     hasOptionA: !!optionAField
   });
   if (optionAField) {
     optionAField.value = "TEST VALUE FOR OPTION A";
-    console.log("[Prompanion Sidepanel] Set test value, field now has:", optionAField.value);
+    console.log("[PromptProfile™ Sidepanel] Set test value, field now has:", optionAField.value);
   }
 };
 
@@ -1299,8 +1299,8 @@ if (chrome?.storage?.local?.onChanged) {
 // Set up storage listener BEFORE init() to catch all changes
 if (chrome?.storage?.onChanged) {
   chrome.storage.onChanged.addListener(async (changes, areaName) => {
-    console.log("[Prompanion Sidepanel] ========== STORAGE CHANGE DETECTED ==========");
-    console.log("[Prompanion Sidepanel] Storage change detected:", {
+    console.log("[PromptProfile™ Sidepanel] ========== STORAGE CHANGE DETECTED ==========");
+    console.log("[PromptProfile™ Sidepanel] Storage change detected:", {
       areaName,
       hasStateKey: !!changes[STATE_KEY],
       hasNewValue: !!changes[STATE_KEY]?.newValue,
@@ -1309,7 +1309,7 @@ if (chrome?.storage?.onChanged) {
     
     if (areaName === "sync" && changes[STATE_KEY]?.newValue) {
       const newState = changes[STATE_KEY].newValue;
-      console.log("[Prompanion Sidepanel] Storage change - new state:", {
+      console.log("[PromptProfile™ Sidepanel] Storage change - new state:", {
         hasOriginalPrompt: !!newState.originalPrompt,
         hasOptionA: !!newState.optionA,
         originalPrompt: newState.originalPrompt?.substring(0, 50),
@@ -1321,7 +1321,7 @@ if (chrome?.storage?.onChanged) {
       if (hasPrompts(newState)) {
         if (currentState) {
           // Process immediately if currentState is ready
-          console.log("[Prompanion Sidepanel] Storage change - currentState ready, updating prompts");
+          console.log("[PromptProfile™ Sidepanel] Storage change - currentState ready, updating prompts");
           // DIRECT UPDATE - don't use handleStatePush, just update directly
           currentState.originalPrompt = newState.originalPrompt || currentState.originalPrompt;
           currentState.optionA = newState.optionA || currentState.optionA;
@@ -1333,17 +1333,17 @@ if (chrome?.storage?.onChanged) {
           // processPendingSideChat(currentState, { saveState });
         } else {
           // Queue for processing after init() completes
-          console.log("[Prompanion Sidepanel] Storage change queued for after init");
+          console.log("[PromptProfile™ Sidepanel] Storage change queued for after init");
           pendingStorageChanges.push(newState);
         }
       } else {
-        console.log("[Prompanion Sidepanel] Storage change - no prompts in new state");
+        console.log("[PromptProfile™ Sidepanel] Storage change - no prompts in new state");
       }
     }
   });
-  console.log("[Prompanion Sidepanel] Storage change listener registered");
+  console.log("[PromptProfile™ Sidepanel] Storage change listener registered");
 } else {
-  console.warn("[Prompanion Sidepanel] chrome.storage.onChanged not available!");
+  console.warn("[PromptProfile™ Sidepanel] chrome.storage.onChanged not available!");
 }
 
 // ALSO: Poll storage every 2 seconds as a backup (remove this once we confirm it's working)
@@ -1351,7 +1351,7 @@ setInterval(async () => {
   if (currentState) {
     const latestState = await loadState();
     if (hasPrompts(latestState) && promptsNeedUpdate(currentState, latestState)) {
-      console.log("[Prompanion Sidepanel] Poll detected prompts update, rendering...");
+      console.log("[PromptProfile™ Sidepanel] Poll detected prompts update, rendering...");
       currentState.originalPrompt = latestState.originalPrompt || currentState.originalPrompt;
       currentState.optionA = latestState.optionA || currentState.optionA;
       renderPrompts(currentState);
@@ -1367,8 +1367,8 @@ if (chrome?.runtime?.onMessage) {
     
     // Handle usage updates from enhancements (e.g., Refine button)
     if (message.type === "PROMPANION_USAGE_UPDATE") {
-      console.log("[Prompanion Sidepanel] ========== USAGE UPDATE RECEIVED ==========");
-      console.log("[Prompanion Sidepanel] Usage data:", {
+      console.log("[PromptProfile™ Sidepanel] ========== USAGE UPDATE RECEIVED ==========");
+      console.log("[PromptProfile™ Sidepanel] Usage data:", {
         enhancementsUsed: message.enhancementsUsed,
         enhancementsLimit: message.enhancementsLimit
       });
@@ -1384,7 +1384,7 @@ if (chrome?.runtime?.onMessage) {
         const limitEl = document.getElementById("enhancements-limit");
         if (countEl) {
           countEl.textContent = message.enhancementsUsed;
-          console.log("[Prompanion Sidepanel] Updated enhancements count from message:", message.enhancementsUsed);
+          console.log("[PromptProfile™ Sidepanel] Updated enhancements count from message:", message.enhancementsUsed);
         }
         if (limitEl) {
           limitEl.textContent = message.enhancementsLimit;
@@ -1405,7 +1405,7 @@ if (chrome?.runtime?.onMessage) {
         return;
       }
       if (message.state && typeof message.state === "object") {
-        console.log("[Prompanion Sidepanel] PROMPANION_STATE_PUSH received:", {
+        console.log("[PromptProfile™ Sidepanel] PROMPANION_STATE_PUSH received:", {
           hasOriginalPrompt: !!message.state.originalPrompt,
           hasOptionA: !!message.state.optionA,
           originalPrompt: message.state.originalPrompt?.substring(0, 50),
@@ -1421,8 +1421,8 @@ if (chrome?.runtime?.onMessage) {
       }
     }
     if (message.type === "PROMPANION_SIDECHAT_DELIVER") {
-      console.log("[Prompanion Sidepanel] ========== PROMPANION_SIDECHAT_DELIVER RECEIVED ==========");
-      console.log("[Prompanion Sidepanel] Message:", {
+      console.log("[PromptProfile™ Sidepanel] ========== PROMPANION_SIDECHAT_DELIVER RECEIVED ==========");
+      console.log("[PromptProfile™ Sidepanel] Message:", {
         hasText: !!message.text,
         textLength: message.text?.length,
         textPreview: message.text?.substring(0, 50),
@@ -1441,7 +1441,7 @@ if (chrome?.runtime?.onMessage) {
       });
       
       if (!currentState) {
-        console.error("[Prompanion Sidepanel] No currentState available!");
+        console.error("[PromptProfile™ Sidepanel] No currentState available!");
         return;
       }
       
@@ -1453,7 +1453,7 @@ if (chrome?.runtime?.onMessage) {
           // Don't store chatHistory - it's passed directly in the message
           timestamp: Date.now()
         };
-        console.log("[Prompanion Sidepanel] Updated pendingSideChat from PROMPANION_SIDECHAT_DELIVER:", {
+        console.log("[PromptProfile™ Sidepanel] Updated pendingSideChat from PROMPANION_SIDECHAT_DELIVER:", {
           hasText: !!message.text,
           textLength: message.text?.length,
           chatHistoryLength: chatHistoryArray.length,
@@ -1463,7 +1463,7 @@ if (chrome?.runtime?.onMessage) {
           note: "Chat history passed directly in message, not stored"
         });
       } else {
-        console.error("[Prompanion Sidepanel] PROMPANION_SIDECHAT_DELIVER has no text!");
+        console.error("[PromptProfile™ Sidepanel] PROMPANION_SIDECHAT_DELIVER has no text!");
         return;
       }
       
@@ -1475,7 +1475,7 @@ if (chrome?.runtime?.onMessage) {
         const chatHistoryFromMessage = Array.isArray(message.chatHistory) ? message.chatHistory : [];
         
         if (!textToSend || !textToSend.trim()) {
-          console.error("[Prompanion Sidepanel] PROMPANION_SIDECHAT_DELIVER: No valid text to send!", {
+          console.error("[PromptProfile™ Sidepanel] PROMPANION_SIDECHAT_DELIVER: No valid text to send!", {
             hasPendingSideChat: !!currentState.pendingSideChat,
             pendingText: currentState.pendingSideChat?.text?.substring(0, 50),
             messageText: message.text?.substring(0, 50)
@@ -1483,7 +1483,7 @@ if (chrome?.runtime?.onMessage) {
           return;
         }
         
-        console.log("[Prompanion Sidepanel] Sending text to triggerAutoSideChat:", {
+        console.log("[PromptProfile™ Sidepanel] Sending text to triggerAutoSideChat:", {
           textLength: textToSend.length,
           textPreview: textToSend.substring(0, 50),
           source: currentState.pendingSideChat?.text ? "pendingSideChat" : "message.text"
@@ -1494,7 +1494,7 @@ if (chrome?.runtime?.onMessage) {
         const sectionOpened = await openSideChatSection();
         
         if (!sectionOpened) {
-          console.warn("[Prompanion Sidepanel] Failed to open side chat section, proceeding anyway");
+          console.warn("[PromptProfile™ Sidepanel] Failed to open side chat section, proceeding anyway");
         }
         
         // Wait for the section to be fully expanded and DOM to be ready
@@ -1510,10 +1510,10 @@ if (chrome?.runtime?.onMessage) {
             const isExpanded = detailsElement?.open || detailsElement?.classList.contains("is-expanded");
             
             if (isExpanded && chatMessage) {
-              console.log("[Prompanion Sidepanel] Side chat section ready after", attempts * 100, "ms");
+              console.log("[PromptProfile™ Sidepanel] Side chat section ready after", attempts * 100, "ms");
               resolve();
             } else if (attempts >= maxAttempts) {
-              console.warn("[Prompanion Sidepanel] Side chat section not ready after max attempts, proceeding anyway");
+              console.warn("[PromptProfile™ Sidepanel] Side chat section not ready after max attempts, proceeding anyway");
               resolve();
             } else {
               setTimeout(checkReady, 100);
@@ -1529,7 +1529,7 @@ if (chrome?.runtime?.onMessage) {
           llmChatHistory: chatHistoryFromMessage // Pass chat history directly from message
         }, { saveState });
       }).catch((error) => {
-        console.error("[Prompanion Sidepanel] Failed to load sideChat for PROMPANION_SIDECHAT_DELIVER:", error);
+        console.error("[PromptProfile™ Sidepanel] Failed to load sideChat for PROMPANION_SIDECHAT_DELIVER:", error);
       });
     }
   });

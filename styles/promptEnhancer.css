@@ -198,36 +198,6 @@
   display: flex;
 }
 
-/* Prompt Feedback */
-.prompt-feedback {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 28px; /* Match button height */
-  height: 28px; /* Fixed height for alignment */
-}
-
-.prompt-feedback .btn--icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  padding: 0;
-  transition: background-color var(--prompt-transition-speed) var(--prompt-transition-ease),
-              transform var(--prompt-transition-speed) var(--prompt-transition-ease);
-}
-
-.prompt-feedback .btn--icon:hover {
-  transform: scale(1.1);
-}
-
-.icon--thumb-up,
-.icon--thumb-down {
-  width: 16px;
-  height: 16px;
-  fill: currentColor;
-  transition: fill var(--prompt-transition-speed) var(--prompt-transition-ease);
-}
-
 /* Prompt Textarea */
 .prompt-textarea {
   width: 100%;

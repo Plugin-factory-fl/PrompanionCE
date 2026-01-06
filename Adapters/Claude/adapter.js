@@ -5,9 +5,9 @@
 // This eliminates duplicate listener registrations and provides unified message handling.
 // ============================================================================
 
-console.log("[Prompanion] ========== CLAUDE ADAPTER LOADING ==========");
-console.log("[Prompanion] Timestamp:", new Date().toISOString());
-console.log("[Prompanion] Location:", window.location.href);
+console.log("[PromptProfile™] ========== CLAUDE ADAPTER LOADING ==========");
+console.log("[PromptProfile™] Timestamp:", new Date().toISOString());
+console.log("[PromptProfile™] Location:", window.location.href);
 
 // CRITICAL: Fix Claude's accessibility bug IMMEDIATELY, before anything else runs
 // This must run before Claude's code can set aria-hidden on fieldsets
@@ -62,17 +62,17 @@ console.log("[Prompanion] Location:", window.location.href);
     });
   }
   
-  console.log("[Prompanion] Installed early aria-hidden prevention for Claude accessibility bug");
+  console.log("[PromptProfile™] Installed early aria-hidden prevention for Claude accessibility bug");
 })();
 
 // Import constants from AdapterBase
 if (typeof AdapterBase === "undefined") {
-  console.error("[Prompanion] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
+  console.error("[PromptProfile™] AdapterBase is not available! Make sure Base/AdapterBase.js is loaded first.");
   throw new Error("AdapterBase must be loaded before adapter.js");
 }
 
-const BUTTON_ID = "prompanion-claude-trigger";
-const BUTTON_CLASS = "prompanion-claude-trigger";
+const BUTTON_ID = "promptprofile-claude-trigger";
+const BUTTON_CLASS = "promptprofile-claude-trigger";
 const SELECTION_TOOLBAR_ID = AdapterBase.SELECTION_TOOLBAR_ID;
 const SELECTION_TOOLBAR_VISIBLE_CLASS = AdapterBase.SELECTION_TOOLBAR_VISIBLE_CLASS;
 const HIGHLIGHT_BUTTON_SELECTORS = [
@@ -82,7 +82,7 @@ const HIGHLIGHT_BUTTON_SELECTORS = [
 ];
 const BUTTON_SIZE = AdapterBase.BUTTON_SIZE;
 
-console.log("[Prompanion] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
+console.log("[PromptProfile™] Constants loaded from AdapterBase:", { BUTTON_ID, BUTTON_CLASS });
 let domObserverStarted = false;
 
 let enhanceTooltipElement = null;
@@ -112,7 +112,7 @@ let highlightObserver = null;
 
 function ensureStyle() {
   // Load generic adapter styles from external CSS file
-  const styleId = "prompanion-adapter-styles";
+  const styleId = "promptprofile-adapter-styles";
   let styleElement = document.getElementById(styleId);
   
   if (!styleElement) {
@@ -204,7 +204,7 @@ function ensureSelectionToolbar() {
   
   const dismiss = document.createElement("button");
   dismiss.type = "button";
-  dismiss.className = "prompanion-selection-toolbar__dismiss";
+  dismiss.className = "promptprofile-selection-toolbar__dismiss";
   dismiss.textContent = "×";
   dismiss.setAttribute("aria-label", "Dismiss");
   dismiss.addEventListener("click", (e) => {
@@ -215,7 +215,7 @@ function ensureSelectionToolbar() {
   
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "prompanion-selection-toolbar__button";
+  button.className = "promptprofile-selection-toolbar__button";
   button.textContent = "Elaborate";
   button.addEventListener("pointerdown", (e) => e.preventDefault());
   button.addEventListener("mousedown", (e) => e.stopPropagation());
@@ -225,7 +225,7 @@ function ensureSelectionToolbar() {
   
   // Verify document.body exists before appending
   if (!document.body) {
-    console.error("[Prompanion] Cannot create selection toolbar: document.body not available");
+    console.error("[PromptProfile™] Cannot create selection toolbar: document.body not available");
     return null;
   }
   
@@ -261,7 +261,7 @@ function updateSelectionToolbar() {
   const selection = window.getSelection();
   const text = selection?.toString().trim();
   
-  console.log("[Prompanion] updateSelectionToolbar called", {
+  console.log("[PromptProfile™] updateSelectionToolbar called", {
     hasSelection: !!selection,
     isCollapsed: selection?.isCollapsed,
     textLength: text?.length,
@@ -272,12 +272,12 @@ function updateSelectionToolbar() {
   
   if (!selection || selection.isCollapsed || !text || selectionWithinComposer(selection) || 
       !selectionTargetsAssistant(selection)) {
-    console.log("[Prompanion] Hiding toolbar - conditions not met");
+    console.log("[PromptProfile™] Hiding toolbar - conditions not met");
     hideSelectionToolbar();
     return;
   }
   
-  console.log("[Prompanion] Showing toolbar - all conditions met");
+  console.log("[PromptProfile™] Showing toolbar - all conditions met");
   const rangeRect = AdapterBase.getSelectionRect(selection);
   if (!rangeRect) {
     hideSelectionToolbar();
@@ -286,7 +286,7 @@ function updateSelectionToolbar() {
 
   const toolbar = ensureSelectionToolbar();
   if (!toolbar) {
-    console.error("[Prompanion] Failed to create selection toolbar");
+    console.error("[PromptProfile™] Failed to create selection toolbar");
     return;
   }
   selectionToolbarText = text;
@@ -311,13 +311,13 @@ function updateSelectionToolbar() {
   
   // Verify we got valid dimensions
   if (!w || !h) {
-    console.warn("[Prompanion] Toolbar has invalid dimensions:", { w, h }, "retrying...");
+    console.warn("[PromptProfile™] Toolbar has invalid dimensions:", { w, h }, "retrying...");
     // Force another reflow and remeasure
     void toolbar.offsetWidth;
     w = toolbar.offsetWidth;
     h = toolbar.offsetHeight;
     if (!w || !h) {
-      console.error("[Prompanion] Toolbar dimensions still invalid, cannot position tooltip");
+      console.error("[PromptProfile™] Toolbar dimensions still invalid, cannot position tooltip");
       return;
     }
   }
@@ -353,8 +353,8 @@ function updateSelectionToolbar() {
 }
 
 function captureClaudeChatHistory(maxMessages = 20) {
-  console.log("%c[Prompanion Claude] ========== captureClaudeChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
-  console.log("[Prompanion Claude] Current URL:", window.location.href);
+  console.log("%c[PromptProfile™ Claude] ========== captureClaudeChatHistory CALLED ==========", "color: blue; font-size: 16px; font-weight: bold;");
+  console.log("[PromptProfile™ Claude] Current URL:", window.location.href);
   
   const messages = [];
   
@@ -383,12 +383,12 @@ function captureClaudeChatHistory(maxMessages = 20) {
       try {
         const found = Array.from(document.querySelectorAll(selector));
         if (found.length > 0) {
-          console.log(`[Prompanion Claude] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
+          console.log(`[PromptProfile™ Claude] ✓ Found ${found.length} assistant messages with selector: ${selector}`);
           assistantElements = found;
           break;
         }
       } catch (e) {
-        console.warn(`[Prompanion Claude] Selector failed: ${selector}`, e);
+        console.warn(`[PromptProfile™ Claude] Selector failed: ${selector}`, e);
       }
     }
     
@@ -396,12 +396,12 @@ function captureClaudeChatHistory(maxMessages = 20) {
       try {
         const found = Array.from(document.querySelectorAll(selector));
         if (found.length > 0) {
-          console.log(`[Prompanion Claude] ✓ Found ${found.length} user messages with selector: ${selector}`);
+          console.log(`[PromptProfile™ Claude] ✓ Found ${found.length} user messages with selector: ${selector}`);
           userElements = found;
           break;
         }
       } catch (e) {
-        console.warn(`[Prompanion Claude] Selector failed: ${selector}`, e);
+        console.warn(`[PromptProfile™ Claude] Selector failed: ${selector}`, e);
       }
     }
     
@@ -433,10 +433,10 @@ function captureClaudeChatHistory(maxMessages = 20) {
       }
     }
     
-    console.log(`[Prompanion Claude] ✓ Captured ${messages.length} messages from Claude conversation`);
+    console.log(`[PromptProfile™ Claude] ✓ Captured ${messages.length} messages from Claude conversation`);
     return messages;
   } catch (error) {
-    console.error("[Prompanion Claude] ✗ Error capturing Claude chat history:", error);
+    console.error("[PromptProfile™ Claude] ✗ Error capturing Claude chat history:", error);
     return [];
   }
 }
@@ -452,13 +452,13 @@ function getElementPosition(element) {
 }
 
 function submitSelectionToSideChat(text) {
-  console.log("%c[Prompanion Claude] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
+  console.log("%c[PromptProfile™ Claude] ========== submitSelectionToSideChat CALLED ==========", "color: red; font-size: 16px; font-weight: bold;");
   
   const snippet = typeof text === "string" ? text.trim() : "";
-  console.log("[Prompanion Claude] Snippet:", snippet?.substring(0, 50));
+  console.log("[PromptProfile™ Claude] Snippet:", snippet?.substring(0, 50));
   
   if (!snippet || selectionAskInFlight) {
-    console.log("[Prompanion Claude] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
+    console.log("[PromptProfile™ Claude] Exiting early - snippet:", !!snippet, "inFlight:", selectionAskInFlight);
     return;
   }
   selectionAskInFlight = true;
@@ -466,21 +466,21 @@ function submitSelectionToSideChat(text) {
   try {
     // Capture chat history from Claude conversation for context
     let chatHistory = [];
-    console.log("%c[Prompanion Claude] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
+    console.log("%c[PromptProfile™ Claude] Attempting to capture chat history...", "color: orange; font-size: 14px; font-weight: bold;");
     try {
       chatHistory = captureClaudeChatHistory(20);
-      console.log(`%c[Prompanion Claude] ✓ Captured ${chatHistory.length} messages`, 
+      console.log(`%c[PromptProfile™ Claude] ✓ Captured ${chatHistory.length} messages`, 
         chatHistory.length > 0 ? "color: green; font-size: 14px; font-weight: bold;" : "color: red; font-size: 14px; font-weight: bold;");
       if (chatHistory.length === 0) {
-        console.warn("[Prompanion Claude] ⚠️ No messages found in DOM");
+        console.warn("[PromptProfile™ Claude] ⚠️ No messages found in DOM");
       }
     } catch (error) {
-      console.error("[Prompanion Claude] ✗ Failed to capture chat history:", error);
+      console.error("[PromptProfile™ Claude] ✗ Failed to capture chat history:", error);
       chatHistory = [];
     }
     
-    console.log("%c[Prompanion Claude] Sending PROMPANION_SIDECHAT_REQUEST", "color: purple; font-size: 14px; font-weight: bold;");
-    console.log("[Prompanion Claude] Request details:", {
+    console.log("%c[PromptProfile™ Claude] Sending PROMPANION_SIDECHAT_REQUEST", "color: purple; font-size: 14px; font-weight: bold;");
+    console.log("[PromptProfile™ Claude] Request details:", {
       textLength: snippet.length,
       chatHistoryLength: chatHistory.length
     });
@@ -491,15 +491,15 @@ function submitSelectionToSideChat(text) {
       chatHistory: chatHistory 
     }, (response) => {
       if (!response?.ok) {
-        console.warn("Prompanion: sidechat request rejected", response?.reason);
+        console.warn("PromptProfile™: sidechat request rejected", response?.reason);
       }
       selectionAskInFlight = false;
     }).catch((error) => {
-      console.warn("Prompanion: failed to request sidechat from selection", error);
+      console.warn("PromptProfile™: failed to request sidechat from selection", error);
       selectionAskInFlight = false;
     });
   } catch (error) {
-    console.error("Prompanion: sidechat request threw synchronously", error);
+    console.error("PromptProfile™: sidechat request threw synchronously", error);
     selectionAskInFlight = false;
   }
 }
@@ -530,7 +530,7 @@ function createIcon() {
 function requestPromptEnhancement(promptText) {
   return AdapterBase.sendMessage({ type: "PROMPANION_PREPARE_ENHANCEMENT", prompt: promptText, openPanel: false })
     .catch((error) => {
-      console.warn("Prompanion: enhancement request failed", error);
+      console.warn("PromptProfile™: enhancement request failed", error);
       return { ok: false };
     });
 }
@@ -586,9 +586,9 @@ function buildButton() {
   button.className = BUTTON_CLASS;
   button.append(createIcon());
   // Use AdapterBase for generic hover tooltip
-  AdapterBase.attachTooltip(button, "Open Prompanion to enhance your prompts for the best response.", BUTTON_ID);
+  AdapterBase.attachTooltip(button, "Open PromptProfile™ to enhance your prompts for the best response.", BUTTON_ID);
   button.addEventListener("click", () => AdapterBase.togglePanel()
-    .catch((e) => console.error("Prompanion: failed to open sidebar from Claude adapter", e)));
+    .catch((e) => console.error("PromptProfile™: failed to open sidebar from Claude adapter", e)));
   button.addEventListener("mouseenter", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("focus", () => AdapterBase.showTooltip(button, BUTTON_ID));
   button.addEventListener("mouseleave", () => AdapterBase.hideTooltip(button));
@@ -720,7 +720,7 @@ function fixAriaHiddenOnFieldsets() {
     if (name === 'aria-hidden' && value === 'true' && this.tagName === 'FIELDSET') {
       const hasFocusable = this.querySelector('textarea, input, [contenteditable="true"], button, [tabindex]:not([tabindex="-1"])');
       if (hasFocusable) {
-        console.warn("[Prompanion] Preventing aria-hidden from being set on fieldset containing focusable element (Claude accessibility bug workaround)");
+        console.warn("[PromptProfile™] Preventing aria-hidden from being set on fieldset containing focusable element (Claude accessibility bug workaround)");
         // Don't set the attribute - just return
         return;
       }
@@ -835,63 +835,63 @@ function init() {
 function handleInsertTextMessage(message, sender, sendResponse) {
   try {
     const textToInsert = typeof message.text === "string" ? message.text.trim() : "";
-    console.log("[Prompanion] ========== INSERT TEXT REQUEST ==========");
-    console.log("[Prompanion] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
-    console.log("[Prompanion] Text length:", textToInsert.length);
+    console.log("[PromptProfile™] ========== INSERT TEXT REQUEST ==========");
+    console.log("[PromptProfile™] Text to insert:", textToInsert.substring(0, 50) + (textToInsert.length > 50 ? "..." : ""));
+    console.log("[PromptProfile™] Text length:", textToInsert.length);
     
     if (!textToInsert) {
-      console.log("[Prompanion] Insert failed: EMPTY_TEXT");
+      console.log("[PromptProfile™] Insert failed: EMPTY_TEXT");
       sendResponse({ ok: false, reason: "EMPTY_TEXT" });
       return false; // sendResponse called synchronously, close channel
     }
 
-    console.log("[Prompanion] Searching for composer node...");
+    console.log("[PromptProfile™] Searching for composer node...");
     const composerNode = findComposerNode();
-    console.log("[Prompanion] Composer node found:", composerNode);
-    console.log("[Prompanion] Node type:", composerNode?.constructor?.name);
-    console.log("[Prompanion] Node isContentEditable:", composerNode?.isContentEditable);
-    console.log("[Prompanion] Node tagName:", composerNode?.tagName);
-    console.log("[Prompanion] Node className:", composerNode?.className);
-    console.log("[Prompanion] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
-    console.log("[Prompanion] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
+    console.log("[PromptProfile™] Composer node found:", composerNode);
+    console.log("[PromptProfile™] Node type:", composerNode?.constructor?.name);
+    console.log("[PromptProfile™] Node isContentEditable:", composerNode?.isContentEditable);
+    console.log("[PromptProfile™] Node tagName:", composerNode?.tagName);
+    console.log("[PromptProfile™] Node className:", composerNode?.className);
+    console.log("[PromptProfile™] Node visible:", composerNode ? (composerNode.offsetParent !== null) : false);
+    console.log("[PromptProfile™] Node current value:", composerNode ? (composerNode.value || composerNode.textContent || "").substring(0, 50) : "");
     
     if (!composerNode) {
-      console.log("[Prompanion] Insert failed: NO_COMPOSER_NODE");
+      console.log("[PromptProfile™] Insert failed: NO_COMPOSER_NODE");
       sendResponse({ ok: false, reason: "NO_COMPOSER_NODE" });
       return false; // sendResponse called synchronously, close channel
     }
 
-    console.log("[Prompanion] Calling setComposerText...");
+    console.log("[PromptProfile™] Calling setComposerText...");
     const success = setComposerText(composerNode, textToInsert);
-    console.log("[Prompanion] setComposerText returned:", success);
+    console.log("[PromptProfile™] setComposerText returned:", success);
     
     // Verify insertion
     const currentValue = composerNode.value || composerNode.textContent || "";
     const textInserted = currentValue.includes(textToInsert.substring(0, Math.min(20, textToInsert.length)));
-    console.log("[Prompanion] Verification - text appears in node:", textInserted);
-    console.log("[Prompanion] Current node value:", currentValue.substring(0, 100));
+    console.log("[PromptProfile™] Verification - text appears in node:", textInserted);
+    console.log("[PromptProfile™] Current node value:", currentValue.substring(0, 100));
     
     if (success && textInserted) {
-      console.log("[Prompanion] Insert succeeded!");
+      console.log("[PromptProfile™] Insert succeeded!");
       sendResponse({ ok: true });
     } else if (success && !textInserted) {
-      console.warn("[Prompanion] setComposerText returned true but text not verified in node");
+      console.warn("[PromptProfile™] setComposerText returned true but text not verified in node");
       sendResponse({ ok: false, reason: "INSERTION_NOT_VERIFIED" });
     } else {
-      console.log("[Prompanion] Insert failed: SET_TEXT_FAILED");
+      console.log("[PromptProfile™] Insert failed: SET_TEXT_FAILED");
       sendResponse({ ok: false, reason: "SET_TEXT_FAILED" });
     }
     return false; // sendResponse called synchronously, close channel
   } catch (error) {
-    console.error("[Prompanion] Insert text handler failed", error);
-    console.error("[Prompanion] Error stack:", error.stack);
+    console.error("[PromptProfile™] Insert text handler failed", error);
+    console.error("[PromptProfile™] Error stack:", error.stack);
     sendResponse({ ok: false, reason: error?.message ?? "UNKNOWN" });
     return false; // sendResponse called synchronously, close channel
   }
 }
 
 // Register message handler using AdapterBase (must be after handleInsertTextMessage is defined)
-console.log("[Prompanion] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
+console.log("[PromptProfile™] Registering PROMPANION_INSERT_TEXT handler with AdapterBase");
 AdapterBase.registerMessageHandler("PROMPANION_INSERT_TEXT", handleInsertTextMessage);
 
 function bootstrap() {
@@ -935,16 +935,16 @@ function teardownEnhanceTooltip() {
 
 function ensureEnhanceTooltipElement() {
   if (!enhanceTooltipElement) {
-    console.log("[Prompanion] Creating enhance tooltip element");
+    console.log("[PromptProfile™] Creating enhance tooltip element");
     enhanceTooltipElement = document.createElement("div");
-    enhanceTooltipElement.className = "prompanion-enhance-tooltip";
+    enhanceTooltipElement.className = "promptprofile-enhance-tooltip";
     // Explicitly set role to tooltip to prevent being interpreted as a dialog
     enhanceTooltipElement.setAttribute("role", "tooltip");
     enhanceTooltipElement.setAttribute("aria-live", "polite");
     enhanceTooltipElement.setAttribute("aria-atomic", "true");
     const dismiss = document.createElement("button");
     dismiss.type = "button";
-    dismiss.className = "prompanion-enhance-tooltip__dismiss";
+    dismiss.className = "promptprofile-enhance-tooltip__dismiss";
     dismiss.textContent = "×";
     dismiss.setAttribute("aria-label", "Dismiss prompt enhancement suggestion");
     dismiss.addEventListener("click", () => {
@@ -953,46 +953,46 @@ function ensureEnhanceTooltipElement() {
     });
     const action = document.createElement("button");
     action.type = "button";
-    action.className = "prompanion-enhance-tooltip__action";
+    action.className = "promptprofile-enhance-tooltip__action";
     AdapterBase.setButtonTextContent(action, "Refine");
-    console.log("[Prompanion] Attaching click handler to Refine button");
-    console.log("[Prompanion] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
+    console.log("[PromptProfile™] Attaching click handler to Refine button");
+    console.log("[PromptProfile™] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
     action.addEventListener("click", handleRefineButtonClick);
-    console.log("[Prompanion] Click handler attached, button:", action);
+    console.log("[PromptProfile™] Click handler attached, button:", action);
     enhanceTooltipElement.append(dismiss, action);
-    console.log("[Prompanion] Enhance tooltip element created");
+    console.log("[PromptProfile™] Enhance tooltip element created");
   }
   if (!enhanceTooltipElement.isConnected) {
-    console.log("[Prompanion] Appending enhance tooltip to body");
+    console.log("[PromptProfile™] Appending enhance tooltip to body");
     document.body.append(enhanceTooltipElement);
   }
   hideEnhanceTooltip();
 }
 
 function handleRefineButtonClick(e) {
-  console.log("[Prompanion] ========== REFINE BUTTON HANDLER FIRED ==========");
-  console.log("[Prompanion] Event type:", e.type);
-  console.log("[Prompanion] Event target:", e.target);
+  console.log("[PromptProfile™] ========== REFINE BUTTON HANDLER FIRED ==========");
+  console.log("[PromptProfile™] Event type:", e.type);
+  console.log("[PromptProfile™] Event target:", e.target);
   e.preventDefault();
   e.stopPropagation();
   if (enhanceActionInFlight) {
     return;
   }
   const composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
-  console.log("[Prompanion] Composer node:", composerNode);
+  console.log("[PromptProfile™] Composer node:", composerNode);
   if (!composerNode) {
-    console.error("[Prompanion] No composer node found!");
+    console.error("[PromptProfile™] No composer node found!");
     return;
   }
   const promptText = extractInputText().trim();
-  console.log("[Prompanion] Prompt text:", promptText);
+  console.log("[PromptProfile™] Prompt text:", promptText);
   if (!promptText) {
     return;
   }
   enhanceActionInFlight = true;
   enhanceTooltipDismissed = true;
   hideEnhanceTooltip();
-  console.log("[Prompanion] Requesting prompt enhancement...");
+  console.log("[PromptProfile™] Requesting prompt enhancement...");
   requestPromptEnhancement(promptText)
     .then((result) => {
       if (!result || !result.ok) {
@@ -1006,7 +1006,7 @@ function handleRefineButtonClick(e) {
       enhanceActionInFlight = false;
     })
     .catch((error) => {
-      console.error("Prompanion: refine request threw", error);
+      console.error("PromptProfile™: refine request threw", error);
       enhanceActionInFlight = false;
     });
 }
@@ -1107,36 +1107,36 @@ function detachTooltipResizeHandler() {
 
 // Backup message listener registration (IIFE to ensure it runs immediately)
 (function registerInsertTextListener() {
-  console.log("[Prompanion] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
-  console.log("[Prompanion] Current time:", new Date().toISOString());
+  console.log("[PromptProfile™] ========== BACKUP MESSAGE LISTENER REGISTRATION ==========");
+  console.log("[PromptProfile™] Current time:", new Date().toISOString());
   
   if (typeof chrome === "undefined") {
-    console.error("[Prompanion] chrome is undefined in backup registration");
+    console.error("[PromptProfile™] chrome is undefined in backup registration");
     return;
   }
   
   if (!chrome.runtime || !chrome.runtime.onMessage) {
-    console.error("[Prompanion] chrome.runtime.onMessage not available in backup registration");
+    console.error("[PromptProfile™] chrome.runtime.onMessage not available in backup registration");
     return;
   }
   
   try {
     chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       if (message && message.type === "PROMPANION_INSERT_TEXT") {
-        console.log("[Prompanion] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
+        console.log("[PromptProfile™] BACKUP LISTENER: PROMPANION_INSERT_TEXT received!");
         if (typeof handleInsertTextMessage === "function") {
           handleInsertTextMessage(message, sender, sendResponse);
         } else {
-          console.error("[Prompanion] handleInsertTextMessage is not a function!");
+          console.error("[PromptProfile™] handleInsertTextMessage is not a function!");
           sendResponse({ ok: false, reason: "HANDLER_NOT_FOUND" });
         }
         return true;
       }
       return false;
     });
-    console.log("[Prompanion] ✓ Backup listener registered successfully");
+    console.log("[PromptProfile™] ✓ Backup listener registered successfully");
   } catch (error) {
-    console.error("[Prompanion] ✗ Backup listener registration failed:", error);
+    console.error("[PromptProfile™] ✗ Backup listener registration failed:", error);
   }
 })();
 
@@ -1152,35 +1152,35 @@ if (readyState === "complete" || readyState === "interactive") {
 // AdapterBase will handle selection changes efficiently
 
 // Verify message listener is registered
-console.log("[Prompanion] ========== VERIFYING MESSAGE LISTENER ==========");
+console.log("[PromptProfile™] ========== VERIFYING MESSAGE LISTENER ==========");
 if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
-  console.log("[Prompanion] chrome.runtime.onMessage is available");
-  console.log("[Prompanion] chrome.runtime.id:", chrome.runtime.id);
-  console.log("[Prompanion] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
+  console.log("[PromptProfile™] chrome.runtime.onMessage is available");
+  console.log("[PromptProfile™] chrome.runtime.id:", chrome.runtime.id);
+  console.log("[PromptProfile™] chrome.runtime.getURL:", typeof chrome.runtime.getURL);
 } else {
-  console.error("[Prompanion] chrome.runtime.onMessage is NOT available at this point!");
+  console.error("[PromptProfile™] chrome.runtime.onMessage is NOT available at this point!");
 }
 
-window.addEventListener("prompanion-panel-resize", () => {
+window.addEventListener("promptprofile-panel-resize", () => {
   // Sticky button doesn't need position refresh
 });
 
 document.addEventListener("mousedown", (e) => {
   if (enhanceTooltipElement?.classList.contains("is-visible")) {
-    const button = enhanceTooltipElement.querySelector(".prompanion-enhance-tooltip__action");
-    const clickedButton = e.target.closest(".prompanion-enhance-tooltip__action");
+    const button = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
+    const clickedButton = e.target.closest(".promptprofile-enhance-tooltip__action");
     if (clickedButton || button === e.target) {
-      console.log("[Prompanion] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
-      console.log("[Prompanion] Setting tooltipClickInProgress flag");
+      console.log("[PromptProfile™] ========== MOUSEDOWN DETECTED ON BUTTON ==========");
+      console.log("[PromptProfile™] Setting tooltipClickInProgress flag");
       tooltipClickInProgress = true;
       const buttonRef = button;
       const mousedownTime = Date.now();
       
       const clickHandler = (clickEvent) => {
         const timeSinceMousedown = Date.now() - mousedownTime;
-        console.log("[Prompanion] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
-        console.log("[Prompanion] Time since mousedown:", timeSinceMousedown, "ms");
-        console.log("[Prompanion] Click target:", clickEvent.target);
+        console.log("[PromptProfile™] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
+        console.log("[PromptProfile™] Time since mousedown:", timeSinceMousedown, "ms");
+        console.log("[PromptProfile™] Click target:", clickEvent.target);
         if (typeof handleRefineButtonClick === "function") {
           handleRefineButtonClick(clickEvent);
         }
@@ -1191,7 +1191,7 @@ document.addEventListener("mousedown", (e) => {
       
       setTimeout(() => {
         tooltipClickInProgress = false;
-        console.log("[Prompanion] tooltipClickInProgress flag cleared");
+        console.log("[PromptProfile™] tooltipClickInProgress flag cleared");
         document.removeEventListener("click", clickHandler, true);
       }, 300);
     }

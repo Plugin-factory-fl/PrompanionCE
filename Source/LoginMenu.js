@@ -3,7 +3,7 @@
  * Handles all functionality related to the account login dialog
  */
 
-const BACKEND_URL = "https://prompanionce.onrender.com";
+const BACKEND_URL = "https://prompanionce.onrender.com"; // Backend URL unchanged for compatibility
 
 /**
  * Shows status popup with loading state
@@ -70,9 +70,9 @@ async function registerUser(name, email, password) {
  * Logs in an existing user
  */
 async function loginUser(email, password) {
-  console.log("[Prompanion LoginMenu] loginUser called with email:", email?.substring(0, 10));
+  console.log("[PromptProfile™ LoginMenu] loginUser called with email:", email?.substring(0, 10));
   try {
-    console.log("[Prompanion LoginMenu] Making API call to:", `${BACKEND_URL}/api/auth/login`);
+    console.log("[PromptProfile™ LoginMenu] Making API call to:", `${BACKEND_URL}/api/auth/login`);
     const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
       method: "POST",
       headers: {
@@ -84,9 +84,9 @@ async function loginUser(email, password) {
       }),
     });
 
-    console.log("[Prompanion LoginMenu] API response status:", response.status, response.statusText);
+    console.log("[PromptProfile™ LoginMenu] API response status:", response.status, response.statusText);
     const data = await response.json();
-    console.log("[Prompanion LoginMenu] API response data:", { hasToken: !!data.token, hasError: !!data.error });
+    console.log("[PromptProfile™ LoginMenu] API response data:", { hasToken: !!data.token, hasError: !!data.error });
 
     if (!response.ok) {
       throw new Error(data.error || "Login failed");
@@ -94,7 +94,7 @@ async function loginUser(email, password) {
 
     return data;
   } catch (error) {
-    console.error("[Prompanion LoginMenu] loginUser error:", error);
+    console.error("[PromptProfile™ LoginMenu] loginUser error:", error);
     throw error;
   }
 }
@@ -116,9 +116,9 @@ async function getAuthToken() {
 async function getUserProfile() {
   try {
     const token = await getAuthToken();
-    console.log("[Prompanion LoginMenu] getAuthToken result:", { hasToken: !!token });
+    console.log("[PromptProfile™ LoginMenu] getAuthToken result:", { hasToken: !!token });
     if (!token) {
-      console.log("[Prompanion LoginMenu] No auth token found");
+      console.log("[PromptProfile™ LoginMenu] No auth token found");
       return null;
     }
 
@@ -130,25 +130,25 @@ async function getUserProfile() {
       },
     });
 
-    console.log("[Prompanion LoginMenu] Profile API response:", { status: response.status, ok: response.ok });
+    console.log("[PromptProfile™ LoginMenu] Profile API response:", { status: response.status, ok: response.ok });
 
     if (!response.ok) {
       if (response.status === 401) {
         // Token is invalid, clear it
         chrome.storage.local.remove(["authToken"]);
-        console.log("[Prompanion LoginMenu] Token invalid, cleared");
+        console.log("[PromptProfile™ LoginMenu] Token invalid, cleared");
       }
       return null;
     }
 
     const data = await response.json();
-    console.log("[Prompanion LoginMenu] Profile API data:", data);
+    console.log("[PromptProfile™ LoginMenu] Profile API data:", data);
     // Return the user object directly (same structure as sidepanel.js uses)
     const user = data.user || data;
-    console.log("[Prompanion LoginMenu] Extracted user:", user);
+    console.log("[PromptProfile™ LoginMenu] Extracted user:", user);
     return user;
   } catch (error) {
-    console.error("[Prompanion LoginMenu] Error fetching user profile:", error);
+    console.error("[PromptProfile™ LoginMenu] Error fetching user profile:", error);
     return null;
   }
 }
@@ -199,7 +199,7 @@ async function updateLoggedInView() {
  * Registers event handlers for the account login dialog
  */
 export function registerAccountHandlers() {
-  console.log("[Prompanion LoginMenu] ========== REGISTERING ACCOUNT HANDLERS ==========");
+  console.log("[PromptProfile™ LoginMenu] ========== REGISTERING ACCOUNT HANDLERS ==========");
   
   try {
     const accountDialog = document.getElementById("account-dialog");
@@ -209,7 +209,7 @@ export function registerAccountHandlers() {
     const createAccountDialog = document.getElementById("create-account-dialog");
     const createAccountForm = document.getElementById("create-account-form");
     
-    console.log("[Prompanion LoginMenu] Registering account handlers:", {
+    console.log("[PromptProfile™ LoginMenu] Registering account handlers:", {
       hasAccountDialog: !!accountDialog,
       hasAccountTrigger: !!accountTrigger,
       hasAccountForm: !!accountForm,
@@ -219,7 +219,7 @@ export function registerAccountHandlers() {
     });
     
     if (!accountDialog || !accountTrigger || !accountForm) {
-      console.error("[Prompanion LoginMenu] Missing required elements:", {
+      console.error("[PromptProfile™ LoginMenu] Missing required elements:", {
         accountDialog: !!accountDialog,
         accountTrigger: !!accountTrigger,
         accountForm: !!accountForm
@@ -235,13 +235,13 @@ export function registerAccountHandlers() {
   const upgradeButton = document.getElementById("upgrade-button");
 
   accountTrigger.addEventListener("click", async (event) => {
-    console.log("[Prompanion LoginMenu] ========== ACCOUNT BUTTON CLICKED ==========");
+    console.log("[PromptProfile™ LoginMenu] ========== ACCOUNT BUTTON CLICKED ==========");
     event.preventDefault();
     
     // Get elements
     const loggedInView = document.getElementById("account-logged-in-view");
     const loginView = document.getElementById("account-form");
-    console.log("[Prompanion LoginMenu] Elements found:", { 
+    console.log("[PromptProfile™ LoginMenu] Elements found:", { 
       hasLoggedInView: !!loggedInView, 
       hasLoginView: !!loginView 
     });
@@ -249,21 +249,21 @@ export function registerAccountHandlers() {
     try {
       // FIRST: Check if user is logged in and show appropriate view BEFORE opening dialog
       const userProfile = await getUserProfile();
-      console.log("[Prompanion LoginMenu] User profile check result:", { 
+      console.log("[PromptProfile™ LoginMenu] User profile check result:", { 
         hasProfile: !!userProfile, 
         profile: userProfile 
       });
       
       if (userProfile && (userProfile.email || userProfile.name)) {
         // User is logged in - show logged-in view, hide login view
-        console.log("[Prompanion LoginMenu] User IS logged in, showing logged-in view");
+        console.log("[PromptProfile™ LoginMenu] User IS logged in, showing logged-in view");
         
         // Force hide login view
         if (loginView) {
           loginView.hidden = true;
           loginView.style.display = "none";
           loginView.style.visibility = "hidden";
-          console.log("[Prompanion LoginMenu] Login view hidden");
+          console.log("[PromptProfile™ LoginMenu] Login view hidden");
         }
         
         // Force show logged-in view
@@ -271,7 +271,7 @@ export function registerAccountHandlers() {
           loggedInView.hidden = false;
           loggedInView.style.display = "block";
           loggedInView.style.visibility = "visible";
-          console.log("[Prompanion LoginMenu] Logged-in view shown");
+          console.log("[PromptProfile™ LoginMenu] Logged-in view shown");
         }
         
         // Update user info
@@ -280,7 +280,7 @@ export function registerAccountHandlers() {
         const displayName = (userProfile.name && userProfile.name.trim()) 
           ? userProfile.name 
           : (userProfile.email || "User");
-        console.log("[Prompanion LoginMenu] Setting display name:", displayName);
+        console.log("[PromptProfile™ LoginMenu] Setting display name:", displayName);
         if (userNameEl) {
           userNameEl.textContent = displayName;
         }
@@ -289,7 +289,7 @@ export function registerAccountHandlers() {
         }
       } else {
         // User is NOT logged in - show login view, hide logged-in view
-        console.log("[Prompanion LoginMenu] User is NOT logged in, showing login view");
+        console.log("[PromptProfile™ LoginMenu] User is NOT logged in, showing login view");
         
         // Force hide logged-in view
         if (loggedInView) {
@@ -308,13 +308,13 @@ export function registerAccountHandlers() {
       
       // NOW open the dialog with the correct view already set
       accountDialog.showModal();
-      console.log("[Prompanion LoginMenu] Account dialog opened");
+      console.log("[PromptProfile™ LoginMenu] Account dialog opened");
       
       // Re-attach login button handler after dialog opens (in case DOM changed)
       setTimeout(() => {
         const loginBtn = accountForm.querySelector('button[value="login"], button.account__submit');
         if (loginBtn) {
-          console.log("[Prompanion LoginMenu] Re-attaching login button handler after dialog open");
+          console.log("[PromptProfile™ LoginMenu] Re-attaching login button handler after dialog open");
           loginBtn.type = "button";
           // Handler should already be attached, but ensure it's there
         }
@@ -322,7 +322,7 @@ export function registerAccountHandlers() {
       
       // Double-check visibility after dialog opens
       setTimeout(() => {
-        console.log("[Prompanion LoginMenu] Post-open check:", {
+        console.log("[PromptProfile™ LoginMenu] Post-open check:", {
           loggedInViewHidden: loggedInView?.hidden,
           loggedInViewDisplay: loggedInView?.style.display,
           loginViewHidden: loginView?.hidden,
@@ -331,7 +331,7 @@ export function registerAccountHandlers() {
       }, 100);
       
     } catch (error) {
-      console.error("[Prompanion LoginMenu] Error opening account dialog:", error);
+      console.error("[PromptProfile™ LoginMenu] Error opening account dialog:", error);
       // On error, default to login view
       if (loggedInView) {
         loggedInView.hidden = true;
@@ -350,18 +350,18 @@ export function registerAccountHandlers() {
     switchAccountButton.addEventListener("click", async (event) => {
       event.preventDefault();
       event.stopPropagation();
-      console.log("[Prompanion LoginMenu] Switch accounts button clicked");
+      console.log("[PromptProfile™ LoginMenu] Switch accounts button clicked");
       
       // Clear auth token
       chrome.storage.local.remove(["authToken"], () => {
-        console.log("[Prompanion LoginMenu] Auth token cleared");
+        console.log("[PromptProfile™ LoginMenu] Auth token cleared");
         
         // Hide logged-in view
         if (loggedInView) {
           loggedInView.hidden = true;
           loggedInView.style.display = "none";
           loggedInView.style.visibility = "hidden";
-          console.log("[Prompanion LoginMenu] Logged-in view hidden");
+          console.log("[PromptProfile™ LoginMenu] Logged-in view hidden");
         }
         
         // Show login view
@@ -369,7 +369,7 @@ export function registerAccountHandlers() {
           loginView.hidden = false;
           loginView.style.display = "block";
           loginView.style.visibility = "visible";
-          console.log("[Prompanion LoginMenu] Login view shown");
+          console.log("[PromptProfile™ LoginMenu] Login view shown");
         }
         
         // Keep dialog open - don't close it
@@ -391,7 +391,7 @@ export function registerAccountHandlers() {
   const closeDialog = (event) => {
     event.preventDefault();
     event.stopPropagation();
-    console.log("[Prompanion LoginMenu] Closing account dialog");
+    console.log("[PromptProfile™ LoginMenu] Closing account dialog");
     accountDialog.close("cancel");
   };
 
@@ -422,18 +422,18 @@ export function registerAccountHandlers() {
   setTimeout(() => {
     const loginSubmitButton = accountForm.querySelector('button[value="login"], button.account__submit, button[type="submit"], button[type="button"].account__submit');
     if (loginSubmitButton) {
-      console.log("[Prompanion LoginMenu] Found login submit button:", loginSubmitButton);
-      console.log("[Prompanion LoginMenu] Button type BEFORE:", loginSubmitButton.type, "Button value:", loginSubmitButton.value);
+      console.log("[PromptProfile™ LoginMenu] Found login submit button:", loginSubmitButton);
+      console.log("[PromptProfile™ LoginMenu] Button type BEFORE:", loginSubmitButton.type, "Button value:", loginSubmitButton.value);
       
       // Remove type="submit" to prevent form submission from button click
       loginSubmitButton.type = "button";
-      console.log("[Prompanion LoginMenu] Button type AFTER:", loginSubmitButton.type);
+      console.log("[PromptProfile™ LoginMenu] Button type AFTER:", loginSubmitButton.type);
       
       const handleLogin = async (event) => {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      console.log("[Prompanion LoginMenu] ========== LOG IN BUTTON CLICKED ==========");
+      console.log("[PromptProfile™ LoginMenu] ========== LOG IN BUTTON CLICKED ==========");
       
       // Store references to ensure we can restore them on error
       const accountDialogRef = accountDialog;
@@ -451,7 +451,7 @@ export function registerAccountHandlers() {
       const email = formData.get("email");
       const password = formData.get("password");
 
-      console.log("[Prompanion LoginMenu] Form data:", { hasEmail: !!email, hasPassword: !!password, email: email?.substring(0, 10) });
+      console.log("[PromptProfile™ LoginMenu] Form data:", { hasEmail: !!email, hasPassword: !!password, email: email?.substring(0, 10) });
 
       // Clear any existing error message when attempting login
       const errorMessageElValidation = document.getElementById("login-error-message");
@@ -471,34 +471,34 @@ export function registerAccountHandlers() {
         return;
       }
 
-      console.log("[Prompanion LoginMenu] Showing loading popup...");
+      console.log("[PromptProfile™ LoginMenu] Showing loading popup...");
       const statusDialog = document.getElementById("status-dialog");
       const loadingEl = document.getElementById("status-loading");
-      console.log("[Prompanion LoginMenu] Status dialog elements:", { hasDialog: !!statusDialog, hasLoading: !!loadingEl });
+      console.log("[PromptProfile™ LoginMenu] Status dialog elements:", { hasDialog: !!statusDialog, hasLoading: !!loadingEl });
       
       if (statusDialog && loadingEl) {
         loadingEl.hidden = false;
         statusDialog.showModal();
-        console.log("[Prompanion LoginMenu] Loading popup shown");
+        console.log("[PromptProfile™ LoginMenu] Loading popup shown");
       } else {
-        console.error("[Prompanion LoginMenu] Status dialog elements not found!");
+        console.error("[PromptProfile™ LoginMenu] Status dialog elements not found!");
       }
       
-      console.log("[Prompanion LoginMenu] Calling loginUser API...");
+      console.log("[PromptProfile™ LoginMenu] Calling loginUser API...");
       
       try {
         const data = await loginUser(email, password);
-        console.log("[Prompanion LoginMenu] Login successful, storing token");
+        console.log("[PromptProfile™ LoginMenu] Login successful, storing token");
         await storeAuthToken(data.token);
         if (statusDialog) {
           statusDialog.close();
         }
         accountDialog.close();
-        console.log("[Prompanion LoginMenu] Reloading page to update UI");
+        console.log("[PromptProfile™ LoginMenu] Reloading page to update UI");
         // Reload to update UI state
         window.location.reload();
       } catch (error) {
-        console.error("[Prompanion LoginMenu] Login error:", error);
+        console.error("[PromptProfile™ LoginMenu] Login error:", error);
         
         // Close status dialog only
         if (statusDialog) {
@@ -536,12 +536,12 @@ export function registerAccountHandlers() {
         // CRITICAL: Ensure dialog stays open - explicitly keep it open
         if (accountDialogRef) {
           if (!accountDialogRef.open) {
-            console.warn("[Prompanion LoginMenu] Account dialog was closed, reopening it");
+            console.warn("[PromptProfile™ LoginMenu] Account dialog was closed, reopening it");
             accountDialogRef.showModal();
           }
         }
         
-        console.log("[Prompanion LoginMenu] Login failed, keeping dialog open for retry");
+        console.log("[PromptProfile™ LoginMenu] Login failed, keeping dialog open for retry");
         // DO NOT close the dialog - let user retry
       }
     };
@@ -552,7 +552,7 @@ export function registerAccountHandlers() {
       // Also attach event listeners as backup
       loginSubmitButton.addEventListener("click", handleLogin, { capture: true, once: false });
       loginSubmitButton.addEventListener("mousedown", (e) => {
-        console.log("[Prompanion LoginMenu] MOUSEDOWN on login button!");
+        console.log("[PromptProfile™ LoginMenu] MOUSEDOWN on login button!");
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -561,7 +561,7 @@ export function registerAccountHandlers() {
       
       // Also handle pointerdown for touch devices
       loginSubmitButton.addEventListener("pointerdown", (e) => {
-        console.log("[Prompanion LoginMenu] POINTERDOWN on login button!");
+        console.log("[PromptProfile™ LoginMenu] POINTERDOWN on login button!");
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -607,7 +607,7 @@ export function registerAccountHandlers() {
       
       // Handle form submission (Enter key) - call the same login handler
       const handleFormSubmit = (e) => {
-        console.log("[Prompanion LoginMenu] Form submit event fired (Enter key pressed)");
+        console.log("[PromptProfile™ LoginMenu] Form submit event fired (Enter key pressed)");
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -620,7 +620,7 @@ export function registerAccountHandlers() {
       accountForm._submitHandler = handleFormSubmit; // Store reference for removal
       
       // Test if button is clickable
-      console.log("[Prompanion LoginMenu] Button element:", {
+      console.log("[PromptProfile™ LoginMenu] Button element:", {
         type: loginSubmitButton.type,
         disabled: loginSubmitButton.disabled,
         hidden: loginSubmitButton.hidden,
@@ -629,9 +629,9 @@ export function registerAccountHandlers() {
         hasOnclick: !!loginSubmitButton.onclick
       });
       
-      console.log("[Prompanion LoginMenu] Login button handler attached with onclick + multiple listeners");
+      console.log("[PromptProfile™ LoginMenu] Login button handler attached with onclick + multiple listeners");
     } else {
-      console.error("[Prompanion LoginMenu] Login submit button NOT FOUND!");
+      console.error("[PromptProfile™ LoginMenu] Login submit button NOT FOUND!");
     }
   }, 100); // Small delay to ensure DOM is ready
 
@@ -670,7 +670,7 @@ export function registerAccountHandlers() {
     const closeCreateDialog = (event) => {
       event.preventDefault();
       event.stopPropagation();
-      console.log("[Prompanion LoginMenu] Closing create account dialog");
+      console.log("[PromptProfile™ LoginMenu] Closing create account dialog");
       createAccountDialog.close("cancel");
     };
 
@@ -865,10 +865,10 @@ export function registerAccountHandlers() {
   });
   
   } catch (error) {
-    console.error("[Prompanion LoginMenu] Error in registerAccountHandlers:", error);
+    console.error("[PromptProfile™ LoginMenu] Error in registerAccountHandlers:", error);
     throw error;
   }
   
-  console.log("[Prompanion LoginMenu] Account handlers registered successfully");
+  console.log("[PromptProfile™ LoginMenu] Account handlers registered successfully");
 }
 

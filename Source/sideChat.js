@@ -38,7 +38,7 @@ function isInSidepanelContext() {
 /**
  * Welcome message content for new conversations
  */
-const WELCOME_MESSAGE = "Welcome to the Side Chat! This is where you can ask me questions to elaborate on ideas you aren't clear on. I open up automatically when you highlight any text response from your LLM in the browser and click the \"Elaborate\" button. I'm here to help!";
+const WELCOME_MESSAGE = "Welcome to the Side Chat!\n\nThis is where you can ask me questions to elaborate on ideas you aren't clear on. I open up automatically when you highlight any text response from your LLM in the browser and click the \"Elaborate\" button. I'm here to help!";
 
 /**
  * Checks if a conversation is fresh (only contains the welcome message)
@@ -75,7 +75,7 @@ function formatTimestamp(timestamp) {
 export function renderChat(history) {
   // Safety check: Ensure we're in the correct context
   if (!isInSidepanelContext()) {
-    console.warn('[Prompanion] renderChat called outside of sidepanel context');
+    console.warn('[PromptProfile™] renderChat called outside of sidepanel context');
     return;
   }
   
@@ -92,16 +92,54 @@ export function renderChat(history) {
 
     const meta = document.createElement("div");
     meta.className = "chat-message__meta";
-    const author = entry.role === "agent" ? "Prompanion" : "You";
+    const author = entry.role === "agent" ? "PromptProfile™" : "You";
     meta.textContent = `${author} • ${formatTimestamp(entry.timestamp)}`;
 
     const bubble = document.createElement("div");
     bubble.className = "chat-message__bubble";
+    
+    // Clean up welcome message if it has duplication
+    let content = entry.content;
+    if (entry.role === "agent" && content && content.includes("Welcome to the Side Chat")) {
+      // Check if the message has duplicate sentences
+      const sentences = content.match(/[^.!?]+[.!?]+/g) || [];
+      const seen = new Set();
+      const unique = [];
+      for (const sent of sentences) {
+        const normalized = sent.toLowerCase().replace(/\s+/g, ' ').trim();
+        if (!seen.has(normalized)) {
+          seen.add(normalized);
+          unique.push(sent.trim());
+        }
+      }
+      // If we found duplicates, use the cleaned version
+      if (unique.length < sentences.length) {
+        content = unique.join(' ');
+        // Preserve paragraph breaks if they exist
+        if (content.includes('\n\n')) {
+          const paragraphs = content.split('\n\n');
+          content = paragraphs.map(p => {
+            const paraSentences = p.match(/[^.!?]+[.!?]+/g) || [];
+            const paraSeen = new Set();
+            const paraUnique = [];
+            for (const sent of paraSentences) {
+              const normalized = sent.toLowerCase().replace(/\s+/g, ' ').trim();
+              if (!paraSeen.has(normalized)) {
+                paraSeen.add(normalized);
+                paraUnique.push(sent.trim());
+              }
+            }
+            return paraUnique.join(' ');
+          }).filter(p => p.length > 0).join('\n\n');
+        }
+      }
+    }
+    
     // Format agent messages with markdown support, keep user messages as plain text
     if (entry.role === "agent") {
-      bubble.innerHTML = formatMessageContent(entry.content);
+      bubble.innerHTML = formatMessageContent(content);
     } else {
-      bubble.textContent = entry.content;
+      bubble.textContent = content;
     }
 
     wrapper.append(meta, bubble);
@@ -119,7 +157,7 @@ export function renderChat(history) {
 export function renderChatTabs(conversations, activeId) {
   // Safety check: Ensure we're in the correct context
   if (!isInSidepanelContext()) {
-    console.warn('[Prompanion] renderChatTabs called outside of sidepanel context');
+    console.warn('[PromptProfile™] renderChatTabs called outside of sidepanel context');
     return;
   }
   
@@ -271,14 +309,14 @@ Provide a comprehensive, well-structured explanation that helps the user underst
       content: systemMessageContent
     });
     
-    console.log("[Prompanion] Added chat history context to API call:", {
+    console.log("[PromptProfile™] Added chat history context to API call:", {
       originalHistoryLength: llmChatHistory.length,
       truncatedHistoryLength: truncatedHistory.length,
       contextTextLength: contextText.length,
       systemMessageLength: systemMessageContent.length
     });
   } else {
-    console.log("[Prompanion] No LLM chat history provided, skipping context system message");
+    console.log("[PromptProfile™] No LLM chat history provided, skipping context system message");
   }
   
   // Add the SideChat conversation history
@@ -327,9 +365,9 @@ export async function generateConversationTitle(stateRef, conversation) {
  * @returns {Promise<Object>} Updated state reference
  */
 export async function sendSideChatMessage(stateRef, message, dependencies, llmChatHistory = []) {
-  console.log("[Prompanion] ========== sendSideChatMessage CALLED ==========");
-  console.log("[Prompanion] Message:", message?.substring(0, 50));
-  console.log("[Prompanion] StateRef:", {
+  console.log("[PromptProfile™] ========== sendSideChatMessage CALLED ==========");
+  console.log("[PromptProfile™] Message:", message?.substring(0, 50));
+  console.log("[PromptProfile™] StateRef:", {
     hasStateRef: !!stateRef,
     hasSettings: !!stateRef?.settings,
     hasConversations: !!stateRef?.conversations,
@@ -339,16 +377,16 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
   
   // Safety check: Ensure we're in the correct context
   if (!isInSidepanelContext()) {
-    console.error('[Prompanion] sendSideChatMessage called outside of sidepanel context');
+    console.error('[PromptProfile™] sendSideChatMessage called outside of sidepanel context');
     return stateRef;
   }
   
   const { saveState } = dependencies;
-  console.log("[Prompanion] Dependencies:", { hasSaveState: typeof saveState === 'function' });
+  console.log("[PromptProfile™] Dependencies:", { hasSaveState: typeof saveState === 'function' });
   
   // Ensure settings object exists
   if (!stateRef.settings) {
-    console.error("[Prompanion] stateRef.settings is missing! Initializing...");
+    console.error("[PromptProfile™] stateRef.settings is missing! Initializing...");
     stateRef.settings = {};
   }
 
@@ -362,10 +400,10 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
   // Fallback to first conversation if not found by ID
   if (!activeConversation && stateRef.conversations.length > 0) {
     activeConversation = stateRef.conversations[0];
-    console.warn("[Prompanion] Active conversation not found by ID, using first conversation");
+    console.warn("[PromptProfile™] Active conversation not found by ID, using first conversation");
   }
   
-  console.log("[Prompanion] Active conversation:", {
+  console.log("[PromptProfile™] Active conversation:", {
     found: !!activeConversation,
     id: activeConversation?.id,
     historyLength: activeConversation?.history?.length,
@@ -374,23 +412,23 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
   });
   
   if (!activeConversation) {
-    console.error("[Prompanion] No active conversation found when sending message");
-    console.error("[Prompanion] StateRef conversations:", stateRef?.conversations);
-    console.error("[Prompanion] Active conversation ID:", stateRef?.activeConversationId);
+    console.error("[PromptProfile™] No active conversation found when sending message");
+    console.error("[PromptProfile™] StateRef conversations:", stateRef?.conversations);
+    console.error("[PromptProfile™] Active conversation ID:", stateRef?.activeConversationId);
     return stateRef;
   }
   
   // Ensure history array exists
   if (!Array.isArray(activeConversation.history)) {
-    console.warn("[Prompanion] Conversation history is not an array, initializing...");
+    console.warn("[PromptProfile™] Conversation history is not an array, initializing...");
     activeConversation.history = [];
   }
 
-  console.log("[Prompanion] Sending message to conversation:", activeConversation.id, "Current history length:", activeConversation.history.length);
+  console.log("[PromptProfile™] Sending message to conversation:", activeConversation.id, "Current history length:", activeConversation.history.length);
 
   const now = Date.now();
   const userMessage = { role: "user", content: message, timestamp: now };
-  console.log("[Prompanion] Adding user message to conversation:", {
+  console.log("[PromptProfile™] Adding user message to conversation:", {
     conversationId: activeConversation.id,
     messageLength: message.length,
     messagePreview: message.substring(0, 50),
@@ -404,15 +442,15 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
   // Verify it was added immediately
   const verifyAdded = activeConversation.history[activeConversation.history.length - 1];
   if (!verifyAdded || verifyAdded.content !== message) {
-    console.error("[Prompanion] CRITICAL: Message was not added to conversation history!", {
+    console.error("[PromptProfile™] CRITICAL: Message was not added to conversation history!", {
       expectedMessage: message.substring(0, 50),
       lastMessageInHistory: verifyAdded?.content?.substring(0, 50),
       historyLength: activeConversation.history.length
     });
   }
   
-  console.log("[Prompanion] User message added, new history length:", activeConversation.history.length);
-  console.log("[Prompanion] Last message in history:", {
+  console.log("[PromptProfile™] User message added, new history length:", activeConversation.history.length);
+  console.log("[PromptProfile™] Last message in history:", {
     role: activeConversation.history[activeConversation.history.length - 1]?.role,
     contentPreview: activeConversation.history[activeConversation.history.length - 1]?.content?.substring(0, 50),
     fullContent: activeConversation.history[activeConversation.history.length - 1]?.content
@@ -421,12 +459,12 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
   // CRITICAL: Save state IMMEDIATELY after adding user message, before rendering
   // This ensures the user message is persisted before any re-renders can occur
   if (!saveState || typeof saveState !== 'function') {
-    console.error("[Prompanion] saveState is not a function in sendSideChatMessage!", typeof saveState);
-    console.error("[Prompanion] Dependencies:", dependencies);
+    console.error("[PromptProfile™] saveState is not a function in sendSideChatMessage!", typeof saveState);
+    console.error("[PromptProfile™] Dependencies:", dependencies);
   } else {
     // Save state synchronously to ensure user message is persisted
     await saveState(stateRef);
-    console.log("[Prompanion] State saved with user message, history length:", activeConversation.history.length);
+    console.log("[PromptProfile™] State saved with user message, history length:", activeConversation.history.length);
   }
   
   // NOW render the chat with the user message included
@@ -439,54 +477,54 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
     const chatWindow = document.getElementById("chat-window");
     if (chatWindow) {
       chatWindow.scrollTop = chatWindow.scrollHeight;
-      console.log("[Prompanion] Scrolled chat window to bottom to show new message");
+      console.log("[PromptProfile™] Scrolled chat window to bottom to show new message");
     }
   }, 50);
   
-  console.log("[Prompanion] Chat rendered, checking DOM...");
+  console.log("[PromptProfile™] Chat rendered, checking DOM...");
   // Verify the message appears in the DOM
   setTimeout(() => {
     const chatWindow = document.getElementById("chat-window");
     if (chatWindow) {
       const userMessages = chatWindow.querySelectorAll('.chat-message--user');
-      console.log("[Prompanion] DOM Verification - Found", userMessages.length, "user messages in chat window");
+      console.log("[PromptProfile™] DOM Verification - Found", userMessages.length, "user messages in chat window");
       if (userMessages.length > 0) {
         const lastUserMessage = userMessages[userMessages.length - 1];
         const messageText = lastUserMessage.querySelector('.chat-message__bubble')?.textContent || '';
-        console.log("[Prompanion] Last user message in DOM:", messageText.substring(0, 50));
+        console.log("[PromptProfile™] Last user message in DOM:", messageText.substring(0, 50));
         
         // Ensure the message is visible by scrolling it into view
         lastUserMessage.scrollIntoView({ behavior: "smooth", block: "nearest" });
       } else {
-        console.warn("[Prompanion] WARNING: No user messages found in DOM after rendering!");
+        console.warn("[PromptProfile™] WARNING: No user messages found in DOM after rendering!");
       }
     } else {
-      console.error("[Prompanion] ERROR: Chat window not found in DOM!");
+      console.error("[PromptProfile™] ERROR: Chat window not found in DOM!");
     }
   }, 100);
   
-  console.log("[Prompanion] Added user message, new history length:", activeConversation.history.length);
+  console.log("[PromptProfile™] Added user message, new history length:", activeConversation.history.length);
 
   try {
     const apiMessages = buildChatApiMessages(activeConversation.history, llmChatHistory);
-    console.log("[Prompanion] Sending to API with", apiMessages.length, "messages");
+    console.log("[PromptProfile™] Sending to API with", apiMessages.length, "messages");
     if (llmChatHistory.length > 0) {
-      console.log("[Prompanion] Chat history context included:", llmChatHistory.length, "messages from LLM conversation");
+      console.log("[PromptProfile™] Chat history context included:", llmChatHistory.length, "messages from LLM conversation");
     }
     
     let apiResult;
     try {
       // Always use ChatGPT - model selection removed
       const model = "chatgpt";
-      console.log("[Prompanion] Using model: chatgpt");
+      console.log("[PromptProfile™] Using model: chatgpt");
       apiResult = await callOpenAI(apiMessages, llmChatHistory, model);
     } catch (error) {
-      console.error("[Prompanion] Side chat API call failed:", error);
+      console.error("[PromptProfile™] Side chat API call failed:", error);
       const errorMessage = error.message || "Failed to get response";
       
       // Check for authentication errors
       if (errorMessage.includes("No authentication token") || errorMessage.includes("Authentication failed")) {
-        alert("Please log in to your Prompanion account to use Side Chat. Click the account button in the header to log in.");
+        alert("Please log in to your PromptProfile™ account to use Side Chat. Click the account button in the header to log in.");
         return stateRef;
       }
       
@@ -518,7 +556,7 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
 
     // Update enhancement count if usage data is available
     if (enhancementsUsed !== undefined && enhancementsLimit !== undefined) {
-      console.log("[Prompanion] Side Chat usage data received:", { enhancementsUsed, enhancementsLimit });
+      console.log("[PromptProfile™] Side Chat usage data received:", { enhancementsUsed, enhancementsLimit });
       // Update state
       if (stateRef) {
         stateRef.enhancementsUsed = enhancementsUsed;
@@ -529,7 +567,7 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
       const limitEl = document.getElementById("enhancements-limit");
       if (countEl) {
         countEl.textContent = enhancementsUsed;
-        console.log("[Prompanion] Updated enhancements count from Side Chat:", enhancementsUsed);
+        console.log("[PromptProfile™] Updated enhancements count from Side Chat:", enhancementsUsed);
       }
       if (limitEl) {
         limitEl.textContent = enhancementsLimit;
@@ -550,29 +588,29 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
           enhancementsLimit 
         }, (response) => {
           if (chrome.runtime.lastError) {
-            console.log("[Prompanion] Usage update message sent (background may not be listening)");
+            console.log("[PromptProfile™] Usage update message sent (background may not be listening)");
           }
         });
       } catch (error) {
-        console.warn("[Prompanion] Failed to send usage update message:", error);
+        console.warn("[PromptProfile™] Failed to send usage update message:", error);
       }
     }
 
     // Re-get the active conversation to ensure we have the latest reference
     const currentActiveConversation = getActiveConversation(stateRef);
     if (!currentActiveConversation) {
-      console.error("[Prompanion] No active conversation found when adding response");
+      console.error("[PromptProfile™] No active conversation found when adding response");
       return stateRef;
     }
     
     // Verify we're adding to the correct conversation
     if (currentActiveConversation.id !== activeConversation.id) {
-      console.warn("[Prompanion] Active conversation changed during API call, using current one");
+      console.warn("[PromptProfile™] Active conversation changed during API call, using current one");
     }
     
     currentActiveConversation.history.push({ role: "agent", content: reply, timestamp: Date.now() });
     renderChat(currentActiveConversation.history);
-    console.log("[Prompanion] Added agent response, final history length:", currentActiveConversation.history.length);
+    console.log("[PromptProfile™] Added agent response, final history length:", currentActiveConversation.history.length);
     
     // Auto-generate title if conversation doesn't have one yet or is still "New chat"
     const nonWelcomeMessages = currentActiveConversation.history.filter(
@@ -588,10 +626,10 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
     const agentMessages = nonWelcomeMessages.filter(msg => msg.role === "agent");
     
     if (needsTitle && userMessages.length >= 1 && agentMessages.length >= 1) {
-      console.log("[Prompanion] Generating title for conversation:", currentActiveConversation.id);
+      console.log("[PromptProfile™] Generating title for conversation:", currentActiveConversation.id);
       // Generate title asynchronously (don't wait for it to complete)
       generateConversationTitle(stateRef, currentActiveConversation).then((title) => {
-        console.log("[Prompanion] Generated title:", title, "for conversation:", currentActiveConversation.id);
+        console.log("[PromptProfile™] Generated title:", title, "for conversation:", currentActiveConversation.id);
         if (title && title !== currentActiveConversation.title && title !== "Conversation") {
           currentActiveConversation.title = title;
           renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
@@ -599,13 +637,13 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
             console.warn("Failed to save state after title generation:", error);
           });
         } else {
-          console.log("[Prompanion] Title not updated - title:", title, "current:", currentActiveConversation.title);
+          console.log("[PromptProfile™] Title not updated - title:", title, "current:", currentActiveConversation.title);
         }
       }).catch((error) => {
         console.warn("Failed to generate conversation title:", error);
       });
     } else {
-      console.log("[Prompanion] Title generation skipped - needsTitle:", needsTitle, "userMessages:", userMessages.length, "agentMessages:", agentMessages.length);
+      console.log("[PromptProfile™] Title generation skipped - needsTitle:", needsTitle, "userMessages:", userMessages.length, "agentMessages:", agentMessages.length);
     }
     
     renderChatTabs(stateRef.conversations, stateRef.activeConversationId);
@@ -691,7 +729,7 @@ function limitConversationsToMax(stateRef) {
   }
   
   if (deletedCount > 0) {
-    console.log(`[Prompanion] Deleted ${deletedCount} oldest conversation(s) to maintain limit of ${MAX_CONVERSATIONS}`);
+    console.log(`[PromptProfile™] Deleted ${deletedCount} oldest conversation(s) to maintain limit of ${MAX_CONVERSATIONS}`);
   }
   
   return deletedCount > 0;
@@ -707,7 +745,7 @@ function limitConversationsToMax(stateRef) {
 export async function triggerAutoSideChat(stateRef, text, { fromPending = false, startFresh = false, llmChatHistory = null } = {}, dependencies = {}) {
   // Safety check: Ensure we're in the correct context
   if (!isInSidepanelContext()) {
-    console.error('[Prompanion] triggerAutoSideChat called outside of sidepanel context');
+    console.error('[PromptProfile™] triggerAutoSideChat called outside of sidepanel context');
     return;
   }
   
@@ -718,7 +756,7 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
   const textToUse = stateRef?.pendingSideChat?.text?.trim() || (typeof text === "string" ? text.trim() : "");
   const snippet = textToUse;
   
-  console.log("[Prompanion] triggerAutoSideChat called:", {
+  console.log("[PromptProfile™] triggerAutoSideChat called:", {
     hasText: !!text,
     textLength: text?.length,
     hasPendingSideChat: !!stateRef?.pendingSideChat?.text,
@@ -731,7 +769,7 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
   });
   
   if (!snippet || !stateRef) {
-    console.error("[Prompanion] triggerAutoSideChat: Missing snippet or stateRef", {
+    console.error("[PromptProfile™] triggerAutoSideChat: Missing snippet or stateRef", {
       snippet: snippet?.substring(0, 50),
       hasStateRef: !!stateRef,
       hasPendingSideChat: !!stateRef?.pendingSideChat,
@@ -742,7 +780,7 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
 
   // Check flight flag BEFORE doing anything to prevent duplicates
   if (autoChatInFlight) {
-    console.log("[Prompanion] Auto chat already in flight, skipping duplicate trigger");
+    console.log("[PromptProfile™] Auto chat already in flight, skipping duplicate trigger");
     return;
   }
 
@@ -762,7 +800,7 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
     // Verify we got the correct conversation
     const activeConversation = getActiveConversation(stateRef);
     if (!activeConversation || activeConversation.id !== newConversation.id) {
-      console.error("[Prompanion] Active conversation mismatch after creating new one");
+      console.error("[PromptProfile™] Active conversation mismatch after creating new one");
       // Force set it
       stateRef.activeConversationId = newConversation.id;
     }
@@ -771,8 +809,8 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
     // This prevents the user message from disappearing when state is reloaded
     const finalActiveConversation = getActiveConversation(stateRef);
     if (!finalActiveConversation) {
-      console.error("[Prompanion] Failed to get active conversation after creating new one!");
-      console.error("[Prompanion] StateRef:", {
+      console.error("[PromptProfile™] Failed to get active conversation after creating new one!");
+      console.error("[PromptProfile™] StateRef:", {
         activeConversationId: stateRef.activeConversationId,
         conversationsLength: stateRef.conversations?.length,
         newConversationId: newConversation.id
@@ -783,7 +821,7 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
     
     // Don't save state yet - wait until user message is added to save both together
     // This prevents race conditions where state is saved with only welcome message
-    console.log("[Prompanion] Created new conversation for Elaborate:", newConversation.id, "History length:", finalActiveConversation.history?.length || 0);
+    console.log("[PromptProfile™] Created new conversation for Elaborate:", newConversation.id, "History length:", finalActiveConversation.history?.length || 0);
   } else {
     // For non-fresh conversations, check fromPending
     if (fromPending) {
@@ -806,7 +844,7 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
   // Show it after the section is opened and conversation is created
   let toast = null;
   if (chatHistoryToUse.length > 0) {
-    console.log("[Prompanion] Chat history retrieved:", chatHistoryToUse.length, "messages");
+    console.log("[PromptProfile™] Chat history retrieved:", chatHistoryToUse.length, "messages");
     // Wait a bit for the section to be visible, then show toast
     setTimeout(() => {
       toast = showSideChatToast("Retrieving chat history...", "loading", 0); // Don't auto-remove
@@ -832,7 +870,7 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
       }, 800); // Show loading for at least 800ms
     }, 300); // Wait for section to open
   } else {
-    console.log("[Prompanion] No chat history found in pendingSideChat");
+    console.log("[PromptProfile™] No chat history found in pendingSideChat");
   }
 
   // Set flight flag BEFORE sending to prevent duplicate sends
@@ -851,7 +889,7 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
       textarea = document.getElementById("chat-message");
       
       if (textarea) {
-        console.log("[Prompanion] Textarea found after", attempts, "attempts");
+        console.log("[PromptProfile™] Textarea found after", attempts, "attempts");
         break;
       }
     }
@@ -860,9 +898,9 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
       textarea.value = snippet;
       // Trigger input event to ensure any listeners are notified
       textarea.dispatchEvent(new Event('input', { bubbles: true }));
-      console.log("[Prompanion] Set textarea value:", snippet.substring(0, 50) + "...");
+      console.log("[PromptProfile™] Set textarea value:", snippet.substring(0, 50) + "...");
     } else {
-      console.error("[Prompanion] Textarea not found after", maxAttempts, "attempts! ID: chat-message");
+      console.error("[PromptProfile™] Textarea not found after", maxAttempts, "attempts! ID: chat-message");
       autoChatInFlight = false;
       return;
     }
@@ -870,13 +908,13 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
     // Verify we have the correct active conversation before sending
     const verifyActiveConversation = getActiveConversation(stateRef);
     if (!verifyActiveConversation) {
-      console.error("[Prompanion] No active conversation found before sending message");
+      console.error("[PromptProfile™] No active conversation found before sending message");
       autoChatInFlight = false;
       return;
     }
-    console.log("[Prompanion] Sending message to conversation:", verifyActiveConversation.id, "Snippet length:", snippet.length);
+    console.log("[PromptProfile™] Sending message to conversation:", verifyActiveConversation.id, "Snippet length:", snippet.length);
     
-    console.log("[Prompanion] About to call sendSideChatMessage with:", {
+    console.log("[PromptProfile™] About to call sendSideChatMessage with:", {
       snippetLength: snippet.length,
       snippetPreview: snippet.substring(0, 100),
       hasDependencies: !!dependencies,
@@ -887,7 +925,7 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
     
     // Verify snippet is not empty before sending
     if (!snippet || snippet.trim().length === 0) {
-      console.error("[Prompanion] ERROR: Snippet is empty! Cannot send message.", {
+      console.error("[PromptProfile™] ERROR: Snippet is empty! Cannot send message.", {
         snippet,
         snippetType: typeof snippet,
         snippetLength: snippet?.length
@@ -898,7 +936,7 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
     
     try {
       await sendSideChatMessage(stateRef, snippet, dependencies, chatHistoryToUse);
-      console.log("[Prompanion] Message sent successfully");
+      console.log("[PromptProfile™] Message sent successfully");
       
       // Verify the message was added to history
       // Wait a bit for state to sync, but check BEFORE the API response comes back
@@ -921,7 +959,7 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
           userMessage = verifyConversation.history[lastMessageIndex];
         }
         
-        console.log("[Prompanion] Verification - Checking conversation:", {
+        console.log("[PromptProfile™] Verification - Checking conversation:", {
           historyLength: historyLength,
           userMessageIndex: userMessageIndex,
           lastMessageIndex: lastMessageIndex,
@@ -940,7 +978,7 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
           const userMessageContentTrimmed = userMessage.content?.trim() || "";
           
           if (userMessageContentTrimmed !== snippetTrimmed) {
-            console.error("[Prompanion] ERROR: User message content doesn't match!", {
+            console.error("[PromptProfile™] ERROR: User message content doesn't match!", {
               expectedSnippet: snippetTrimmed.substring(0, 100),
               actualUserMessage: userMessageContentTrimmed.substring(0, 100),
               expectedLength: snippetTrimmed.length,
@@ -948,10 +986,10 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
               match: userMessageContentTrimmed === snippetTrimmed
             });
           } else {
-            console.log("[Prompanion] ✓ Verification passed - User message was added correctly!");
+            console.log("[PromptProfile™] ✓ Verification passed - User message was added correctly!");
           }
         } else {
-          console.warn("[Prompanion] WARNING: Could not find user message in conversation history!", {
+          console.warn("[PromptProfile™] WARNING: Could not find user message in conversation history!", {
             historyLength: historyLength,
             allMessages: verifyConversation.history.map((m, i) => ({
               index: i,
@@ -961,14 +999,14 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
           });
         }
       } else {
-        console.error("[Prompanion] ERROR: Could not find active conversation for verification!", {
+        console.error("[PromptProfile™] ERROR: Could not find active conversation for verification!", {
           activeConversationId: stateRef.activeConversationId,
           conversationsCount: stateRef.conversations?.length,
           conversationIds: stateRef.conversations?.map(c => c.id)
         });
       }
     } catch (error) {
-      console.error("[Prompanion] Error sending message:", error);
+      console.error("[PromptProfile™] Error sending message:", error);
       throw error;
     }
     if (textarea) {
@@ -981,7 +1019,7 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
       stateRef.pendingSideChat = null;
       try {
         await saveState(stateRef);
-        console.log("[Prompanion] Cleared pendingSideChat after processing");
+        console.log("[PromptProfile™] Cleared pendingSideChat after processing");
       } catch (error) {
         console.warn("Prompanion: failed to clear pending side chat", error);
       }
@@ -997,7 +1035,7 @@ export async function triggerAutoSideChat(stateRef, text, { fromPending = false,
 export function processPendingSideChat(stateRef, dependencies = {}) {
   // Prevent duplicate processing
   if (pendingSideChatProcessing) {
-    console.log("[Prompanion] processPendingSideChat already in progress, skipping");
+    console.log("[PromptProfile™] processPendingSideChat already in progress, skipping");
     return;
   }
   
@@ -1008,7 +1046,7 @@ export function processPendingSideChat(stateRef, dependencies = {}) {
   
   // Only process if not already in flight (to avoid conflicts with direct calls)
   if (autoChatInFlight) {
-    console.log("[Prompanion] Auto chat already in flight, skipping pending side chat");
+    console.log("[PromptProfile™] Auto chat already in flight, skipping pending side chat");
     return;
   }
   
