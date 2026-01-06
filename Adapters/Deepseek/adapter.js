@@ -1225,13 +1225,9 @@ function ensureDomObserver() {
     AdapterBase.requestSelectionToolbarUpdate();
     const composer = locateComposer();
     if (composer) {
-      placeButton(composer.container, composer.input);
       setupEnhanceTooltip(composer.input, composer.container);
     }
-    // Recalculate button position when DOM changes (in case buttons move)
-    if (floatingButtonTargetInput) {
-      refreshFloatingButtonPosition();
-    }
+    // Sticky button doesn't need position refresh
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
   domObserverStarted = true;
@@ -1328,11 +1324,13 @@ function locateComposer() {
 
 function init() {
   console.log("[Prompanion Deepseek] init() called");
+  // Initialize sticky button (no injection logic needed)
+  AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
+  
   const composer = locateComposer();
   AdapterBase.requestSelectionToolbarUpdate();
   if (composer) {
-    console.log("[Prompanion Deepseek] Composer found, calling placeButton");
-    placeButton(composer.container, composer.input);
+    console.log("[Prompanion Deepseek] Composer found, setting up enhance tooltip");
     setupEnhanceTooltip(composer.input, composer.container);
     ensureDomObserver();
     return true;

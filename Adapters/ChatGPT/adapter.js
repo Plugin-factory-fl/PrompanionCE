@@ -22,10 +22,7 @@ const BUTTON_SIZE = AdapterBase.BUTTON_SIZE;
 
 // Constants loaded from AdapterBase
 let domObserverStarted = false;
-let buttonPositionObserver = null;
-let buttonPositionMutationObserver = null;
-let buttonPositionInputHandler = null;
-let buttonPositionAnimationFrame = null;
+// Button position observer variables removed - sticky button doesn't need positioning logic
 
 let enhanceTooltipElement = null;
 let enhanceTooltipTimer = null;
@@ -33,10 +30,7 @@ let enhanceTooltipDismissed = false;
 let enhanceTooltipActiveTextarea = null;
 let lastEnhanceTextSnapshot = "";
 let enhanceTooltipResizeHandler = null;
-let floatingButtonElement = null;
-let floatingButtonWrapper = null;
-let floatingButtonTargetContainer = null;
-let floatingButtonTargetInput = null;
+// Floating button variables removed - using sticky button from AdapterBase instead
 let enhanceActionInFlight = false;
 let selectionAskInFlight = false;
 let tooltipClickInProgress = false;
@@ -613,8 +607,12 @@ function captureGPTChatHistory(maxMessages = 20) {
   }
 }
 
-// Floating button positioning functions - based on Grok adapter pattern
-function positionFloatingButton(inputNode, containerNode = floatingButtonTargetContainer) {
+// Floating button positioning functions removed - using sticky button from AdapterBase
+// Legacy function kept for compatibility but does nothing
+function positionFloatingButton(inputNode, containerNode = null) {
+  // No-op: sticky button handles positioning automatically
+  // All the complex positioning logic below is no longer needed
+  return;
   if (!floatingButtonWrapper) return;
   
   // Find the form container
@@ -910,9 +908,8 @@ function positionFloatingButton(inputNode, containerNode = floatingButtonTargetC
 }
 
 function refreshFloatingButtonPosition() {
-  if (floatingButtonTargetInput) {
-    positionFloatingButton(floatingButtonTargetInput, null);
-  }
+  // No-op: sticky button doesn't need position refresh
+  return;
 }
 
 function getElementPosition(element) {
@@ -1062,7 +1059,7 @@ function requestPromptEnhancement(promptText) {
  */
 function findComposerNode() {
   // Try tracked nodes first
-  let composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
+  let composerNode = enhanceTooltipActiveTextarea;
   if (composerNode) {
     return composerNode;
   }
@@ -1096,55 +1093,21 @@ function setComposerText(node, text) {
   return AdapterBase.setEditableElementText(node, text, { verbose: true });
 }
 
+// buildButton, ensureFloatingButton, and placeButton removed - using sticky button from AdapterBase
+// Legacy functions kept for compatibility but do nothing
 function buildButton() {
-  AdapterBase.ensureStyle();
-  const button = document.createElement("button");
-  button.id = BUTTON_ID;
-  button.type = "button";
-  button.className = BUTTON_CLASS;
-  button.append(createIcon());
-  // Use AdapterBase for generic hover tooltip
-  AdapterBase.attachTooltip(button, "Open Prompanion to enhance your prompts for the best response.", BUTTON_ID);
-  button.addEventListener("click", () => AdapterBase.togglePanel()
-    .catch((e) => console.error("Prompanion: failed to open sidebar from ChatGPT adapter", e)));
-  button.addEventListener("mouseenter", () => AdapterBase.showTooltip(button, BUTTON_ID));
-  button.addEventListener("focus", () => AdapterBase.showTooltip(button, BUTTON_ID));
-  button.addEventListener("mouseleave", () => AdapterBase.hideTooltip(button));
-  button.addEventListener("blur", () => AdapterBase.hideTooltip(button));
-  return button;
+  // No-op: sticky button is created by AdapterBase.initStickyButton()
+  return null;
 }
 
 function ensureFloatingButton() {
-  if (floatingButtonWrapper && floatingButtonElement) {
-    floatingButtonWrapper.style.width = floatingButtonWrapper.style.height = BUTTON_SIZE.wrapper;
-    floatingButtonElement.style.width = floatingButtonElement.style.height = BUTTON_SIZE.element;
-    return;
-  }
-  AdapterBase.ensureStyle();
-  floatingButtonWrapper = document.getElementById(`${BUTTON_ID}-wrapper`);
-  if (!floatingButtonWrapper) {
-    floatingButtonWrapper = document.createElement("div");
-    floatingButtonWrapper.id = `${BUTTON_ID}-wrapper`;
-    floatingButtonWrapper.style.position = "absolute";
-    floatingButtonWrapper.style.zIndex = "2147483000";
-    floatingButtonWrapper.style.pointerEvents = "auto";
-    floatingButtonWrapper.style.display = "flex";
-    floatingButtonWrapper.style.alignItems = "center";
-    floatingButtonWrapper.style.justifyContent = "center";
-  }
-  floatingButtonWrapper.style.width = floatingButtonWrapper.style.height = BUTTON_SIZE.wrapper;
-  floatingButtonElement = document.getElementById(BUTTON_ID) ?? buildButton();
-  floatingButtonElement.style.width = floatingButtonElement.style.height = BUTTON_SIZE.element;
-  if (!floatingButtonElement.isConnected) floatingButtonWrapper.append(floatingButtonElement);
+  // No-op: sticky button is created by AdapterBase.initStickyButton()
+  return;
 }
 
 function placeButton(targetContainer, inputNode) {
-  if (!inputNode) return;
-  ensureFloatingButton();
-  floatingButtonTargetContainer = targetContainer ?? inputNode;
-  floatingButtonTargetInput = inputNode;
-  // CRITICAL: Always call positionFloatingButton which will find the correct container
-  positionFloatingButton(inputNode, null);
+  // No-op: sticky button doesn't need placement
+  return;
 }
 
 function ensureDomObserver() {
@@ -1153,12 +1116,7 @@ function ensureDomObserver() {
     AdapterBase.requestSelectionToolbarUpdate();
     const composer = locateComposer();
     if (composer) {
-      placeButton(composer.container, composer.input);
       setupEnhanceTooltip(composer.input, composer.container);
-    }
-    // Recalculate button position when DOM changes (in case buttons move)
-    if (floatingButtonTargetInput) {
-      refreshFloatingButtonPosition();
     }
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
@@ -1166,24 +1124,8 @@ function ensureDomObserver() {
 }
 
 function cleanupButtonPositionObserver() {
-  if (buttonPositionObserver) {
-    buttonPositionObserver.disconnect();
-    buttonPositionObserver = null;
-  }
-  if (buttonPositionMutationObserver) {
-    buttonPositionMutationObserver.disconnect();
-    buttonPositionMutationObserver = null;
-  }
-  if (buttonPositionInputHandler && floatingButtonTargetInput) {
-    floatingButtonTargetInput.removeEventListener('input', buttonPositionInputHandler);
-    floatingButtonTargetInput.removeEventListener('keyup', buttonPositionInputHandler);
-    floatingButtonTargetInput.removeEventListener('focus', buttonPositionInputHandler);
-    if (buttonPositionAnimationFrame) {
-      cancelAnimationFrame(buttonPositionAnimationFrame);
-      buttonPositionAnimationFrame = null;
-    }
-    buttonPositionInputHandler = null;
-  }
+  // No-op: sticky button doesn't need position observers
+  return;
 }
 
 function locateComposer() {
@@ -1214,10 +1156,13 @@ function locateComposer() {
 }
 
 function init() {
-  const composer = locateComposer();
+  // Initialize sticky button (no injection logic needed)
+  AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
+  
+  // Setup selection toolbar and enhance tooltip
   AdapterBase.requestSelectionToolbarUpdate();
+  const composer = locateComposer();
   if (composer) {
-    placeButton(composer.container, composer.input);
     setupEnhanceTooltip(composer.input, composer.container);
     ensureDomObserver();
     return true;
@@ -1232,7 +1177,7 @@ function init() {
  */
 function findComposerNode() {
   // Try tracked nodes first
-  let composerNode = enhanceTooltipActiveTextarea ?? floatingButtonTargetInput;
+  let composerNode = enhanceTooltipActiveTextarea;
   if (composerNode) {
     return composerNode;
   }
@@ -1668,16 +1613,8 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage)
   console.error("[Prompanion] chrome.runtime.onMessage is NOT available at this point!");
 }
 
-window.addEventListener("prompanion-panel-resize", () => {
-  refreshFloatingButtonPosition();
-});
-
-// Also recalculate on window resize to keep button position correct
-window.addEventListener("resize", () => {
-  if (floatingButtonTargetInput) {
-    refreshFloatingButtonPosition();
-  }
-});
+// Window resize listeners removed - sticky button doesn't need position updates
+// Sticky button maintains its position automatically via fixed positioning
 
 // Cleanup observer when page unloads
 window.addEventListener("beforeunload", () => {

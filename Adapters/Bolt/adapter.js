@@ -625,10 +625,7 @@ function ensureDomObserver() {
       const inputChanged = lastComposerInput !== composer.input;
       if (inputChanged) {
         lastComposerInput = composer.input;
-        placeButton(composer.container, composer.input);
         setupEnhanceTooltip(composer.input, composer.container);
-      } else {
-        placeButton(composer.container, composer.input);
       }
     } else {
       lastComposerInput = null;
@@ -741,10 +738,12 @@ function locateComposer() {
 }
 
 function init() {
+  // Initialize sticky button (no injection logic needed)
+  AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
+  
   const composer = locateComposer();
   AdapterBase.requestSelectionToolbarUpdate();
   if (composer) {
-    placeButton(composer.container, composer.input);
     setupEnhanceTooltip(composer.input, composer.container);
     ensureDomObserver();
     
@@ -1835,7 +1834,7 @@ window.__prompanionApplyBoltPush = applyBoltContainerPush;
 
 // Listen for panel resize events
 window.addEventListener("prompanion-panel-resize", () => {
-  refreshFloatingButtonPosition();
+  // Sticky button doesn't need position refresh
   const panelContainer = document.getElementById('prompanion-sidepanel-container');
   const isVisible = panelContainer && panelContainer.classList.contains('prompanion-sidepanel-visible');
   applyBoltContainerPush(isVisible);

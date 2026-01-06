@@ -655,7 +655,6 @@ function ensureDomObserver() {
     requestSelectionToolbarUpdate();
     const composer = locateComposer();
     if (composer) {
-      placeButton(composer.container, composer.input);
       setupEnhanceTooltip(composer.input, composer.container);
     }
   });
@@ -807,6 +806,9 @@ function fixAriaHiddenOnFieldsets() {
 let ariaHiddenFixObservers = null;
 
 function init() {
+  // Initialize sticky button (no injection logic needed)
+  AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
+  
   const composer = locateComposer();
   requestSelectionToolbarUpdate();
   
@@ -816,7 +818,6 @@ function init() {
   }
   
   if (composer) {
-    placeButton(composer.container, composer.input);
     setupEnhanceTooltip(composer.input, composer.container);
     ensureDomObserver();
     return true;
@@ -1161,7 +1162,7 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage)
 }
 
 window.addEventListener("prompanion-panel-resize", () => {
-  refreshFloatingButtonPosition();
+  // Sticky button doesn't need position refresh
 });
 
 document.addEventListener("mousedown", (e) => {

@@ -609,7 +609,6 @@ function ensureDomObserver() {
     AdapterBase.requestSelectionToolbarUpdate();
     const composer = locateComposer();
     if (composer) {
-      placeButton(composer.container, composer.input);
       setupEnhanceTooltip(composer.input, composer.container);
     }
   });
@@ -671,12 +670,13 @@ function init() {
   initInProgress = true;
   try {
     console.log("[Prompanion Gemini] init() called");
+    // Initialize sticky button (no injection logic needed)
+    AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
+    
     const composer = locateComposer();
     console.log("[Prompanion Gemini] init() - composer found:", !!composer);
     AdapterBase.requestSelectionToolbarUpdate();
     if (composer) {
-      console.log("[Prompanion Gemini] init() - calling placeButton");
-      placeButton(composer.container, composer.input);
       setupEnhanceTooltip(composer.input, composer.container);
       ensureDomObserver();
       return true;
@@ -1045,13 +1045,13 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage)
 }
 
 window.addEventListener("prompanion-panel-resize", () => {
-  refreshFloatingButtonPosition();
+  // Sticky button doesn't need position refresh
 });
 
 // Also recalculate on window resize to keep button position correct
 window.addEventListener("resize", () => {
   if (floatingButtonTargetInput) {
-    refreshFloatingButtonPosition();
+    // Sticky button doesn't need position refresh
   }
 });
 

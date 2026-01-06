@@ -1551,7 +1551,6 @@ function ensureDomObserver() {
     requestSelectionToolbarUpdate();
     const composer = locateComposer();
     if (composer) {
-      placeButton(composer.container, composer.input, composer.buttonTargetElement);
       setupEnhanceTooltip(composer.input, composer.container);
     }
   });
@@ -1694,10 +1693,12 @@ function locateComposer() {
 }
 
 function init() {
+  // Initialize sticky button (no injection logic needed)
+  AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
+  
   const composer = locateComposer();
   requestSelectionToolbarUpdate();
   if (composer) {
-    placeButton(composer.container, composer.input, composer.buttonTargetElement);
     setupEnhanceTooltip(composer.input, composer.container);
     ensureDomObserver();
     return true;

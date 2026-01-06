@@ -1088,6 +1088,192 @@ class AdapterBase {
   static requestSelectionToolbarUpdate() {
     this._handleSelectionChange();
   }
+  
+  // ============================================================================
+  // Sticky Button System
+  // ============================================================================
+  // Provides a fixed-position sticky button that stays visible on the page
+  // regardless of page changes or scrolling. This eliminates the need for
+  // per-adapter injection logic.
+  // ============================================================================
+  
+  static _stickyButtonElement = null;
+  static _stickyButtonInitialized = false;
+  
+  /**
+   * Creates and initializes the sticky button
+   * This button stays in a fixed position on the page and is visible across all adapters
+   * @param {Object} options - Optional configuration
+   * @param {string} options.position - Position: 'bottom-right' (default), 'bottom-left', 'top-right', 'top-left'
+   * @param {number} options.offsetX - Horizontal offset in pixels (default: 250)
+   * @param {number} options.offsetY - Vertical offset in pixels (default: 250)
+   */
+  static initStickyButton(options = {}) {
+    if (this._stickyButtonInitialized) {
+      console.log("[AdapterBase] Sticky button already initialized");
+      return this._stickyButtonElement;
+    }
+    
+    const position = options.position || 'bottom-right';
+    const offsetX = options.offsetX || 250;
+    const offsetY = options.offsetY || 250;
+    
+    // Ensure styles are loaded
+    this.ensureStyle();
+    
+    // Create button element
+    const button = document.createElement("button");
+    button.id = this.BUTTON_ID;
+    button.type = "button";
+    button.className = this.BUTTON_CLASS;
+    button.setAttribute("aria-label", "Open Prompanion to enhance your prompts");
+    
+    // Create icon
+    const icon = this._createStickyButtonIcon();
+    button.append(icon);
+    
+    // Attach tooltip
+    this.attachTooltip(button, "Open Prompanion to enhance your prompts for the best response.", this.BUTTON_ID);
+    
+    // Add event listeners
+    button.addEventListener("click", () => {
+      this.togglePanel().catch((e) => {
+        console.error("Prompanion: failed to open sidebar from sticky button", e);
+      });
+    });
+    
+    button.addEventListener("mouseenter", () => this.showTooltip(button, this.BUTTON_ID));
+    button.addEventListener("focus", () => this.showTooltip(button, this.BUTTON_ID));
+    button.addEventListener("mouseleave", () => this.hideTooltip(button));
+    button.addEventListener("blur", () => this.hideTooltip(button));
+    
+    // Apply sticky positioning styles
+    this._applyStickyButtonStyles(button, position, offsetX, offsetY);
+    
+    // Append to body
+    if (!document.body) {
+      // Wait for body to be available
+      const observer = new MutationObserver((mutations, obs) => {
+        if (document.body) {
+          document.body.appendChild(button);
+          obs.disconnect();
+          this._stickyButtonElement = button;
+          this._stickyButtonInitialized = true;
+          console.log("[AdapterBase] ✓ Sticky button initialized and added to page");
+        }
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+    } else {
+      document.body.appendChild(button);
+      this._stickyButtonElement = button;
+      this._stickyButtonInitialized = true;
+      console.log("[AdapterBase] ✓ Sticky button initialized and added to page");
+    }
+    
+    return button;
+  }
+  
+  /**
+   * Creates the icon element for the sticky button
+   * @private
+   */
+  static _createStickyButtonIcon() {
+    const icon = document.createElement("span");
+    icon.className = `${this.BUTTON_CLASS}__icon`;
+    icon.setAttribute("aria-hidden", "true");
+    
+    if (typeof chrome !== "undefined" && chrome.runtime) {
+      const assetUrl = chrome.runtime.getURL("/Assets/icons/icon48.png");
+      icon.style.backgroundImage = `url('${assetUrl}')`;
+      icon.dataset.iconUrl = assetUrl;
+    }
+    
+    return icon;
+  }
+  
+  /**
+   * Applies sticky positioning styles to the button
+   * @private
+   */
+  static _applyStickyButtonStyles(button, position, offsetX, offsetY) {
+    // Calculate 25% larger size for sticky button
+    const baseWrapperSize = parseInt(this.BUTTON_SIZE.wrapper) || 44;
+    const baseIconSize = parseInt(this.BUTTON_SIZE.icon) || 34;
+    
+    const largerWrapperSize = Math.round(baseWrapperSize * 1.25); // 44 * 1.25 = 55px
+    const largerIconSize = Math.round(baseIconSize * 1.25); // 34 * 1.25 = 43px
+    
+    // Base fixed positioning with larger size
+    button.style.position = "fixed";
+    button.style.zIndex = "2147483000";
+    button.style.width = `${largerWrapperSize}px`;
+    button.style.height = `${largerWrapperSize}px`;
+    button.style.display = "flex";
+    button.style.alignItems = "center";
+    button.style.justifyContent = "center";
+    button.style.pointerEvents = "auto";
+    button.style.transition = "transform 120ms ease, box-shadow 120ms ease";
+    
+    // Update icon size to match larger button
+    const icon = button.querySelector(`.${this.BUTTON_CLASS}__icon`);
+    if (icon) {
+      icon.style.width = `${largerIconSize}px`;
+      icon.style.height = `${largerIconSize}px`;
+    }
+    
+    // Position-specific styles
+    switch (position) {
+      case 'bottom-right':
+        button.style.bottom = `${offsetY}px`;
+        button.style.right = `${offsetX}px`;
+        button.style.top = "auto";
+        button.style.left = "auto";
+        break;
+      case 'bottom-left':
+        button.style.bottom = `${offsetY}px`;
+        button.style.left = `${offsetX}px`;
+        button.style.top = "auto";
+        button.style.right = "auto";
+        break;
+      case 'top-right':
+        button.style.top = `${offsetY}px`;
+        button.style.right = `${offsetX}px`;
+        button.style.bottom = "auto";
+        button.style.left = "auto";
+        break;
+      case 'top-left':
+        button.style.top = `${offsetY}px`;
+        button.style.left = `${offsetX}px`;
+        button.style.bottom = "auto";
+        button.style.right = "auto";
+        break;
+      default:
+        // Default to bottom-right
+        button.style.bottom = `${offsetY}px`;
+        button.style.right = `${offsetX}px`;
+        button.style.top = "auto";
+        button.style.left = "auto";
+    }
+  }
+  
+  /**
+   * Gets the sticky button element if it exists
+   * @returns {HTMLElement|null} The sticky button element or null
+   */
+  static getStickyButton() {
+    return this._stickyButtonElement;
+  }
+  
+  /**
+   * Removes the sticky button from the page
+   */
+  static removeStickyButton() {
+    if (this._stickyButtonElement && this._stickyButtonElement.parentElement) {
+      this._stickyButtonElement.remove();
+    }
+    this._stickyButtonElement = null;
+    this._stickyButtonInitialized = false;
+  }
 }
 
 // Export for use in adapters

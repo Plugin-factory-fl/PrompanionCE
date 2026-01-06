@@ -1106,11 +1106,8 @@ function ensureDomObserver() {
     requestSelectionToolbarUpdate();
     const composer = locateComposer();
     if (composer) {
-      console.log("[Prompanion Lovable] DOM observer: composer found, placing button");
-      placeButton(composer.container, composer.input);
+      console.log("[Prompanion Lovable] DOM observer: composer found, setting up enhance tooltip");
       setupEnhanceTooltip(composer.input, composer.container);
-      // Also refresh button position in case target element appeared
-      refreshFloatingButtonPosition();
     } else {
       console.log("[Prompanion Lovable] DOM observer: composer not found yet");
     }
@@ -1219,17 +1216,13 @@ function locateComposer() {
 
 function init() {
   console.log("[Prompanion Lovable] ========== INIT CALLED ==========");
+  // Initialize sticky button (no injection logic needed)
+  AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
+  
   const composer = locateComposer();
   requestSelectionToolbarUpdate();
   if (composer) {
-    console.log("[Prompanion Lovable] Composer found, placing button:", {
-      inputTagName: composer.input.tagName,
-      inputClassName: composer.input.className,
-      containerTagName: composer.container.tagName,
-      containerClassName: composer.container.className,
-      hasButtonTargetElement: !!composer.buttonTargetElement
-    });
-    placeButton(composer.container, composer.input, composer.buttonTargetElement);
+    console.log("[Prompanion Lovable] Composer found, setting up enhance tooltip");
     setupEnhanceTooltip(composer.input, composer.container);
     ensureDomObserver();
     return true;

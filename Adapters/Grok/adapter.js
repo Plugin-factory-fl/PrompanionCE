@@ -1167,11 +1167,9 @@ function ensureDomObserver() {
     requestSelectionToolbarUpdate();
     const composer = locateComposer();
     if (composer) {
-      placeButton(composer.container, composer.input);
       setupEnhanceTooltip(composer.input, composer.container);
     }
-    // Always recalculate button position when DOM changes (removes the composer-lock)
-    refreshFloatingButtonPosition();
+    // Sticky button doesn't need position refresh
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
   domObserverStarted = true;
@@ -1216,10 +1214,12 @@ function locateComposer() {
 }
 
 function init() {
+  // Initialize sticky button (no injection logic needed)
+  AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
+  
   const composer = locateComposer();
   requestSelectionToolbarUpdate();
   if (composer) {
-    placeButton(composer.container, composer.input);
     setupEnhanceTooltip(composer.input, composer.container);
     ensureDomObserver();
     return true;

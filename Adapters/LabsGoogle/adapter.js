@@ -317,9 +317,10 @@ function locateComposer() {
 }
 
 function init() {
-  const composer = locateComposer();
-  positionFloatingButton(composer?.input || null);
+  // Initialize sticky button (no injection logic needed)
+  AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
   
+  const composer = locateComposer();
   if (composer) {
     setupEnhanceTooltip(composer.input, composer.container);
     ensureDomObserver();

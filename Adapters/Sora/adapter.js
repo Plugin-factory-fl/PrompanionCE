@@ -416,11 +416,8 @@ function ensureDomObserver() {
       const composer = locateComposer();
       if (composer) {
         setupEnhanceTooltip(composer.input, composer.container);
-        placeButton(null, composer.input);
-      } else {
-        placeButton(null, null);
       }
-      refreshFloatingButtonPosition();
+      // Sticky button doesn't need placement or position refresh
     }, 500); // Slower debounce to prevent UI lag
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
@@ -464,11 +461,11 @@ function locateComposer() {
 
 function init() {
   console.log("[Prompanion Sora] init() called");
+  // Initialize sticky button (no injection logic needed)
+  AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
+  
   const composer = locateComposer();
   AdapterBase.requestSelectionToolbarUpdate();
-  
-  // Always try to place button in settings container (independent of composer)
-  placeButton(null, composer?.input || null);
   
   if (composer) {
     console.log("[Prompanion Sora] Composer found, setting up enhance tooltip");
@@ -476,7 +473,7 @@ function init() {
     ensureDomObserver();
     return true;
   }
-  console.warn("[Prompanion Sora] Composer not found in init(), but button placement attempted");
+  console.warn("[Prompanion Sora] Composer not found in init()");
   ensureDomObserver();
   return false;
 }
