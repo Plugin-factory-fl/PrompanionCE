@@ -1686,6 +1686,19 @@ document.addEventListener("mousedown", (e) => {
         console.log("[PromptProfile™ Grok] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
         console.log("[PromptProfile™ Grok] Time since mousedown:", timeSinceMousedown, "ms");
         console.log("[PromptProfile™ Grok] Click target:", clickEvent.target);
+        
+        // Check if this is the upgrade button - if so, don't call refine handler
+        const clickedElement = clickEvent.target;
+        const isUpgradeButton = clickedElement.classList.contains("promptprofile-enhance-tooltip__upgrade") ||
+                                clickedElement.closest(".promptprofile-enhance-tooltip__upgrade");
+        
+        if (isUpgradeButton) {
+          console.log("[PromptProfile™ Grok] Upgrade button clicked, skipping refine handler in document click");
+          document.removeEventListener("click", clickHandler, true);
+          tooltipClickInProgress = false;
+          return; // Don't call refine handler for upgrade button
+        }
+        
         if (typeof handleRefineButtonClick === "function") {
           handleRefineButtonClick(clickEvent);
         }
