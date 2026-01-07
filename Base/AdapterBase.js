@@ -1274,9 +1274,7 @@ class AdapterBase {
     this._stickyButtonElement = null;
     this._stickyButtonInitialized = false;
   }
-}
-
-// Export for use in adapters
+  
   /**
    * Handles Stripe checkout for upgrade button
    * @param {HTMLElement} button - The upgrade button element
