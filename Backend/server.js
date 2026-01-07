@@ -30,7 +30,18 @@ app.use(helmet());
 
 // CORS configuration
 const allowedOriginsRaw = process.env.ALLOWED_ORIGINS || '*';
-const allowedOrigins = allowedOriginsRaw.split(',').map(origin => origin.trim());
+// Split and trim, also remove any trailing paths (CORS origins are domain-only)
+const allowedOrigins = allowedOriginsRaw.split(',').map(origin => {
+  const trimmed = origin.trim();
+  // Remove trailing paths - CORS origins are just protocol + domain + port
+  try {
+    const url = new URL(trimmed);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    // If it's not a URL (like 'chrome-extension://*' or '*'), return as-is
+    return trimmed;
+  }
+});
 console.log('[CORS] Allowed origins:', allowedOrigins);
 
 app.use(cors({
@@ -45,13 +56,33 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // Check if origin is in allowed list
-    if (allowedOrigins.includes(origin)) {
+    // Normalize the incoming origin (remove path if present)
+    let normalizedOrigin = origin;
+    try {
+      const url = new URL(origin);
+      normalizedOrigin = `${url.protocol}//${url.host}`;
+    } catch {
+      // If it's not a URL, use as-is
+    }
+    
+    // Check if origin matches (exact match or wildcard pattern)
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (allowed === normalizedOrigin) return true;
+      // Support wildcard patterns like 'chrome-extension://*'
+      if (allowed.includes('*')) {
+        const pattern = allowed.replace(/\*/g, '.*');
+        const regex = new RegExp(`^${pattern}$`);
+        return regex.test(normalizedOrigin) || regex.test(origin);
+      }
+      return false;
+    });
+    
+    if (isAllowed) {
       return callback(null, true);
     }
     
     // Log rejected origin for debugging
-    console.log('[CORS] Rejected origin:', origin);
+    console.log('[CORS] Rejected origin:', origin, '(normalized:', normalizedOrigin + ')');
     console.log('[CORS] Allowed origins:', allowedOrigins);
     callback(new Error(`Not allowed by CORS. Origin: ${origin}`));
   },
