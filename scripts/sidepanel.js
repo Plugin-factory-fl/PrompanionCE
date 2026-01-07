@@ -674,19 +674,24 @@ function renderStatus(status) {
   
   if (upgradeBtn) {
     if (isLoggedIn && isFreemium) {
-      // Show button and trigger fade-in animation
-      upgradeBtn.style.display = "inline-flex";
-      // Remove any existing animation classes
-      upgradeBtn.classList.remove("btn--upgrade--visible", "btn--upgrade--fade-in");
-      // Force reflow to ensure the animation triggers
-      void upgradeBtn.offsetWidth;
-      // Add fade-in class for graceful 2-second animation
-      upgradeBtn.classList.add("btn--upgrade--fade-in");
-      // After animation completes, add visible class for hover states
-      setTimeout(() => {
-        upgradeBtn.classList.remove("btn--upgrade--fade-in");
-        upgradeBtn.classList.add("btn--upgrade--visible");
-      }, 2000);
+      // Only trigger fade-in if button is not already visible
+      if (!upgradeBtn.classList.contains("btn--upgrade--visible") && 
+          !upgradeBtn.classList.contains("btn--upgrade--fade-in")) {
+        // Show button and trigger fade-in animation
+        upgradeBtn.style.display = "inline-flex";
+        // Force reflow to ensure the animation triggers
+        void upgradeBtn.offsetWidth;
+        // Add fade-in class for graceful 2-second animation
+        upgradeBtn.classList.add("btn--upgrade--fade-in");
+        // After animation completes, add visible class for hover states
+        setTimeout(() => {
+          upgradeBtn.classList.remove("btn--upgrade--fade-in");
+          upgradeBtn.classList.add("btn--upgrade--visible");
+        }, 2000);
+      } else {
+        // Button already visible or animating, just ensure it's displayed
+        upgradeBtn.style.display = "inline-flex";
+      }
     } else {
       // Hide button immediately
       upgradeBtn.style.display = "none";

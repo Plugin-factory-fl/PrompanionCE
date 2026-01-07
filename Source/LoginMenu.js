@@ -378,12 +378,62 @@ export function registerAccountHandlers() {
     });
   }
 
-  // Handle "UPGRADE NOW" button
+  // Handle "UPGRADE NOW" button - triggers Stripe checkout
   if (upgradeButton) {
-    upgradeButton.addEventListener("click", (event) => {
+    upgradeButton.addEventListener("click", async (event) => {
       event.preventDefault();
-      // TODO: Implement upgrade flow (Stripe integration)
-      alert("Upgrade functionality coming soon!");
+      event.stopPropagation();
+      
+      const BACKEND_URL = "https://prompanionce.onrender.com";
+      
+      // Disable button to prevent double-clicks
+      upgradeButton.disabled = true;
+      const originalText = upgradeButton.textContent;
+      upgradeButton.textContent = "Loading...";
+
+      try {
+        // Get auth token
+        const authToken = await chrome.storage.local.get("authToken");
+        const token = authToken.authToken;
+
+        if (!token) {
+          alert("Please log in to upgrade your plan.");
+          upgradeButton.disabled = false;
+          upgradeButton.textContent = originalText;
+          return;
+        }
+
+        // Create checkout session
+        const response = await fetch(`${BACKEND_URL}/api/checkout/create-session`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ error: "Unknown error" }));
+          throw new Error(error.error || "Failed to create checkout session");
+        }
+
+        const data = await response.json();
+
+        // Redirect to Stripe Checkout
+        if (data.url) {
+          // Open in new tab
+          chrome.tabs.create({ url: data.url });
+          // Close the account dialog
+          accountDialog.close();
+        } else {
+          throw new Error("No checkout URL received");
+        }
+      } catch (error) {
+        console.error("[PromptProfile™ LoginMenu] Checkout error:", error);
+        alert("Failed to start checkout: " + error.message + "\n\nPlease try again or contact support.");
+        upgradeButton.disabled = false;
+        upgradeButton.textContent = originalText;
+      }
     });
   }
 
