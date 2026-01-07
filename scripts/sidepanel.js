@@ -675,7 +675,7 @@ function renderStatus(status) {
   if (upgradeBtn) {
     // Reset button text if it's stuck on "Loading..."
     if (upgradeBtn.textContent === "Loading..." && !upgradeBtn.disabled) {
-      upgradeBtn.textContent = "Upgrade";
+      upgradeBtn.textContent = "Get Pro";
     }
     
     if (isLoggedIn && isFreemium) {
@@ -883,7 +883,7 @@ async function handleUpgradeClick() {
       chrome.tabs.create({ url: data.url });
       // Reset button after successful checkout session creation
       upgradeBtn.disabled = false;
-      upgradeBtn.textContent = "Upgrade";
+      upgradeBtn.textContent = "Get Pro";
     } else {
       throw new Error("No checkout URL received");
     }
@@ -891,7 +891,7 @@ async function handleUpgradeClick() {
     console.error("[PromptProfile™ Sidepanel] Checkout error:", error);
     alert("Failed to start checkout: " + error.message + "\n\nPlease try again or contact support.");
     upgradeBtn.disabled = false;
-    upgradeBtn.textContent = "Upgrade";
+    upgradeBtn.textContent = "Get Pro";
   }
 }
 
