@@ -532,7 +532,7 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
       if (errorMessage === "LIMIT_REACHED") {
         const limitMessage = {
           role: "agent",
-          content: 'You used all 10 of your free uses! You\'ll get 10 more tomorrow. If <a href="#" style="text-decoration: underline; color: inherit;" onclick="event.preventDefault(); console.log(\'Upgrade clicked - placeholder for Stripe integration\'); return false;">upgrade now</a> you can get unlimited uses.',
+          content: 'You used all 10 of your free uses! You\'ll get 10 more tomorrow. If <a href="#" class="sidechat-upgrade-link" style="text-decoration: underline; color: inherit;">upgrade now</a> you can get unlimited uses.',
           timestamp: Date.now()
         };
         activeConversation.history.push(limitMessage);
@@ -659,7 +659,7 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
       if (errorMessage === "LIMIT_REACHED") {
         currentActiveConversation.history.push({
           role: "agent",
-          content: 'You used all 10 of your free uses! You\'ll get 10 more tomorrow. If <a href="#" style="text-decoration: underline; color: inherit;" onclick="event.preventDefault(); console.log(\'Upgrade clicked - placeholder for Stripe integration\'); return false;">upgrade now</a> you can get unlimited uses.',
+          content: 'You used all 10 of your free uses! You\'ll get 10 more tomorrow. If <a href="#" class="sidechat-upgrade-link" style="text-decoration: underline; color: inherit;">upgrade now</a> you can get unlimited uses.',
           timestamp: Date.now()
         });
       } else {
@@ -1123,8 +1123,55 @@ const handlerStore = {
   resetButton: null,
   tabsContainer: null,
   textarea: null,
-  form: null
+  form: null,
+  chatWindow: null
 };
+
+/**
+ * Handles upgrade link clicks in chat messages
+ * @returns {Promise<void>}
+ */
+async function handleSideChatUpgradeClick() {
+  const BACKEND_URL = "https://prompanionce.onrender.com";
+  
+  try {
+    // Get auth token
+    const authToken = await chrome.storage.local.get("authToken");
+    const token = authToken.authToken;
+
+    if (!token) {
+      alert("Please log in to upgrade your plan.");
+      return;
+    }
+
+    // Create checkout session
+    const response = await fetch(`${BACKEND_URL}/api/checkout/create-session`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: "Unknown error" }));
+      throw new Error(error.error || "Failed to create checkout session");
+    }
+
+    const data = await response.json();
+
+    // Redirect to Stripe Checkout
+    if (data.url) {
+      // Open in new tab since we're in a sidepanel
+      chrome.tabs.create({ url: data.url });
+    } else {
+      throw new Error("No checkout URL received");
+    }
+  } catch (error) {
+    console.error("[PromptProfile™ SideChat] Checkout error:", error);
+    alert("Failed to start checkout: " + error.message + "\n\nPlease try again or contact support.");
+  }
+}
 
 /**
  * Registers all event handlers for the Side Chat section
@@ -1143,9 +1190,30 @@ export function registerChatHandlers(stateRef, dependencies = {}) {
   const textarea = document.getElementById("chat-message");
   const resetButton = document.getElementById("chat-reset");
   const tabsContainer = document.getElementById("chat-tabs");
+  const chatWindow = document.getElementById("chat-window");
   
   if (!form || !textarea || !resetButton || !tabsContainer || !saveState) {
     return;
+  }
+  
+  // Set up event delegation for upgrade links in chat messages
+  if (chatWindow) {
+    // Remove old handler if it exists
+    if (handlerStore.chatWindow) {
+      chatWindow.removeEventListener("click", handlerStore.chatWindow);
+    }
+    
+    // Create new handler for upgrade link clicks
+    handlerStore.chatWindow = (e) => {
+      const upgradeLink = e.target.closest(".sidechat-upgrade-link");
+      if (upgradeLink) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleSideChatUpgradeClick();
+      }
+    };
+    
+    chatWindow.addEventListener("click", handlerStore.chatWindow);
   }
 
   // Remove old event listeners if they exist to prevent duplicates
