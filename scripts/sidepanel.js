@@ -656,7 +656,7 @@ async function updateEnhancementsDisplay() {
  * Renders status information in the UI
  * @param {Object} status - Status object with plan, enhancementsUsed, enhancementsLimit, activePlatform, and optionally settings
  */
-async function renderStatus(status) {
+function renderStatus(status) {
   // Handle both direct status object and full state object
   const plan = status.plan || status?.plan || "Freemium";
   const enhancementsUsed = status.enhancementsUsed ?? status?.enhancementsUsed ?? 0;
@@ -676,49 +676,81 @@ async function renderStatus(status) {
       upgradeBtn.textContent = "Get Pro";
     }
     
-    // Check login status directly from storage instead of DOM to avoid race conditions
-    let isLoggedIn = false;
-    try {
-      const result = await chrome.storage.local.get("authToken");
-      isLoggedIn = !!result.authToken;
-    } catch (error) {
-      // Fallback to DOM check if storage access fails
-      const userStatus = document.getElementById("user-status")?.textContent;
-      isLoggedIn = userStatus && userStatus !== "Not Logged In";
-    }
+    // Check login status - use DOM as primary check, but verify with storage asynchronously
+    const userStatus = document.getElementById("user-status")?.textContent;
+    const isLoggedInFromDOM = userStatus && userStatus !== "Not Logged In";
     
-    if (isLoggedIn && isFreemium) {
-      // Always show button if conditions are met - don't hide it once it's been shown
-      // Only trigger fade-in if button is not already visible or animating
+    // If button is already visible and conditions seem right, keep it visible
+    // This prevents the button from disappearing due to race conditions
+    const buttonWasVisible = upgradeBtn.classList.contains("btn--upgrade--visible") || 
+                             upgradeBtn.classList.contains("btn--upgrade--fade-in");
+    
+    // Verify login status with storage (non-blocking)
+    chrome.storage.local.get("authToken", (result) => {
+      const isLoggedInFromStorage = !!result.authToken;
+      const shouldShow = isLoggedInFromStorage && isFreemium;
+      
+      if (shouldShow) {
+        // Always show button if conditions are met
+        if (!upgradeBtn.classList.contains("btn--upgrade--visible") && 
+            !upgradeBtn.classList.contains("btn--upgrade--fade-in")) {
+          // Show button and trigger fade-in animation
+          upgradeBtn.style.display = "inline-flex";
+          upgradeBtn.style.opacity = "0";
+          void upgradeBtn.offsetWidth; // Force reflow
+          upgradeBtn.classList.add("btn--upgrade--fade-in");
+          setTimeout(() => {
+            upgradeBtn.classList.remove("btn--upgrade--fade-in");
+            upgradeBtn.classList.add("btn--upgrade--visible");
+            upgradeBtn.style.opacity = "1";
+          }, 2000);
+        } else {
+          // Button already visible or animating, ensure it stays displayed
+          upgradeBtn.style.display = "inline-flex";
+          upgradeBtn.style.opacity = "1";
+          if (!upgradeBtn.classList.contains("btn--upgrade--visible") && 
+              !upgradeBtn.classList.contains("btn--upgrade--fade-in")) {
+            upgradeBtn.classList.add("btn--upgrade--visible");
+          }
+        }
+      } else if (!isLoggedInFromStorage && !isFreemium) {
+        // Only hide if we're sure user is not logged in AND not on freemium
+        // Don't hide if button was visible and we're just checking - might be a race condition
+        if (!buttonWasVisible || (!isLoggedInFromStorage && !isFreemium)) {
+          upgradeBtn.style.display = "none";
+          upgradeBtn.classList.remove("btn--upgrade--visible", "btn--upgrade--fade-in");
+          upgradeBtn.style.opacity = "0";
+        }
+      }
+    });
+    
+    // Immediate check using DOM (for initial render)
+    if (isLoggedInFromDOM && isFreemium) {
+      // If button is not visible yet, show it (will be verified by storage check above)
       if (!upgradeBtn.classList.contains("btn--upgrade--visible") && 
           !upgradeBtn.classList.contains("btn--upgrade--fade-in")) {
-        // Show button and trigger fade-in animation
         upgradeBtn.style.display = "inline-flex";
         upgradeBtn.style.opacity = "0";
-        // Force reflow to ensure the animation triggers
         void upgradeBtn.offsetWidth;
-        // Add fade-in class for graceful 2-second animation
         upgradeBtn.classList.add("btn--upgrade--fade-in");
-        // After animation completes, add visible class for hover states
         setTimeout(() => {
           upgradeBtn.classList.remove("btn--upgrade--fade-in");
           upgradeBtn.classList.add("btn--upgrade--visible");
           upgradeBtn.style.opacity = "1";
         }, 2000);
       } else {
-        // Button already visible or animating, ensure it stays displayed and visible
+        // Button already visible, ensure it stays visible
         upgradeBtn.style.display = "inline-flex";
-        upgradeBtn.style.opacity = "1"; // Always set to 1 if conditions are met
-        // Ensure visible class is present
+        upgradeBtn.style.opacity = "1";
         if (!upgradeBtn.classList.contains("btn--upgrade--visible") && 
             !upgradeBtn.classList.contains("btn--upgrade--fade-in")) {
           upgradeBtn.classList.add("btn--upgrade--visible");
         }
       }
-    } else {
-      // Only hide button if user is not logged in OR not on freemium plan
-      // This prevents the button from disappearing when renderStatus is called multiple times
-      if (!isLoggedIn || !isFreemium) {
+    } else if (!isLoggedInFromDOM && !isFreemium) {
+      // Only hide if DOM clearly shows not logged in AND not freemium
+      // But preserve button if it was already visible (might be a race condition)
+      if (!buttonWasVisible) {
         upgradeBtn.style.display = "none";
         upgradeBtn.classList.remove("btn--upgrade--visible", "btn--upgrade--fade-in");
         upgradeBtn.style.opacity = "0";
