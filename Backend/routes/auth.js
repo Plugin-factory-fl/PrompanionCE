@@ -5,7 +5,7 @@
 
 import express from 'express';
 import { query } from '../config/database.js';
-import { hashPassword, comparePassword, generateToken } from '../config/auth.js';
+import { hashPassword, comparePassword, generateToken, generateResetToken } from '../config/auth.js';
 import { findAndLinkStripeCustomerByEmail } from '../config/stripe.js';
 
 const router = express.Router();
@@ -157,6 +157,122 @@ router.post('/verify', async (req, res) => {
     });
   } catch (error) {
     res.status(401).json({ error: 'Invalid or expired token' });
+  }
+});
+
+/**
+ * POST /api/auth/forgot-password
+ * Request password reset - generates reset token
+ */
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Validation
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Check if email format is valid (basic validation)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    // Check if user exists
+    const result = await query(
+      'SELECT id, email FROM users WHERE email = $1',
+      [email.toLowerCase()]
+    );
+
+    if (result.rows.length === 0) {
+      // Don't reveal if email exists for security, but return success
+      // This prevents email enumeration attacks
+      return res.json({
+        message: 'If an account exists with this email, a password reset token has been generated',
+        token: null // Return null token if email doesn't exist
+      });
+    }
+
+    const user = result.rows[0];
+
+    // Generate reset token
+    const resetToken = generateResetToken();
+    
+    // Set expiration to 1 hour from now
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 1);
+
+    // Store token and expiration in database
+    await query(
+      'UPDATE users SET password_reset_token = $1, password_reset_expires = $2 WHERE id = $3',
+      [resetToken, expiresAt, user.id]
+    );
+
+    res.json({
+      message: 'Password reset requested',
+      token: resetToken // Return token for frontend to use in next step
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Failed to process password reset request' });
+  }
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Reset password using token
+ */
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, token, newPassword } = req.body;
+
+    // Validation
+    if (!email || !token || !newPassword) {
+      return res.status(400).json({ error: 'Email, token, and new password are required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    // Find user and verify token
+    const result = await query(
+      'SELECT id, email, password_reset_token, password_reset_expires FROM users WHERE email = $1',
+      [email.toLowerCase()]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'No account found with this email address' });
+    }
+
+    const user = result.rows[0];
+
+    // Check if token exists and matches
+    if (!user.password_reset_token || user.password_reset_token !== token) {
+      return res.status(401).json({ error: 'Invalid or expired reset token. Please request a new password reset.' });
+    }
+
+    // Check if token has expired
+    if (!user.password_reset_expires || new Date(user.password_reset_expires) < new Date()) {
+      return res.status(401).json({ error: 'Invalid or expired reset token. Please request a new password reset.' });
+    }
+
+    // Hash new password
+    const hashedPassword = await hashPassword(newPassword);
+
+    // Update password and clear reset token
+    await query(
+      'UPDATE users SET password_hash = $1, password_reset_token = NULL, password_reset_expires = NULL, updated_at = NOW() WHERE id = $2',
+      [hashedPassword, user.id]
+    );
+
+    res.json({
+      message: 'Password reset successful'
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 

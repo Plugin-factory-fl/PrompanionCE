@@ -111,6 +111,62 @@ async function getAuthToken() {
 }
 
 /**
+ * Requests password reset token for an email
+ * @param {string} email - User's email address
+ * @returns {Promise<Object>} Response with token or error
+ */
+async function requestPasswordReset(email) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/auth/forgot-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to request password reset");
+    }
+
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * Resets password using email and token
+ * @param {string} email - User's email address
+ * @param {string} token - Password reset token
+ * @param {string} newPassword - New password
+ * @returns {Promise<Object>} Response with success message or error
+ */
+async function resetPassword(email, token, newPassword) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/auth/reset-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, token, newPassword }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to reset password");
+    }
+
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
  * Fetches user profile from backend
  */
 async function getUserProfile() {
@@ -887,15 +943,416 @@ export function registerAccountHandlers() {
     const forgotPasswordInCreateAccount = document.getElementById("create-account-forgot-password");
     if (forgotPasswordInCreateAccount) {
       forgotPasswordInCreateAccount.addEventListener("click", () => {
-        // Close create account dialog and open login dialog
+        // Close create account dialog
         createAccountDialog.close();
-        // Note: Forgot password functionality would go here in the future
-        // For now, just switch to login dialog
-        if (accountDialog) {
-          accountDialog.showModal();
+        // Open forgot password email dialog
+        const forgotPasswordEmailDialog = document.getElementById("forgot-password-email-dialog");
+        if (forgotPasswordEmailDialog) {
+          forgotPasswordEmailDialog.showModal();
         }
       });
     }
+  }
+
+  // Password Reset Handlers
+  const forgotPasswordButton = document.getElementById("forgot-password");
+  const forgotPasswordEmailDialog = document.getElementById("forgot-password-email-dialog");
+  const forgotPasswordEmailForm = document.getElementById("forgot-password-email-form");
+  const forgotPasswordResetDialog = document.getElementById("forgot-password-reset-dialog");
+  const forgotPasswordResetForm = document.getElementById("forgot-password-reset-form");
+
+  // Store email and token for password reset flow
+  let passwordResetEmail = null;
+  let passwordResetToken = null;
+
+  // Handle "Forgot Password?" button in login form
+  if (forgotPasswordButton) {
+    forgotPasswordButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      console.log("[PromptProfile™ LoginMenu] Forgot Password button clicked");
+
+      // Hide user email in logged-in view if visible
+      const userNameEl = document.getElementById("account-user-name");
+      if (userNameEl && userNameEl.textContent && userNameEl.textContent !== "Loading..." && userNameEl.textContent !== "User") {
+        // Store email temporarily (though we'll ask for it again for security)
+        passwordResetEmail = null; // Clear any previous value
+        userNameEl.textContent = "User"; // Hide the actual email
+      }
+
+      // Close account dialog
+      if (accountDialog) {
+        accountDialog.close();
+      }
+
+      // Open forgot password email dialog
+      if (forgotPasswordEmailDialog) {
+        forgotPasswordEmailDialog.showModal();
+      }
+    });
+  }
+
+  // Forgot Password Email Dialog Handlers
+  if (forgotPasswordEmailDialog && forgotPasswordEmailForm) {
+    const emailCancelButtons = forgotPasswordEmailDialog.querySelectorAll(".forgot-password-email__cancel");
+    const emailCloseButton = forgotPasswordEmailDialog.querySelector(".modal__close");
+    const emailSubmitButton = forgotPasswordEmailForm.querySelector(".forgot-password-email__submit");
+
+    const closeEmailDialog = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      forgotPasswordEmailDialog.close("cancel");
+    };
+
+    emailCancelButtons.forEach((button) => {
+      button.addEventListener("click", closeEmailDialog);
+    });
+
+    if (emailCloseButton) {
+      emailCloseButton.addEventListener("click", closeEmailDialog);
+    }
+
+    // Handle backdrop clicks
+    forgotPasswordEmailDialog.addEventListener("click", (event) => {
+      if (event.target === forgotPasswordEmailDialog) {
+        forgotPasswordEmailDialog.close("cancel");
+      }
+    });
+
+    // Handle Escape key
+    forgotPasswordEmailDialog.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        forgotPasswordEmailDialog.close("cancel");
+      }
+    });
+
+    // Handle email form submission
+    if (emailSubmitButton) {
+      emailSubmitButton.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const emailInput = document.getElementById("forgot-password-email");
+        const errorMessageEl = document.getElementById("forgot-password-email-error-message");
+
+        // Clear any existing error message
+        if (errorMessageEl) {
+          errorMessageEl.hidden = true;
+          errorMessageEl.textContent = "";
+        }
+
+        if (!emailInput || !emailInput.value) {
+          if (errorMessageEl) {
+            errorMessageEl.textContent = "Please enter your email address";
+            errorMessageEl.hidden = false;
+          } else {
+            alert("Please enter your email address");
+          }
+          return;
+        }
+
+        const email = emailInput.value.trim();
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          if (errorMessageEl) {
+            errorMessageEl.textContent = "Please enter a valid email address";
+            errorMessageEl.hidden = false;
+          } else {
+            alert("Please enter a valid email address");
+          }
+          return;
+        }
+
+        // Disable submit button
+        emailSubmitButton.disabled = true;
+        const originalText = emailSubmitButton.textContent;
+        emailSubmitButton.textContent = "Loading...";
+
+        try {
+          showStatusPopup("loading");
+          const data = await requestPasswordReset(email);
+
+          showStatusPopup("close");
+
+          // Check if token was returned (email exists)
+          if (data.token) {
+            // Store email and token for next step
+            passwordResetEmail = email;
+            passwordResetToken = data.token;
+
+            // Close email dialog and open reset dialog
+            forgotPasswordEmailDialog.close();
+            if (forgotPasswordResetDialog) {
+              forgotPasswordResetDialog.showModal();
+            }
+          } else {
+            // Email doesn't exist, but we show a generic message for security
+            if (errorMessageEl) {
+              errorMessageEl.textContent = "No account found with this email address";
+              errorMessageEl.hidden = false;
+            } else {
+              alert("No account found with this email address");
+            }
+          }
+        } catch (error) {
+          showStatusPopup("close");
+          console.error("[PromptProfile™ LoginMenu] Password reset request error:", error);
+          
+          let displayMessage = error.message || "Failed to request password reset. Please check your connection and try again.";
+          
+          if (error.message && error.message.includes("No account found")) {
+            displayMessage = "No account found with this email address";
+          }
+
+          if (errorMessageEl) {
+            errorMessageEl.textContent = displayMessage;
+            errorMessageEl.hidden = false;
+          } else {
+            alert(displayMessage);
+          }
+        } finally {
+          emailSubmitButton.disabled = false;
+          emailSubmitButton.textContent = originalText;
+        }
+      });
+    }
+
+    // Clear error message when user types
+    const emailInput = document.getElementById("forgot-password-email");
+    if (emailInput) {
+      emailInput.addEventListener("input", () => {
+        const errorMessageEl = document.getElementById("forgot-password-email-error-message");
+        if (errorMessageEl && !errorMessageEl.hidden) {
+          errorMessageEl.hidden = true;
+          errorMessageEl.textContent = "";
+        }
+      });
+    }
+
+    // Reset form when dialog closes
+    forgotPasswordEmailDialog.addEventListener("close", () => {
+      if (forgotPasswordEmailForm) {
+        forgotPasswordEmailForm.reset();
+      }
+      const errorMessageEl = document.getElementById("forgot-password-email-error-message");
+      if (errorMessageEl) {
+        errorMessageEl.hidden = true;
+        errorMessageEl.textContent = "";
+      }
+    });
+  }
+
+  // Forgot Password Reset Dialog Handlers
+  if (forgotPasswordResetDialog && forgotPasswordResetForm) {
+    const resetCancelButtons = forgotPasswordResetDialog.querySelectorAll(".forgot-password-reset__cancel");
+    const resetCloseButton = forgotPasswordResetDialog.querySelector(".modal__close");
+    const resetSubmitButton = forgotPasswordResetForm.querySelector(".forgot-password-reset__submit");
+
+    const closeResetDialog = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      forgotPasswordResetDialog.close("cancel");
+      // Clear stored email and token
+      passwordResetEmail = null;
+      passwordResetToken = null;
+    };
+
+    resetCancelButtons.forEach((button) => {
+      button.addEventListener("click", closeResetDialog);
+    });
+
+    if (resetCloseButton) {
+      resetCloseButton.addEventListener("click", closeResetDialog);
+    }
+
+    // Handle backdrop clicks
+    forgotPasswordResetDialog.addEventListener("click", (event) => {
+      if (event.target === forgotPasswordResetDialog) {
+        closeResetDialog(event);
+      }
+    });
+
+    // Handle Escape key
+    forgotPasswordResetDialog.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeResetDialog(event);
+      }
+    });
+
+    // Handle reset form submission
+    if (resetSubmitButton) {
+      resetSubmitButton.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const newPasswordInput = document.getElementById("forgot-password-new-password");
+        const confirmPasswordInput = document.getElementById("forgot-password-confirm-password");
+        const errorMessageEl = document.getElementById("forgot-password-reset-error-message");
+
+        // Clear any existing error message
+        if (errorMessageEl) {
+          errorMessageEl.hidden = true;
+          errorMessageEl.textContent = "";
+        }
+
+        if (!newPasswordInput || !confirmPasswordInput) {
+          if (errorMessageEl) {
+            errorMessageEl.textContent = "Please enter both password fields";
+            errorMessageEl.hidden = false;
+          }
+          return;
+        }
+
+        const newPassword = newPasswordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+
+        // Validation
+        if (!newPassword || !confirmPassword) {
+          if (errorMessageEl) {
+            errorMessageEl.textContent = "Please enter both password fields";
+            errorMessageEl.hidden = false;
+          } else {
+            alert("Please enter both password fields");
+          }
+          return;
+        }
+
+        if (newPassword !== confirmPassword) {
+          if (errorMessageEl) {
+            errorMessageEl.textContent = "Passwords do not match";
+            errorMessageEl.hidden = false;
+          } else {
+            alert("Passwords do not match");
+          }
+          return;
+        }
+
+        if (newPassword.length < 8) {
+          if (errorMessageEl) {
+            errorMessageEl.textContent = "Password must be at least 8 characters long";
+            errorMessageEl.hidden = false;
+          } else {
+            alert("Password must be at least 8 characters long");
+          }
+          return;
+        }
+
+        if (!passwordResetEmail || !passwordResetToken) {
+          if (errorMessageEl) {
+            errorMessageEl.textContent = "Session expired. Please request a new password reset.";
+            errorMessageEl.hidden = false;
+          } else {
+            alert("Session expired. Please request a new password reset.");
+          }
+          // Close reset dialog and open email dialog
+          forgotPasswordResetDialog.close();
+          if (forgotPasswordEmailDialog) {
+            forgotPasswordEmailDialog.showModal();
+          }
+          return;
+        }
+
+        // Disable submit button
+        resetSubmitButton.disabled = true;
+        const originalText = resetSubmitButton.textContent;
+        resetSubmitButton.textContent = "Loading...";
+
+        try {
+          showStatusPopup("loading");
+          await resetPassword(passwordResetEmail, passwordResetToken, newPassword);
+          showStatusPopup("close");
+
+          // Success - close dialog and show success message
+          forgotPasswordResetDialog.close();
+          
+          // Clear stored email and token
+          passwordResetEmail = null;
+          passwordResetToken = null;
+
+          // Show success message and open login dialog
+          alert("Password reset successful! You can now log in with your new password.");
+        if (accountDialog) {
+          accountDialog.showModal();
+          }
+        } catch (error) {
+          showStatusPopup("close");
+          console.error("[PromptProfile™ LoginMenu] Password reset error:", error);
+          
+          let displayMessage = error.message || "Failed to reset password. Please check your connection and try again.";
+          
+          if (error.message && (error.message.includes("Invalid") || error.message.includes("expired"))) {
+            displayMessage = "Invalid or expired reset token. Please request a new password reset.";
+            // Clear stored values and close reset dialog
+            passwordResetEmail = null;
+            passwordResetToken = null;
+            forgotPasswordResetDialog.close();
+            if (forgotPasswordEmailDialog) {
+              forgotPasswordEmailDialog.showModal();
+            }
+          }
+
+          if (errorMessageEl) {
+            errorMessageEl.textContent = displayMessage;
+            errorMessageEl.hidden = false;
+          } else {
+            alert(displayMessage);
+          }
+        } finally {
+          resetSubmitButton.disabled = false;
+          resetSubmitButton.textContent = originalText;
+        }
+      });
+    }
+
+    // Clear error message when user types
+    const newPasswordInput = document.getElementById("forgot-password-new-password");
+    const confirmPasswordInput = document.getElementById("forgot-password-confirm-password");
+    
+    if (newPasswordInput) {
+      newPasswordInput.addEventListener("input", () => {
+        const errorMessageEl = document.getElementById("forgot-password-reset-error-message");
+        if (errorMessageEl && !errorMessageEl.hidden) {
+          errorMessageEl.hidden = true;
+          errorMessageEl.textContent = "";
+        }
+      });
+    }
+    
+    if (confirmPasswordInput) {
+      confirmPasswordInput.addEventListener("input", () => {
+        const errorMessageEl = document.getElementById("forgot-password-reset-error-message");
+        if (errorMessageEl && !errorMessageEl.hidden) {
+          errorMessageEl.hidden = true;
+          errorMessageEl.textContent = "";
+        }
+      });
+    }
+
+    // Reset form when dialog closes
+    forgotPasswordResetDialog.addEventListener("close", () => {
+      if (forgotPasswordResetForm) {
+        forgotPasswordResetForm.reset();
+        // Reset password visibility
+        const passwordInputs = forgotPasswordResetDialog.querySelectorAll(".account__input--password");
+        passwordInputs.forEach((input) => {
+          input.type = "password";
+          const toggle = forgotPasswordResetDialog.querySelector(`[data-target="${input.id}"]`);
+          if (toggle) {
+            toggle.textContent = "Show";
+          }
+        });
+      }
+      const errorMessageEl = document.getElementById("forgot-password-reset-error-message");
+      if (errorMessageEl) {
+        errorMessageEl.hidden = true;
+        errorMessageEl.textContent = "";
+      }
+      // Clear stored email and token when dialog closes
+      passwordResetEmail = null;
+      passwordResetToken = null;
+    });
   }
 
   // Password Toggle Handlers

@@ -333,6 +333,71 @@
       </form>
     </dialog>
 
+    <!-- Forgot Password Email Dialog -->
+    <dialog id="forgot-password-email-dialog" class="modal modal--dark">
+      <form method="dialog" class="modal__content" id="forgot-password-email-form">
+        <header class="modal__header">
+          <h2>Reset Password</h2>
+          <button class="btn btn--ghost modal__close forgot-password-email__cancel" value="cancel" aria-label="Close password reset dialog">
+            <svg class="icon icon--close" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7.05 6.34a1 1 0 0 1 1.41 0L12 9.88l3.54-3.54a1 1 0 1 1 1.41 1.41L13.41 11.3l3.54 3.54a1 1 0 0 1-1.41 1.41L12 12.7l-3.54 3.54a1 1 0 0 1-1.41-1.41l3.54-3.54-3.54-3.54a1 1 0 0 1 0-1.41Z" />
+            </svg>
+          </button>
+        </header>
+        <div class="modal__body account__body">
+          <p style="color: rgba(255, 255, 255, 0.8); margin-bottom: 16px;">Enter the email address associated with your account to reset your password.</p>
+          <label class="form-field">
+            <span class="form-field__label">Email</span>
+            <input type="email" class="account__input" name="email" id="forgot-password-email" autocomplete="email" required />
+          </label>
+          <div class="account__error-message" id="forgot-password-email-error-message" hidden></div>
+        </div>
+        <footer class="modal__footer account__footer">
+          <div class="account__footer-buttons">
+            <button class="btn btn--ghost forgot-password-email__cancel" value="cancel">Cancel</button>
+            <button class="btn btn--primary forgot-password-email__submit" type="button" value="submit">Continue</button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+
+    <!-- Forgot Password Reset Dialog -->
+    <dialog id="forgot-password-reset-dialog" class="modal modal--dark">
+      <form method="dialog" class="modal__content" id="forgot-password-reset-form">
+        <header class="modal__header">
+          <h2>Set New Password</h2>
+          <button class="btn btn--ghost modal__close forgot-password-reset__cancel" value="cancel" aria-label="Close password reset dialog">
+            <svg class="icon icon--close" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7.05 6.34a1 1 0 0 1 1.41 0L12 9.88l3.54-3.54a1 1 0 1 1 1.41 1.41L13.41 11.3l3.54 3.54a1 1 0 0 1-1.41 1.41L12 12.7l-3.54 3.54a1 1 0 0 1-1.41-1.41l3.54-3.54-3.54-3.54a1 1 0 0 1 0-1.41Z" />
+            </svg>
+          </button>
+        </header>
+        <div class="modal__body account__body">
+          <label class="form-field">
+            <span class="form-field__label">New Password</span>
+            <div class="account__input-wrapper">
+              <input type="password" class="account__input account__input--password" name="newPassword" id="forgot-password-new-password" autocomplete="new-password" required />
+              <button type="button" class="account__password-toggle" data-target="forgot-password-new-password" aria-label="Show password">Show</button>
+            </div>
+          </label>
+          <label class="form-field">
+            <span class="form-field__label">Confirm New Password</span>
+            <div class="account__input-wrapper">
+              <input type="password" class="account__input account__input--password" name="confirmNewPassword" id="forgot-password-confirm-password" autocomplete="new-password" required />
+              <button type="button" class="account__password-toggle" data-target="forgot-password-confirm-password" aria-label="Show password">Show</button>
+            </div>
+          </label>
+          <div class="account__error-message" id="forgot-password-reset-error-message" hidden></div>
+        </div>
+        <footer class="modal__footer account__footer">
+          <div class="account__footer-buttons">
+            <button class="btn btn--ghost forgot-password-reset__cancel" value="cancel">Cancel</button>
+            <button class="btn btn--primary forgot-password-reset__submit" type="button" value="submit">Reset Password</button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+
     <dialog id="library-info-dialog" class="modal modal--dark">
       <form method="dialog" class="modal__content">
         <header class="modal__header">

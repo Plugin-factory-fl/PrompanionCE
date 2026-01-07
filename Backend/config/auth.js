@@ -5,6 +5,7 @@
 
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-in-production';
 const JWT_EXPIRES_IN = '7d'; // Token expires in 7 days
@@ -49,6 +50,14 @@ export const verifyToken = (token) => {
   } catch (error) {
     throw new Error('Invalid or expired token');
   }
+};
+
+/**
+ * Generate secure random token for password reset
+ * @returns {string} Secure random token (64 hex characters)
+ */
+export const generateResetToken = () => {
+  return crypto.randomBytes(32).toString('hex');
 };
 
 /**
