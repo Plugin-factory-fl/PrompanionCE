@@ -161,20 +161,26 @@ export async function findAndLinkStripeCustomerByEmail(email) {
       `[Stripe] Found and linked customer ${customer.id} to user ${user.id} (email: ${normalizedEmail})`
     );
 
-    // Check if customer has active subscriptions and update user status
+    // Check if customer has active or trialing subscriptions and update user status
+    // Note: We check for both 'active' and 'trialing' to match webhook handler logic
     const subscriptions = await stripe.subscriptions.list({
       customer: customer.id,
-      status: 'active',
-      limit: 1
+      status: 'all', // Get all subscriptions to filter manually
+      limit: 10
     });
 
-    if (subscriptions.data.length > 0) {
-      const subscription = subscriptions.data[0];
+    // Filter for active or trialing subscriptions
+    const activeOrTrialingSubscriptions = subscriptions.data.filter(
+      sub => sub.status === 'active' || sub.status === 'trialing'
+    );
+
+    if (activeOrTrialingSubscriptions.length > 0) {
+      const subscription = activeOrTrialingSubscriptions[0];
       await query(
         'UPDATE users SET subscription_status = $1, enhancements_limit = 999999 WHERE id = $2',
         ['premium', user.id]
       );
-      console.log(`[Stripe] Updated user ${user.id} to premium status based on active subscription`);
+      console.log(`[Stripe] Updated user ${user.id} to premium status based on ${subscription.status} subscription`);
     }
 
     return {
