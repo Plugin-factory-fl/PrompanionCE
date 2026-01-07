@@ -1524,11 +1524,9 @@ function showUpgradeButtonInTooltip() {
   // Change action button to upgrade button
   const action = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
   if (action) {
-    // Remove old click handlers by cloning
-    const newAction = action.cloneNode(true);
-    action.replaceWith(newAction);
-    
-    // Update the new button
+    // Create a completely new button instead of cloning to avoid old event listeners
+    const newAction = document.createElement("button");
+    newAction.type = "button";
     newAction.className = "promptprofile-enhance-tooltip__action promptprofile-enhance-tooltip__upgrade";
     AdapterBase.setButtonTextContent(newAction, "Upgrade for more uses!");
     
@@ -1540,6 +1538,9 @@ function showUpgradeButtonInTooltip() {
       e.stopImmediatePropagation(); // Prevent other handlers from running
       await AdapterBase.handleStripeCheckout(newAction);
     }, true); // Use capture phase to ensure it runs first
+    
+    // Replace the old button with the new one
+    action.replaceWith(newAction);
     
     // Insert dismiss button before the upgrade button
     newAction.parentNode.insertBefore(dismiss, newAction);
