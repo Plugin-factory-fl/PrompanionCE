@@ -838,10 +838,10 @@ function showUpgradeButtonInTooltip() {
     action.replaceWith(newAction);
     newAction.className = "promptprofile-enhance-tooltip__action promptprofile-enhance-tooltip__upgrade";
     AdapterBase.setButtonTextContent(newAction, "Upgrade for more uses!");
-    newAction.addEventListener("click", (e) => {
+    newAction.addEventListener("click", async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log("[PromptProfile™ Sora] Upgrade button clicked - placeholder for Stripe integration");
+      await AdapterBase.handleStripeCheckout(newAction);
     });
     newAction.parentNode.insertBefore(dismiss, newAction);
   } else {

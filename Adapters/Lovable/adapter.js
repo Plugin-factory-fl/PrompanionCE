@@ -1656,12 +1656,10 @@ function showUpgradeButtonInTooltip() {
     AdapterBase.setButtonTextContent(newAction, "Upgrade for more uses!");
     
     // Add upgrade click handler
-    newAction.addEventListener("click", (e) => {
+    newAction.addEventListener("click", async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log("[PromptProfile™] Upgrade button clicked - placeholder for Stripe integration");
-      // TODO: Navigate to Stripe upgrade page
-      // window.open("https://stripe.com/upgrade", "_blank");
+      await AdapterBase.handleStripeCheckout(newAction);
     });
     
     // Insert dismiss button before the upgrade button

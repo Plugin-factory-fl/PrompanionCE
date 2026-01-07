@@ -1277,6 +1277,71 @@ class AdapterBase {
 }
 
 // Export for use in adapters
+  /**
+   * Handles Stripe checkout for upgrade button
+   * @param {HTMLElement} button - The upgrade button element
+   * @returns {Promise<void>}
+   */
+  static async handleStripeCheckout(button) {
+    const BACKEND_URL = "https://prompanionce.onrender.com";
+    
+    if (!button) {
+      console.error("[PromptProfile™ AdapterBase] Upgrade button not found");
+      return;
+    }
+
+    // Disable button to prevent double-clicks
+    button.disabled = true;
+    const originalText = button.textContent;
+    button.textContent = "Loading...";
+
+    try {
+      // Get auth token from storage
+      const result = await chrome.storage.local.get("authToken");
+      const token = result.authToken;
+
+      if (!token) {
+        alert("Please log in to upgrade your plan. Open the extension sidepanel to log in.");
+        button.disabled = false;
+        button.textContent = originalText;
+        return;
+      }
+
+      // Create checkout session
+      const response = await fetch(`${BACKEND_URL}/api/checkout/create-session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(error.error || "Failed to create checkout session");
+      }
+
+      const data = await response.json();
+
+      // Redirect to Stripe Checkout
+      if (data.url) {
+        // Open in new tab
+        window.open(data.url, "_blank");
+        // Reset button after successful checkout session creation
+        button.disabled = false;
+        button.textContent = originalText;
+      } else {
+        throw new Error("No checkout URL received");
+      }
+    } catch (error) {
+      console.error("[PromptProfile™ AdapterBase] Checkout error:", error);
+      alert("Failed to start checkout: " + error.message + "\n\nPlease try again or contact support.");
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  }
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = AdapterBase;
 } else {
