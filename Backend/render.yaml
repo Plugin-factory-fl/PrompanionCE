@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: prompanion-backend
+    name: promptprofile-backend
     env: node
     plan: starter
     rootDir: Backend
@@ -11,18 +11,26 @@ services:
         value: production
       - key: DATABASE_URL
         fromDatabase:
-          name: prompanion-db
+          name: promptprofile-db
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
       - key: OPENAI_API_KEY
         sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
+      - key: FRONTEND_URL
+        value: https://megamixai.github.io/PrompanionCE
       - key: ALLOWED_ORIGINS
-        value: chrome-extension://*
+        value: chrome-extension://*,https://megamixai.github.io
 
 databases:
-  - name: prompanion-db
+  - name: promptprofile-db
     plan: starter
-    databaseName: prompanion
-    user: prompanion_user
+    databaseName: promptprofile
+    user: promptprofile_user
 

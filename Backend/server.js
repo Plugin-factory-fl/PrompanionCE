@@ -12,6 +12,8 @@ import { pool } from './config/database.js';
 import authRoutes from './routes/auth.js';
 import apiRoutes from './routes/api.js';
 import userRoutes from './routes/user.js';
+import webhookRoutes from './routes/webhooks.js';
+import checkoutRoutes from './routes/checkout.js';
 
 // Load environment variables
 dotenv.config();
@@ -39,7 +41,11 @@ app.use(cors({
   credentials: true
 }));
 
-// Body parsing middleware
+// Stripe webhook route needs raw body for signature verification
+// Must be BEFORE other body parsers
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
+
+// Body parsing middleware for all other routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -73,6 +79,8 @@ app.get('/health', async (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/checkout', checkoutRoutes);
 app.use('/api', apiRoutes);
 
 // Error handling middleware

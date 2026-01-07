@@ -51,7 +51,12 @@ In your Web Service settings, go to **"Environment"** tab and add:
 | `DATABASE_URL` | `[Internal Database URL]` | From PostgreSQL service |
 | `JWT_SECRET` | `[Random string]` | Generate with: `openssl rand -base64 32` |
 | `OPENAI_API_KEY` | `sk-...` | Your OpenAI API key (required) |
-| `ALLOWED_ORIGINS` | `chrome-extension://*` | Or specific extension IDs |
+| `STRIPE_SECRET_KEY` | `sk_live_...` or `sk_test_...` | Your Stripe secret key (from Stripe Dashboard) |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_...` | Webhook signing secret (from Stripe webhook endpoint) |
+| `STRIPE_PRICE_ID` | `price_...` | Stripe Price ID for the $5.99/month subscription |
+| `FRONTEND_URL` | `https://megamixai.github.io/PrompanionCE` | Your GitHub Pages URL (for checkout redirects) |
+| `BACKEND_URL` | `https://your-backend.onrender.com` | Your Render backend URL (optional, defaults to RENDER_EXTERNAL_URL) |
+| `ALLOWED_ORIGINS` | `chrome-extension://*,https://megamixai.github.io` | Comma-separated list of allowed origins (extension + website) |
 
 **Important**: 
 - Use the **Internal Database URL** (not External) for better performance
