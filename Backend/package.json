@@ -10,7 +10,8 @@
     "dev": "node --watch server.js",
     "migrate": "node scripts/migrate.js",
     "migrate:add-name": "node scripts/add-name-column.js",
-    "migrate:add-last-reset-date": "node scripts/add-last-reset-date.js"
+    "migrate:add-last-reset-date": "node scripts/add-last-reset-date.js",
+    "migrate:add-password-reset-token": "node scripts/add-password-reset-token.js"
   },
   "keywords": [],
   "author": "",
