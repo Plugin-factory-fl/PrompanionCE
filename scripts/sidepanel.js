@@ -665,6 +665,21 @@ function renderStatus(status) {
   document.getElementById("user-plan").textContent = plan;
   document.getElementById("enhancements-count").textContent = enhancementsUsed;
   document.getElementById("enhancements-limit").textContent = enhancementsLimit;
+  
+  // Show/hide upgrade button based on plan and login status
+  const upgradeBtn = document.getElementById("status-upgrade-btn");
+  const userStatus = document.getElementById("user-status").textContent;
+  const isLoggedIn = userStatus !== "Not Logged In";
+  const isFreemium = plan.toLowerCase() === "freemium" || plan.toLowerCase() === "free";
+  
+  if (upgradeBtn) {
+    if (isLoggedIn && isFreemium) {
+      upgradeBtn.style.display = "inline-flex";
+    } else {
+      upgradeBtn.style.display = "none";
+    }
+  }
+  
   // Model Being Used card removed - always uses ChatGPT
 }
 
@@ -784,6 +799,66 @@ async function updateUserStatus() {
   } catch (error) {
     console.error("[PromptProfile™ Sidepanel] Error updating user status:", error);
     userStatusEl.textContent = "Not Logged In";
+  }
+}
+
+/**
+ * Handles upgrade button click - triggers Stripe checkout
+ */
+async function handleUpgradeClick() {
+  const BACKEND_URL = "https://prompanionce.onrender.com";
+  const upgradeBtn = document.getElementById("status-upgrade-btn");
+  
+  if (!upgradeBtn) {
+    console.error("[PromptProfile™ Sidepanel] Upgrade button not found");
+    return;
+  }
+
+  // Disable button to prevent double-clicks
+  upgradeBtn.disabled = true;
+  const originalText = upgradeBtn.textContent;
+  upgradeBtn.textContent = "Loading...";
+
+  try {
+    // Get auth token
+    const authToken = await chrome.storage.local.get("authToken");
+    const token = authToken.authToken;
+
+    if (!token) {
+      alert("Please log in to upgrade your plan.");
+      upgradeBtn.disabled = false;
+      upgradeBtn.textContent = originalText;
+      return;
+    }
+
+    // Create checkout session
+    const response = await fetch(`${BACKEND_URL}/api/checkout/create-session`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: "Unknown error" }));
+      throw new Error(error.error || "Failed to create checkout session");
+    }
+
+    const data = await response.json();
+
+    // Redirect to Stripe Checkout
+    if (data.url) {
+      // Open in new tab since we're in a sidepanel
+      chrome.tabs.create({ url: data.url });
+    } else {
+      throw new Error("No checkout URL received");
+    }
+  } catch (error) {
+    console.error("[PromptProfile™ Sidepanel] Checkout error:", error);
+    alert("Failed to start checkout: " + error.message + "\n\nPlease try again or contact support.");
+    upgradeBtn.disabled = false;
+    upgradeBtn.textContent = originalText;
   }
 }
 
@@ -1052,6 +1127,15 @@ async function init() {
   }
   initTabs();
   registerSectionActionGuards();
+  
+  // Register upgrade button handler
+  const upgradeBtn = document.getElementById("status-upgrade-btn");
+  if (upgradeBtn) {
+    upgradeBtn.addEventListener("click", handleUpgradeClick);
+    console.log("[PromptProfile™ Sidepanel] Upgrade button handler registered");
+  } else {
+    console.warn("[PromptProfile™ Sidepanel] Upgrade button not found during init");
+  }
   
   // Initialize side chat after module loads (or immediately if already loaded)
   window.initSideChat = function() {

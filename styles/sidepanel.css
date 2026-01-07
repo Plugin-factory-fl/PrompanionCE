@@ -249,6 +249,19 @@ body {
   color: var(--color-text-subtle);
 }
 
+.status-card__plan-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.status-card__plan-row .status-card__label {
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
 .status-card__value {
   font-weight: 600;
   font-size: 14px;
@@ -256,6 +269,32 @@ body {
   overflow-wrap: break-word;
   hyphens: auto;
   min-height: 1.5em; /* Ensure minimum height for consistent card size */
+}
+
+/* Upgrade Button Styling - Green background with black text */
+.btn--upgrade {
+  background: #10b981 !important;
+  color: #000000 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  transition: background-color 140ms ease, transform 140ms ease;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn--upgrade:hover {
+  background: #059669 !important;
+  color: #000000 !important;
+  transform: translateY(-1px);
+}
+
+.btn--upgrade:active {
+  transform: translateY(0);
 }
 
 /* prompt-preview, prompt-tabs, prompt-tabpanel, prompt-textarea moved to styles/promptEnhancer.css */
