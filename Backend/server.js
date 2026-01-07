@@ -29,16 +29,35 @@ app.set('trust proxy', true);
 app.use(helmet());
 
 // CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['*'];
+const allowedOriginsRaw = process.env.ALLOWED_ORIGINS || '*';
+const allowedOrigins = allowedOriginsRaw.split(',').map(origin => origin.trim());
+console.log('[CORS] Allowed origins:', allowedOrigins);
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (allowedOrigins.includes('*') || !origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      return callback(null, true);
     }
+    
+    // If '*' is in allowed origins, allow all
+    if (allowedOrigins.includes('*')) {
+      return callback(null, true);
+    }
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Log rejected origin for debugging
+    console.log('[CORS] Rejected origin:', origin);
+    console.log('[CORS] Allowed origins:', allowedOrigins);
+    callback(new Error(`Not allowed by CORS. Origin: ${origin}`));
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Stripe webhook route needs raw body for signature verification
