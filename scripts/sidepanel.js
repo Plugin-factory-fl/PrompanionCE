@@ -666,7 +666,7 @@ function renderStatus(status) {
   document.getElementById("enhancements-count").textContent = enhancementsUsed;
   document.getElementById("enhancements-limit").textContent = enhancementsLimit;
   
-  // Show/hide upgrade button based on plan and login status
+  // Show/hide upgrade button based on plan and login status with graceful fade-in
   const upgradeBtn = document.getElementById("status-upgrade-btn");
   const userStatus = document.getElementById("user-status").textContent;
   const isLoggedIn = userStatus !== "Not Logged In";
@@ -674,9 +674,24 @@ function renderStatus(status) {
   
   if (upgradeBtn) {
     if (isLoggedIn && isFreemium) {
+      // Show button and trigger fade-in animation
       upgradeBtn.style.display = "inline-flex";
+      // Remove any existing animation classes
+      upgradeBtn.classList.remove("btn--upgrade--visible", "btn--upgrade--fade-in");
+      // Force reflow to ensure the animation triggers
+      void upgradeBtn.offsetWidth;
+      // Add fade-in class for graceful 2-second animation
+      upgradeBtn.classList.add("btn--upgrade--fade-in");
+      // After animation completes, add visible class for hover states
+      setTimeout(() => {
+        upgradeBtn.classList.remove("btn--upgrade--fade-in");
+        upgradeBtn.classList.add("btn--upgrade--visible");
+      }, 2000);
     } else {
+      // Hide button immediately
       upgradeBtn.style.display = "none";
+      upgradeBtn.classList.remove("btn--upgrade--visible", "btn--upgrade--fade-in");
+      upgradeBtn.style.opacity = "0";
     }
   }
   

@@ -250,11 +250,11 @@ body {
 }
 
 .status-card__plan-row {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   margin-bottom: 4px;
+  flex-wrap: wrap;
 }
 
 .status-card__plan-row .status-card__label {
@@ -278,13 +278,21 @@ body {
   border: 1px solid rgba(0, 0, 0, 0.1) !important;
   font-size: 12px;
   font-weight: 500;
-  padding: 6px 16px;
+  padding: 4px 12px;
   border-radius: 9999px;
-  transition: background-color 140ms ease, transform 140ms ease;
+  transition: background-color 140ms ease, transform 140ms ease, opacity 2000ms ease;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.btn--upgrade.btn--upgrade--visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .btn--upgrade:hover {
@@ -295,6 +303,21 @@ body {
 
 .btn--upgrade:active {
   transform: translateY(0);
+}
+
+/* Fade-in animation for upgrade button */
+@keyframes fadeInUpgrade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.btn--upgrade.btn--upgrade--fade-in {
+  animation: fadeInUpgrade 2000ms ease forwards;
+  pointer-events: auto;
 }
 
 /* prompt-preview, prompt-tabs, prompt-tabpanel, prompt-textarea moved to styles/promptEnhancer.css */
