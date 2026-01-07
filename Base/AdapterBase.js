@@ -1282,7 +1282,6 @@ class AdapterBase {
    */
   static async handleStripeCheckout(button) {
     console.log("[PromptProfile™ AdapterBase] handleStripeCheckout called with button:", button);
-    const BACKEND_URL = "https://prompanionce.onrender.com";
     
     if (!button) {
       console.error("[PromptProfile™ AdapterBase] Upgrade button not found");
@@ -1293,49 +1292,29 @@ class AdapterBase {
     button.disabled = true;
     const originalText = button.textContent;
     button.textContent = "Loading...";
-    console.log("[PromptProfile™ AdapterBase] Button disabled, fetching auth token...");
+    console.log("[PromptProfile™ AdapterBase] Button disabled, sending checkout request to background script...");
 
     try {
-      // Get auth token from storage
-      const result = await chrome.storage.local.get("authToken");
-      const token = result.authToken;
+      // Send message to background script to handle checkout (avoids CORS issues)
+      const response = await this.sendMessage({
+        type: "PROMPANION_CHECKOUT_REQUEST"
+      });
 
-      if (!token) {
-        alert("Please log in to upgrade your plan. Open the extension sidepanel to log in.");
+      if (!response || !response.ok) {
+        const errorMessage = response?.error || "Failed to create checkout session";
+        alert("Failed to start checkout: " + errorMessage + "\n\nPlease try again or contact support.");
         button.disabled = false;
         button.textContent = originalText;
         return;
       }
 
-      // Create checkout session
-      const response = await fetch(`${BACKEND_URL}/api/checkout/create-session`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: "Unknown error" }));
-        throw new Error(error.error || "Failed to create checkout session");
-      }
-
-      const data = await response.json();
-
-      // Redirect to Stripe Checkout
-      if (data.url) {
-        // Open in new tab
-        window.open(data.url, "_blank");
-        // Reset button after successful checkout session creation
-        button.disabled = false;
-        button.textContent = originalText;
-      } else {
-        throw new Error("No checkout URL received");
-      }
+      // Checkout URL will be opened by background script
+      console.log("[PromptProfile™ AdapterBase] Checkout session created, URL:", response.url);
+      button.disabled = false;
+      button.textContent = originalText; // Reset button text after successful redirect
     } catch (error) {
       console.error("[PromptProfile™ AdapterBase] Checkout error:", error);
-      alert("Failed to start checkout: " + error.message + "\n\nPlease try again or contact support.");
+      alert("Failed to start checkout: " + (error.message || "Unknown error") + "\n\nPlease try again or contact support.");
       button.disabled = false;
       button.textContent = originalText;
     }

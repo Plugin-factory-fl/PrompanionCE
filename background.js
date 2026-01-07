@@ -850,5 +850,50 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })();
     return true;
   }
+
+  if (message.type === "PROMPANION_CHECKOUT_REQUEST") {
+    // Return true to keep the message channel open for async response
+    (async () => {
+      try {
+        console.log("[PromptProfile™ Background] ========== PROMPANION_CHECKOUT_REQUEST RECEIVED ==========");
+        
+        // Get auth token from storage
+        const token = await getAuthToken();
+        if (!token) {
+          sendResponse?.({ ok: false, error: "Please log in to upgrade your plan. Open the extension sidepanel to log in." });
+          return;
+        }
+
+        // Make API call to create checkout session
+        const response = await fetch(`${BACKEND_URL}/api/checkout/create-session`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ error: "Unknown error" }));
+          throw new Error(error.error || "Failed to create checkout session");
+        }
+
+        const data = await response.json();
+        console.log("[PromptProfile™ Background] Checkout session created:", data);
+
+        if (data.url) {
+          // Open checkout URL in new tab
+          chrome.tabs.create({ url: data.url });
+          sendResponse?.({ ok: true, url: data.url });
+        } else {
+          throw new Error("No checkout URL received");
+        }
+      } catch (error) {
+        console.error("[PromptProfile™ Background] Checkout error:", error);
+        sendResponse?.({ ok: false, error: error.message || "Failed to start checkout" });
+      }
+    })();
+    return true; // Keep the message channel open for async response
+  }
 });
 
