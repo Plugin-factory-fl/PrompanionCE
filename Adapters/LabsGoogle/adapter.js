@@ -596,6 +596,73 @@ function hideEnhanceTooltip() {
   detachTooltipResizeHandler();
 }
 
+function showUpgradeButtonInTooltip() {
+  // Ensure tooltip element exists and is visible
+  if (!enhanceTooltipElement) {
+    ensureEnhanceTooltipElement();
+  }
+  if (!enhanceTooltipElement) {
+    console.error("[PromptProfile™ LabsGoogle] Cannot show upgrade button - tooltip element not found");
+    return;
+  }
+  
+  // Make sure tooltip is visible first
+  if (!enhanceTooltipElement.classList.contains("is-visible")) {
+    enhanceTooltipElement.classList.add("is-visible");
+    positionEnhanceTooltip();
+    attachTooltipResizeHandler();
+  }
+  
+  // Remove existing dismiss button if it exists (we'll add a new one)
+  const oldDismiss = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__dismiss");
+  if (oldDismiss) {
+    oldDismiss.remove();
+  }
+  
+  // Add dismiss button (X) for closing the upgrade tooltip
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "promptprofile-enhance-tooltip__dismiss";
+  dismiss.textContent = "×";
+  dismiss.setAttribute("aria-label", "Dismiss upgrade prompt");
+  dismiss.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    enhanceTooltipDismissed = true;
+    enhanceTooltipElement.classList.remove("show-upgrade");
+    hideEnhanceTooltip();
+  });
+  
+  // Change action button to upgrade button
+  const action = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
+  if (action) {
+    // Remove old click handlers by cloning
+    const newAction = action.cloneNode(true);
+    action.replaceWith(newAction);
+    
+    // Update the new button
+    newAction.className = "promptprofile-enhance-tooltip__action promptprofile-enhance-tooltip__upgrade";
+    AdapterBase.setButtonTextContent(newAction, "Upgrade for more uses!");
+    
+    // Add upgrade click handler
+    newAction.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      await AdapterBase.handleStripeCheckout(newAction);
+    });
+    
+    // Insert dismiss button before the upgrade button
+    newAction.parentNode.insertBefore(dismiss, newAction);
+  } else {
+    // If no action button exists, just add the dismiss button
+    enhanceTooltipElement.appendChild(dismiss);
+  }
+  
+  // Add class to prevent auto-hide
+  enhanceTooltipElement.classList.add("show-upgrade");
+  enhanceTooltipDismissed = false; // Reset dismissed flag so tooltip stays visible
+}
+
 function positionEnhanceTooltip() {
   if (!enhanceTooltipElement || !enhanceTooltipActiveTextarea) return;
   const rect = enhanceTooltipActiveTextarea.getBoundingClientRect();
