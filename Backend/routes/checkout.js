@@ -17,7 +17,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 
 const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID;
 const BACKEND_URL = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://megamixai.github.io/PrompanionCE';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://plugin-factory-fl.github.io/PrompanionCE';
 
 /**
  * POST /api/checkout/create-session

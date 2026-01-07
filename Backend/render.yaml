@@ -24,9 +24,9 @@ services:
       - key: STRIPE_PRICE_ID
         sync: false
       - key: FRONTEND_URL
-        value: https://megamixai.github.io/PrompanionCE
+        value: https://plugin-factory-fl.github.io/PrompanionCE
       - key: ALLOWED_ORIGINS
-        value: chrome-extension://*,https://megamixai.github.io
+        value: chrome-extension://*,https://plugin-factory-fl.github.io,https://megamixai.github.io
 
 databases:
   - name: promptprofile-db
