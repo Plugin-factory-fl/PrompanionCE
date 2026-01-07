@@ -12,8 +12,9 @@
 
 /* Chat Window */
 .chat-window {
-  height: 431px; /* Increased another 40% from 308px */
+  height: 431px; /* Large fixed height */
   overflow-y: auto;
+  overflow-x: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 16px;
@@ -22,6 +23,8 @@
   gap: 12px;
   background: var(--color-elevate);
   box-shadow: var(--shadow-inset);
+  /* Ensure scrolling works properly */
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Chat Messages */
@@ -261,7 +264,10 @@
   margin-bottom: 8px;
 }
 
-/* SideChat Toast Notification */
+.panel__section--chat .section-collapsible[open] {
+  overflow: visible; /* Allow scrolling when section is open */
+}
+
 .panel__section--chat .section-content {
   position: relative;
 }

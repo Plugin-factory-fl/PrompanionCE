@@ -218,8 +218,32 @@ export function setActiveConversation(state, conversationId) {
  * @param {Array} llmChatHistory - Optional array of LLM chat history for context
  * @returns {Array} Array of API message objects with role and content
  */
-function buildChatApiMessages(history, llmChatHistory = []) {
+function buildChatApiMessages(history, llmChatHistory = [], levelOfDetail = 2) {
   const messages = [];
+  
+  // Define response length instructions based on detail level
+  const detailInstructions = {
+    1: {
+      text: "CRITICAL: Keep your response VERY BRIEF and CONCISE. Paraphrase and condense your language to be as short as possible while maintaining clarity. Think Twitter post length - direct, no fluff. Remove all unnecessary words and explanations. Keep only the essential information. Aim for the shortest possible version while maintaining meaning. DO NOT truncate - instead, paraphrase longer explanations into shorter, more direct statements.",
+      style: "extremely brief, direct, and minimal",
+      length: "very short - like a Twitter post (typically 2-4 sentences or 50-100 words)",
+      examples: "Instead of 'This concept is important because it helps users understand how the system works in practice', use 'This helps users understand how the system works.' Instead of 'In the context of your conversation about [topic], this means that...', use 'This means...'"
+    },
+    2: {
+      text: "Keep your response MODERATE in length - clear and focused without being overly verbose. Write in well-structured paragraphs that are concise but complete. Avoid unnecessary elaboration, but provide enough context to be helpful. Paraphrase longer explanations into more concise language when possible.",
+      style: "clear, concise, and well-structured",
+      length: "moderate length - typically 3-5 sentences or 100-200 words",
+      examples: "Provide clear explanations without excessive detail. Be direct but complete."
+    },
+    3: {
+      text: "Provide a MORE DETAILED response with context and explanations, but keep it REASONABLE in length. Include necessary background information and connections, but avoid creating 'gigantic text blocks'. Aim for comprehensive but well-organized responses that are easy to read. Paraphrase verbose sections to maintain clarity while including important details.",
+      style: "detailed, informative, and well-organized",
+      length: "moderately detailed - typically 5-8 sentences or 200-350 words",
+      examples: "Include context and explanations, but keep paragraphs focused and avoid repetition."
+    }
+  };
+
+  const detail = detailInstructions[levelOfDetail] || detailInstructions[2];
   
   // If LLM chat history is provided, add it as context in a system message
   if (Array.isArray(llmChatHistory) && llmChatHistory.length > 0) {
@@ -261,26 +285,34 @@ function buildChatApiMessages(history, llmChatHistory = []) {
 
 CRITICAL REQUIREMENTS FOR YOUR RESPONSE:
 
-1. **Structure**: Provide a clear, well-organized explanation that flows naturally from general to specific.
+1. **Response Length (CRITICAL)**: 
+   ${detail.text}
+   
+   Your response must be ${detail.style} and approximately ${detail.length}.
+   ${detail.examples ? `\n   Examples: ${detail.examples}` : ''}
+   
+   IMPORTANT: DO NOT truncate your response mid-thought. Instead, paraphrase and condense your language to meet the length requirement while maintaining all essential information.
 
-2. **Content**: 
+2. **Structure**: Provide a clear, well-organized explanation that flows naturally from general to specific.
+
+3. **Content**: 
    - Start by explaining what the highlighted topic means in general terms
    - Then explain how it specifically relates to the conversation context provided
    - Use specific examples or details from the conversation when relevant
    - Make connections between the topic and the broader conversation
 
-3. **Relevance Explanation**: 
+4. **Relevance Explanation**: 
    - Explicitly state WHY this information is relevant to the user's original conversation
    - Explain how understanding this topic helps them in the context of what they were discussing
    - Connect the elaboration back to the original conversation's purpose or goal
 
-4. **Format**:
+5. **Format**:
    - Write in clear, concise paragraphs
    - Use proper formatting (bold for key terms if helpful, but keep it minimal)
    - Ensure the response reads naturally and is easy to understand
    - Avoid repeating the conversation context verbatim - instead, synthesize and explain
 
-5. **Conclusion**: 
+6. **Conclusion**: 
    - End by summarizing how this elaboration relates back to the original conversation
    - Use phrases like "In the context of your conversation about [topic], this means..." or "This is relevant because..."
 
@@ -291,7 +323,7 @@ Conversation context:
 
 The user wants to elaborate on: "${userQuestion}"
 
-Provide a comprehensive, well-structured explanation that helps the user understand this topic and how it relates to their conversation. Make sure to explain the relevance clearly.`;
+Provide a ${detail.style} explanation (approximately ${detail.length}) that helps the user understand this topic and how it relates to their conversation. Make sure to explain the relevance clearly. Remember to paraphrase and condense your language to meet the length requirement - do not truncate.`;
     
     // Calculate max context length to keep total under limit
     const fixedTextLength = instructionsPrefix.length + instructionsSuffix.length;
@@ -316,7 +348,27 @@ Provide a comprehensive, well-structured explanation that helps the user underst
       systemMessageLength: systemMessageContent.length
     });
   } else {
-    console.log("[PromptProfile™] No LLM chat history provided, skipping context system message");
+    // Even without LLM chat history, add a system message with detail level instructions
+    const systemMessageContent = `You are helping the user with their question.
+
+CRITICAL REQUIREMENT FOR YOUR RESPONSE:
+
+**Response Length (CRITICAL)**: 
+${detail.text}
+
+Your response must be ${detail.style} and approximately ${detail.length}.
+${detail.examples ? `\n\nExamples: ${detail.examples}` : ''}
+
+IMPORTANT: DO NOT truncate your response mid-thought. Instead, paraphrase and condense your language to meet the length requirement while maintaining all essential information.
+
+Provide a clear, well-organized response that directly addresses the user's question.`;
+
+    messages.push({
+      role: "system",
+      content: systemMessageContent
+    });
+    
+    console.log("[PromptProfile™] No LLM chat history provided, added system message with detail level instructions");
   }
   
   // Add the SideChat conversation history
@@ -506,7 +558,11 @@ export async function sendSideChatMessage(stateRef, message, dependencies, llmCh
   console.log("[PromptProfile™] Added user message, new history length:", activeConversation.history.length);
 
   try {
-    const apiMessages = buildChatApiMessages(activeConversation.history, llmChatHistory);
+    // Get the complexity setting from state (maps to levelOfDetail: 1=low, 2=medium, 3=high)
+    const levelOfDetail = stateRef.settings?.complexity || 2;
+    console.log("[PromptProfile™] Using detail level:", levelOfDetail);
+    
+    const apiMessages = buildChatApiMessages(activeConversation.history, llmChatHistory, levelOfDetail);
     console.log("[PromptProfile™] Sending to API with", apiMessages.length, "messages");
     if (llmChatHistory.length > 0) {
       console.log("[PromptProfile™] Chat history context included:", llmChatHistory.length, "messages from LLM conversation");
