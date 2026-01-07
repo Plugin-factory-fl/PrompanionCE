@@ -423,6 +423,9 @@ export function registerAccountHandlers() {
         if (data.url) {
           // Open in new tab
           chrome.tabs.create({ url: data.url });
+          // Reset button after successful checkout session creation
+          upgradeButton.disabled = false;
+          upgradeButton.textContent = "UPGRADE NOW";
           // Close the account dialog
           accountDialog.close();
         } else {
@@ -432,7 +435,7 @@ export function registerAccountHandlers() {
         console.error("[PromptProfile™ LoginMenu] Checkout error:", error);
         alert("Failed to start checkout: " + error.message + "\n\nPlease try again or contact support.");
         upgradeButton.disabled = false;
-        upgradeButton.textContent = originalText;
+        upgradeButton.textContent = "UPGRADE NOW";
       }
     });
   }

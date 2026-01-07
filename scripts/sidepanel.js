@@ -673,12 +673,18 @@ function renderStatus(status) {
   const isFreemium = plan.toLowerCase() === "freemium" || plan.toLowerCase() === "free";
   
   if (upgradeBtn) {
+    // Reset button text if it's stuck on "Loading..."
+    if (upgradeBtn.textContent === "Loading..." && !upgradeBtn.disabled) {
+      upgradeBtn.textContent = "Upgrade";
+    }
+    
     if (isLoggedIn && isFreemium) {
       // Only trigger fade-in if button is not already visible
       if (!upgradeBtn.classList.contains("btn--upgrade--visible") && 
           !upgradeBtn.classList.contains("btn--upgrade--fade-in")) {
         // Show button and trigger fade-in animation
         upgradeBtn.style.display = "inline-flex";
+        upgradeBtn.style.opacity = "0";
         // Force reflow to ensure the animation triggers
         void upgradeBtn.offsetWidth;
         // Add fade-in class for graceful 2-second animation
@@ -687,10 +693,14 @@ function renderStatus(status) {
         setTimeout(() => {
           upgradeBtn.classList.remove("btn--upgrade--fade-in");
           upgradeBtn.classList.add("btn--upgrade--visible");
+          upgradeBtn.style.opacity = "1";
         }, 2000);
       } else {
-        // Button already visible or animating, just ensure it's displayed
+        // Button already visible or animating, just ensure it's displayed and visible
         upgradeBtn.style.display = "inline-flex";
+        if (upgradeBtn.classList.contains("btn--upgrade--visible")) {
+          upgradeBtn.style.opacity = "1";
+        }
       }
     } else {
       // Hide button immediately
@@ -871,6 +881,9 @@ async function handleUpgradeClick() {
     if (data.url) {
       // Open in new tab since we're in a sidepanel
       chrome.tabs.create({ url: data.url });
+      // Reset button after successful checkout session creation
+      upgradeBtn.disabled = false;
+      upgradeBtn.textContent = "Upgrade";
     } else {
       throw new Error("No checkout URL received");
     }
@@ -878,7 +891,7 @@ async function handleUpgradeClick() {
     console.error("[PromptProfile™ Sidepanel] Checkout error:", error);
     alert("Failed to start checkout: " + error.message + "\n\nPlease try again or contact support.");
     upgradeBtn.disabled = false;
-    upgradeBtn.textContent = originalText;
+    upgradeBtn.textContent = "Upgrade";
   }
 }
 
