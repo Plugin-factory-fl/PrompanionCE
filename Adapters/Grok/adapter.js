@@ -1376,6 +1376,15 @@ function handleRefineButtonClick(e) {
   console.log("[PromptProfile™ Grok] ========== REFINE BUTTON HANDLER FIRED ==========");
   console.log("[PromptProfile™ Grok] Event type:", e.type);
   console.log("[PromptProfile™ Grok] Event target:", e.target);
+  
+  // Don't handle clicks on upgrade button - let the upgrade handler deal with it
+  const target = e.target;
+  if (target && (target.classList.contains("promptprofile-enhance-tooltip__upgrade") || 
+                  target.closest(".promptprofile-enhance-tooltip__upgrade"))) {
+    console.log("[PromptProfile™ Grok] Upgrade button clicked, ignoring refine handler");
+    return;
+  }
+  
   e.preventDefault();
   e.stopPropagation();
   if (enhanceActionInFlight) {
@@ -1393,8 +1402,7 @@ function handleRefineButtonClick(e) {
     return;
   }
   enhanceActionInFlight = true;
-  enhanceTooltipDismissed = true;
-  hideEnhanceTooltip();
+  // Don't hide tooltip yet - wait to see if there's a limit error
   console.log("[PromptProfile™ Grok] Requesting prompt enhancement...");
   requestPromptEnhancement(promptText)
     .then((result) => {
@@ -1402,9 +1410,22 @@ function handleRefineButtonClick(e) {
         enhanceActionInFlight = false;
         if (result?.reason === "EXTENSION_CONTEXT_INVALIDATED") {
           console.error("[PromptProfile™ Grok] Cannot enhance prompt - extension context invalidated. Please reload the page.");
+          enhanceTooltipDismissed = true;
+          hideEnhanceTooltip();
+        } else if (result?.error === "LIMIT_REACHED") {
+          // Show upgrade button in tooltip instead of hiding
+          console.log("[PromptProfile™ Grok] Limit reached, showing upgrade button");
+          showUpgradeButtonInTooltip();
+        } else {
+          // Other errors - hide tooltip normally
+          enhanceTooltipDismissed = true;
+          hideEnhanceTooltip();
         }
         return;
       }
+      // Success - hide tooltip and set text
+      enhanceTooltipDismissed = true;
+      hideEnhanceTooltip();
       const refinedText = result.optionA && typeof result.optionA === "string" && result.optionA.trim()
         ? result.optionA.trim() 
         : promptText;
