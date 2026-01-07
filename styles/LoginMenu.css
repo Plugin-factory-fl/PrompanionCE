@@ -29,7 +29,7 @@
 .account__body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 /* Account Input Fields */
@@ -43,6 +43,8 @@
   background: var(--color-surface-light);
   color: #000000;
   box-shadow: 0 8px 20px rgba(5, 7, 13, 0.2);
+  margin-top: 5px;
+  margin-bottom: 5px;
 }
 
 .account__input:focus {
@@ -92,7 +94,8 @@
 .account__error-message {
   color: #dc2626;
   font-size: 13px;
-  margin-top: 4px;
+  margin-top: 5px;
+  margin-bottom: 5px;
   padding: 8px 0;
 }
 
@@ -266,7 +269,7 @@
 .account__logged-in-as {
   margin: 0;
   font-size: 14px;
-  color: var(--color-text);
+  color: #ffffff;
   line-height: 1.5;
 }
 
@@ -308,7 +311,7 @@
 .account__plan-label {
   margin: 0;
   font-size: 14px;
-  color: var(--color-text);
+  color: #ffffff;
   line-height: 1.5;
   font-weight: 600;
 }
@@ -320,7 +323,7 @@
 .account__plan-description {
   margin: 0;
   font-size: 13px;
-  color: var(--color-text-secondary);
+  color: rgba(255, 255, 255, 0.8);
   line-height: 1.6;
 }
 

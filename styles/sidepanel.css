@@ -1,38 +1,64 @@
 :root {
-  color-scheme: only dark;
+  color-scheme: light;
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   font-size: 14px;
   line-height: 1.5;
-  --color-bg: #05070d;
-  --color-panel: #090b12;
-  --color-surface: #111520;
-  --color-surface-alt: #1b202c;
+  --color-bg: #5b7fb8;
+  --color-panel: #5b7fb8;
+  --color-surface: #f8fafc;
+  --color-surface-alt: #f1f5f9;
   --color-surface-light: #f0f2f7;
   --color-elevate: #232938;
-  --color-border: #252c3a;
+  --color-border: #e2e8f0;
   --color-border-soft: rgba(148, 163, 184, 0.28);
   --color-primary: #20d4b0;
   --color-primary-soft: rgba(32, 212, 176, 0.16);
   --color-primary-strong: #33e1be;
-  --color-text: #eef2ff;
-  --color-text-inverse: #0f172a;
-  --color-text-subtle: #94a3c3;
+  --color-text: #0f172a;
+  --color-text-inverse: #eef2ff;
+  --color-text-subtle: #64748b;
   --color-accent: #20d4b0;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
-  --shadow-sm: 0 18px 42px rgba(5, 7, 13, 0.6);
-  --shadow-inset: inset 0 10px 24px rgba(2, 4, 9, 0.55);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-inset: inset 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 * {
   box-sizing: border-box;
 }
 
+/* Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #2a2a2a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4a4a4a;
+  border-radius: 6px;
+  border: 2px solid #2a2a2a;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5a5a5a;
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #4a4a4a #2a2a2a;
+}
+
 body {
   margin: 0;
-  background: var(--color-bg);
+  background: #000000;
   color: var(--color-text);
 }
 
@@ -46,7 +72,7 @@ body {
   flex-direction: column;
   padding: 16px;
   gap: 16px;
-  background: var(--color-panel);
+  background: #000000;
 }
 
 .panel__header {
@@ -55,10 +81,10 @@ body {
   justify-content: space-between;
   padding: 12px 16px;
   border-radius: var(--radius-md);
-  background: #05070d;
-  color: var(--color-text);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  box-shadow: 0 12px 32px rgba(5, 7, 13, 0.55);
+  background: #1e3a5f;
+  color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   flex-shrink: 0; /* Prevent header from shrinking */
 }
 
@@ -110,7 +136,7 @@ body {
 }
 
 .panel__section {
-  background: var(--color-surface);
+  background: #0f1f35;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
@@ -146,12 +172,12 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: #162036;
+  background: #1e3a5f;
   color: #ffffff;
   cursor: pointer;
   user-select: none;
   list-style: none;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .section-heading::-webkit-details-marker,
@@ -193,7 +219,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: rgba(26, 32, 44, 0.8);
+  background: #0f1f35;
+  color: #ffffff;
 }
 
 /* section-content__actions, prompt-preview, prompt-feedback moved to styles/promptEnhancer.css */
@@ -290,6 +317,22 @@ body {
   height: 18px;
 }
 
+.modal__close {
+  background: transparent;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.modal__close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.modal__close svg {
+  fill: currentColor;
+}
+
 /* icon--account moved to styles/LoginMenu.css */
 
 .btn:focus-visible {
@@ -349,8 +392,8 @@ body {
 }
 
 .modal--dark .modal__content {
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: #000000;
+  color: #ffffff;
 }
 
 .modal--dark .modal__header,
@@ -366,13 +409,14 @@ body {
 /* modal--dark form-field styles moved to styles/settingsPanel.css */
 
 .modal--dark .btn--ghost {
-  background: rgba(226, 232, 240, 0.1);
-  color: var(--color-text);
-  border: 1px solid rgba(226, 232, 240, 0.18);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .modal--dark .btn--ghost:hover {
-  background: rgba(226, 232, 240, 0.2);
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
 }
 
 .modal--dark .btn--primary {
@@ -390,8 +434,8 @@ body {
   flex-direction: column;
   gap: 16px;
   padding: 16px;
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: #000000;
+  color: #ffffff;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--color-border);
 }

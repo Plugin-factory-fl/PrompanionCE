@@ -264,6 +264,17 @@
   transform: translateY(0);
 }
 
+.prompt-preview__actions .btn--ghost {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.prompt-preview__actions .btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
 /* Animations */
 @keyframes fadeIn {
   from {

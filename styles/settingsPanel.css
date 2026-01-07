@@ -6,8 +6,8 @@
 
 /* Settings Panel Color Scheme */
 #settings-dialog {
-  --settings-bg-primary: var(--color-surface);
-  --settings-bg-secondary: var(--color-surface-alt);
+  --settings-bg-primary: #000000;
+  --settings-bg-secondary: #0a0a0a;
   --settings-bg-tabs: rgba(12, 18, 32, 0.75);
   --settings-text-primary: var(--color-text);
   --settings-text-secondary: rgba(226, 232, 240, 0.82);
@@ -74,13 +74,15 @@
 .form-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  margin-bottom: 5px;
 }
 
 .form-field__label {
   font-size: 13px;
   font-weight: 500;
   color: var(--settings-text-secondary);
+  margin-bottom: 5px;
 }
 
 .form-field__helper {

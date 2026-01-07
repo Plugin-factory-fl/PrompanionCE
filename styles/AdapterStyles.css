@@ -39,6 +39,7 @@
 }
 
 /* Enhance Tooltip Styles */
+.promptprofile-enhance-tooltip,
 .prompanion-enhance-tooltip {
   position: fixed;
   display: flex;
@@ -56,17 +57,20 @@
   z-index: 2147483000;
 }
 
+.promptprofile-enhance-tooltip.is-visible,
 .prompanion-enhance-tooltip.is-visible {
   opacity: 1;
   transform: translate(-50%, 0);
   pointer-events: auto;
 }
 
+.promptprofile-enhance-tooltip button,
 .prompanion-enhance-tooltip button {
   border: none;
   cursor: pointer;
 }
 
+.promptprofile-enhance-tooltip__dismiss,
 .prompanion-enhance-tooltip__dismiss {
   width: 24px;
   height: 24px;
@@ -79,11 +83,13 @@
   line-height: 1;
 }
 
+.promptprofile-enhance-tooltip__dismiss:hover,
 .prompanion-enhance-tooltip__dismiss:hover {
   background: rgba(233, 237, 255, 0.14);
   color: #ffffff;
 }
 
+.promptprofile-enhance-tooltip__action,
 .prompanion-enhance-tooltip__action {
   display: inline-flex;
   align-items: center;
@@ -97,19 +103,23 @@
   box-shadow: 0 10px 26px rgba(58, 123, 255, 0.35);
 }
 
+.promptprofile-enhance-tooltip__action:hover,
 .prompanion-enhance-tooltip__action:hover {
   background: #2957c7;
 }
 
+.promptprofile-enhance-tooltip__upgrade,
 .prompanion-enhance-tooltip__upgrade {
   background: #10b981 !important;
   box-shadow: 0 10px 26px rgba(16, 185, 129, 0.35) !important;
 }
 
+.promptprofile-enhance-tooltip__upgrade:hover,
 .prompanion-enhance-tooltip__upgrade:hover {
   background: #059669 !important;
 }
 
+.promptprofile-enhance-tooltip.show-upgrade,
 .prompanion-enhance-tooltip.show-upgrade {
   /* Keep tooltip visible when showing upgrade button */
   opacity: 1 !important;
