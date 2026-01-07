@@ -163,6 +163,12 @@ body {
   overflow: hidden;
 }
 
+/* When section is closed, round all corners of the heading */
+.section-collapsible:not([open]) > .section-heading {
+  border-radius: var(--radius-md); /* Rounded corners on all sides when closed */
+  border-bottom: none; /* Remove bottom border when closed */
+}
+
 .section-collapsible:not([open]) .section-content {
   display: none;
 }
@@ -178,6 +184,7 @@ body {
   user-select: none;
   list-style: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-md) var(--radius-md) 0 0; /* Rounded top corners */
 }
 
 .section-heading::-webkit-details-marker,
@@ -194,6 +201,10 @@ body {
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
   transition: transform 160ms ease;
+}
+
+.section-collapsible[open] > .section-heading {
+  border-radius: var(--radius-md) var(--radius-md) 0 0; /* Keep rounded top corners when open */
 }
 
 .section-collapsible[open] > .section-heading::after {
