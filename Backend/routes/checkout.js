@@ -102,6 +102,7 @@ router.post('/create-session', async (req, res) => {
       ],
       success_url: `${FRONTEND_URL}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${FRONTEND_URL}?checkout=cancelled`,
+      locale: 'en', // Explicitly set locale to prevent localization errors
       metadata: {
         user_id: userId ? userId.toString() : '',
       },
