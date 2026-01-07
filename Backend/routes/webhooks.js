@@ -6,6 +6,7 @@
 import express from 'express';
 import Stripe from 'stripe';
 import { query } from '../config/database.js';
+import { linkStripeCustomerByEmail, getStripeCustomerEmail } from '../config/stripe.js';
 
 const router = express.Router();
 
@@ -122,27 +123,19 @@ async function handleSubscriptionCreated(subscription) {
 
   // If not found, try to link by customer email
   if (userResult.rows.length === 0) {
-    try {
-      const customer = await stripe.customers.retrieve(customerId);
-      
-      if (customer.email) {
-        // Try to find user by email and link the customer ID
+    const { email } = await getStripeCustomerEmail(customerId);
+    
+    if (email) {
+      const linkResult = await linkStripeCustomerByEmail(email, customerId);
+      if (linkResult.linked) {
         userResult = await query(
-          'SELECT id FROM users WHERE email = $1',
-          [customer.email.toLowerCase()]
+          'SELECT id FROM users WHERE id = $1',
+          [linkResult.userId]
         );
-        
-        if (userResult.rows.length > 0) {
-          const userId = userResult.rows[0].id;
-          await query(
-            'UPDATE users SET stripe_customer_id = $1 WHERE id = $2',
-            [customerId, userId]
-          );
-          console.log(`[Webhook] Linked customer ${customerId} to user ${userId} by email`);
-        }
+        console.log(`[Webhook] ${linkResult.message}`);
+      } else {
+        console.log(`[Webhook] ${linkResult.message}`);
       }
-    } catch (error) {
-      console.error(`[Webhook] Error retrieving customer ${customerId}:`, error);
     }
   }
 
@@ -179,13 +172,31 @@ async function handleSubscriptionUpdated(subscription) {
 
   console.log(`[Webhook] Subscription updated: ${subscriptionId} - status: ${status}`);
 
-  const userResult = await query(
+  let userResult = await query(
     'SELECT id FROM users WHERE stripe_customer_id = $1',
     [customerId]
   );
 
+  // If not found, try to link by customer email
   if (userResult.rows.length === 0) {
-    console.warn(`[Webhook] User not found for customer ${customerId}`);
+    const { email } = await getStripeCustomerEmail(customerId);
+    
+    if (email) {
+      const linkResult = await linkStripeCustomerByEmail(email, customerId);
+      if (linkResult.linked) {
+        userResult = await query(
+          'SELECT id FROM users WHERE id = $1',
+          [linkResult.userId]
+        );
+        console.log(`[Webhook] ${linkResult.message}`);
+      } else {
+        console.log(`[Webhook] ${linkResult.message}`);
+      }
+    }
+  }
+
+  if (userResult.rows.length === 0) {
+    console.warn(`[Webhook] User not found for customer ${customerId}. Subscription will be linked when user account is created.`);
     return;
   }
 
@@ -229,13 +240,31 @@ async function handleSubscriptionDeleted(subscription) {
 
   console.log(`[Webhook] Subscription deleted: ${subscriptionId} for customer ${customerId}`);
 
-  const userResult = await query(
+  let userResult = await query(
     'SELECT id FROM users WHERE stripe_customer_id = $1',
     [customerId]
   );
 
+  // If not found, try to link by customer email
   if (userResult.rows.length === 0) {
-    console.warn(`[Webhook] User not found for customer ${customerId}`);
+    const { email } = await getStripeCustomerEmail(customerId);
+    
+    if (email) {
+      const linkResult = await linkStripeCustomerByEmail(email, customerId);
+      if (linkResult.linked) {
+        userResult = await query(
+          'SELECT id FROM users WHERE id = $1',
+          [linkResult.userId]
+        );
+        console.log(`[Webhook] ${linkResult.message}`);
+      } else {
+        console.log(`[Webhook] ${linkResult.message}`);
+      }
+    }
+  }
+
+  if (userResult.rows.length === 0) {
+    console.warn(`[Webhook] User not found for customer ${customerId}. Subscription will be linked when user account is created.`);
     return;
   }
 
@@ -266,10 +295,28 @@ async function handlePaymentSucceeded(invoice) {
 
   // Ensure subscription is active
   if (subscriptionId) {
-    const userResult = await query(
+    let userResult = await query(
       'SELECT id FROM users WHERE stripe_customer_id = $1',
       [customerId]
     );
+
+    // If not found, try to link by customer email
+    if (userResult.rows.length === 0) {
+      const { email } = await getStripeCustomerEmail(customerId);
+      
+      if (email) {
+        const linkResult = await linkStripeCustomerByEmail(email, customerId);
+        if (linkResult.linked) {
+          userResult = await query(
+            'SELECT id FROM users WHERE id = $1',
+            [linkResult.userId]
+          );
+          console.log(`[Webhook] ${linkResult.message}`);
+        } else {
+          console.log(`[Webhook] ${linkResult.message}`);
+        }
+      }
+    }
 
     if (userResult.rows.length > 0) {
       const userId = userResult.rows[0].id;

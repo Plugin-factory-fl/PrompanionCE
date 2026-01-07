@@ -6,6 +6,7 @@
 import express from 'express';
 import { query } from '../config/database.js';
 import { hashPassword, comparePassword, generateToken } from '../config/auth.js';
+import { findAndLinkStripeCustomerByEmail } from '../config/stripe.js';
 
 const router = express.Router();
 
@@ -45,6 +46,12 @@ router.post('/register', async (req, res) => {
 
     const user = result.rows[0];
 
+    // Check if there's a Stripe customer with this email and link it
+    const linkResult = await findAndLinkStripeCustomerByEmail(user.email);
+    if (linkResult.linked) {
+      console.log(`[Auth] ${linkResult.message}`);
+    }
+
     // Generate token
     const token = generateToken({ userId: user.id, email: user.email });
 
@@ -78,7 +85,7 @@ router.post('/login', async (req, res) => {
 
     // Find user
     const result = await query(
-      'SELECT id, email, password_hash FROM users WHERE email = $1',
+      'SELECT id, email, password_hash, stripe_customer_id FROM users WHERE email = $1',
       [email.toLowerCase()]
     );
 
@@ -92,6 +99,14 @@ router.post('/login', async (req, res) => {
     const isValidPassword = await comparePassword(password, user.password_hash);
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Check if user has a Stripe customer ID, if not, try to find and link one
+    if (!user.stripe_customer_id) {
+      const linkResult = await findAndLinkStripeCustomerByEmail(user.email);
+      if (linkResult.linked) {
+        console.log(`[Auth] ${linkResult.message}`);
+      }
     }
 
     // Generate token
