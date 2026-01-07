@@ -1344,6 +1344,15 @@ function handleRefineButtonClick(e) {
   console.log("[PromptProfile™] ========== REFINE BUTTON HANDLER FIRED ==========");
   console.log("[PromptProfile™] Event type:", e.type);
   console.log("[PromptProfile™] Event target:", e.target);
+  
+  // Don't handle clicks on upgrade button - let the upgrade handler deal with it
+  const target = e.target;
+  if (target && (target.classList.contains("promptprofile-enhance-tooltip__upgrade") || 
+                  target.closest(".promptprofile-enhance-tooltip__upgrade"))) {
+    console.log("[PromptProfile™] Upgrade button clicked, ignoring refine handler");
+    return;
+  }
+  
   e.preventDefault();
   e.stopPropagation();
   if (enhanceActionInFlight) {
@@ -1523,12 +1532,14 @@ function showUpgradeButtonInTooltip() {
     newAction.className = "promptprofile-enhance-tooltip__action promptprofile-enhance-tooltip__upgrade";
     AdapterBase.setButtonTextContent(newAction, "Upgrade for more uses!");
     
-    // Add upgrade click handler
+    // Add upgrade click handler - use capture phase to run before other handlers
     newAction.addEventListener("click", async (e) => {
+      console.log("[PromptProfile™ ChatGPT] Upgrade button clicked, calling handleStripeCheckout");
       e.preventDefault();
       e.stopPropagation();
+      e.stopImmediatePropagation(); // Prevent other handlers from running
       await AdapterBase.handleStripeCheckout(newAction);
-    });
+    }, true); // Use capture phase to ensure it runs first
     
     // Insert dismiss button before the upgrade button
     newAction.parentNode.insertBefore(dismiss, newAction);

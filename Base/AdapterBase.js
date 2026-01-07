@@ -1281,6 +1281,7 @@ class AdapterBase {
    * @returns {Promise<void>}
    */
   static async handleStripeCheckout(button) {
+    console.log("[PromptProfile™ AdapterBase] handleStripeCheckout called with button:", button);
     const BACKEND_URL = "https://prompanionce.onrender.com";
     
     if (!button) {
@@ -1292,6 +1293,7 @@ class AdapterBase {
     button.disabled = true;
     const originalText = button.textContent;
     button.textContent = "Loading...";
+    console.log("[PromptProfile™ AdapterBase] Button disabled, fetching auth token...");
 
     try {
       // Get auth token from storage
