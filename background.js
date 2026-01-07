@@ -340,7 +340,7 @@ async function generateEnhancements(promptText, settings = {}) {
     const optionA = typeof data.optionA === "string" ? data.optionA.trim() : fallbackA;
     // Include usage data if available from API response
     return { 
-      optionA,
+      optionA, 
       enhancementsUsed: data.enhancementsUsed,
       enhancementsLimit: data.enhancementsLimit
     };
@@ -629,7 +629,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Send response AFTER state is saved and messages are sent
         sendResponse?.({ 
           ok: !error, 
-          optionA,
+          optionA, 
           error,
           enhancementsUsed, // Pass through usage data
           enhancementsLimit
@@ -672,12 +672,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const regenerated = await regenerateEnhancement(originalPrompt, currentEnhanced, settings);
         
         // Update optionA (only option now)
-        const nextState = {
-          ...currentState,
+          const nextState = {
+            ...currentState,
           optionA: regenerated
-        };
-        await writeState(nextState);
-        chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState });
+          };
+          await writeState(nextState);
+          chrome.runtime.sendMessage({ type: "PROMPANION_STATE_PUSH", state: nextState });
         
         if (sendResponse) {
           sendResponse({ ok: true, regenerated });

@@ -1102,7 +1102,7 @@ function buildButton() {
 
 function ensureFloatingButton() {
   // No-op: sticky button is created by AdapterBase.initStickyButton()
-  return;
+    return;
 }
 
 function placeButton(targetContainer, inputNode) {

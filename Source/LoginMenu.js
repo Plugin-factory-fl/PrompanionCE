@@ -341,7 +341,47 @@ export function registerAccountHandlers() {
           userNameEl.textContent = displayName;
         }
         if (planNameEl) {
-          planNameEl.textContent = "FREE";
+          // Check subscription status to determine plan text
+          const subscriptionStatus = userProfile.subscription_status || userProfile.subscriptionStatus;
+          if (subscriptionStatus === "premium") {
+            planNameEl.textContent = "PRO";
+          } else {
+            planNameEl.textContent = "FREE";
+          }
+        }
+        
+        // Show/hide upgrade button vs email us button based on subscription status
+        const upgradeButton = document.getElementById("upgrade-button");
+        const emailUsAccountButton = document.getElementById("email-us-account-button");
+        const subscriptionStatus = userProfile.subscription_status || userProfile.subscriptionStatus;
+        const isPremium = subscriptionStatus === "premium";
+        
+        if (isPremium) {
+          // Premium users: hide upgrade button, show email us button
+          if (upgradeButton) {
+            upgradeButton.style.display = "none";
+          }
+          if (emailUsAccountButton) {
+            emailUsAccountButton.style.display = "block";
+          }
+        } else {
+          // Freemium users: show upgrade button, hide email us button
+          if (upgradeButton) {
+            upgradeButton.style.display = "block";
+          }
+          if (emailUsAccountButton) {
+            emailUsAccountButton.style.display = "none";
+          }
+        }
+        
+        // Show/hide crown icon based on subscription status
+        const crownIcon = document.getElementById("account-crown-icon");
+        if (crownIcon) {
+          if (isPremium) {
+            crownIcon.style.display = "block";
+          } else {
+            crownIcon.style.display = "none";
+          }
         }
       } else {
         // User is NOT logged in - show login view, hide logged-in view
@@ -494,6 +534,24 @@ export function registerAccountHandlers() {
         upgradeButton.textContent = "Get PromptProfile Pro";
       }
     });
+  }
+
+  // Handle "Email Us" button in account dialog - opens email client
+  const emailUsAccountButton = document.getElementById("email-us-account-button");
+  if (emailUsAccountButton) {
+    emailUsAccountButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      // Use anchor element approach for better compatibility
+      const mailtoLink = document.createElement("a");
+      mailtoLink.href = "mailto:megamix.ai.plugins@gmail.com?subject=PromptProfile Support Request";
+      mailtoLink.target = "_blank";
+      mailtoLink.rel = "noopener noreferrer";
+      document.body.appendChild(mailtoLink);
+      mailtoLink.click();
+      document.body.removeChild(mailtoLink);
+    }, { capture: true });
   }
 
   // Close button handlers

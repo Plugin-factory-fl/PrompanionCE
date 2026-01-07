@@ -358,3 +358,24 @@
   outline-offset: 2px;
 }
 
+/* Pulsating animation for upgrade button */
+@keyframes pulsateUpgrade {
+  0%, 100% {
+    background-color: #10b981;
+    color: #ffffff;
+  }
+  50% {
+    background-color: #ffffff;
+    color: #10b981;
+    border: 2px solid #10b981;
+  }
+}
+
+.btn--upgrade {
+  animation: pulsateUpgrade 2s ease-in-out infinite;
+}
+
+.btn--upgrade:hover {
+  animation-play-state: paused;
+}
+

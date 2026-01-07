@@ -300,6 +300,8 @@ body {
   opacity: 0;
   pointer-events: none;
   margin-left: auto;
+  /* Pulsating animation applied when visible */
+  animation: none;
 }
 
 .status-card .btn--upgrade.btn--upgrade--visible {
@@ -328,8 +330,98 @@ body {
 }
 
 .status-card .btn--upgrade.btn--upgrade--fade-in {
-  animation: fadeInUpgrade 2000ms ease forwards;
+  animation: fadeInUpgrade 2000ms ease forwards, pulsateUpgrade 2s ease-in-out infinite;
   pointer-events: auto;
+}
+
+/* Pulsating animation for upgrade button */
+@keyframes pulsateUpgrade {
+  0%, 100% {
+    background-color: #10b981 !important;
+    color: #000000 !important;
+  }
+  50% {
+    background-color: #ffffff !important;
+    color: #10b981 !important;
+  }
+}
+
+/* Apply pulsating animation to visible upgrade buttons */
+.status-card .btn--upgrade.btn--upgrade--visible {
+  animation: pulsateUpgrade 2s ease-in-out infinite !important;
+}
+
+/* Also apply when button is visible via inline styles (more specific) */
+.status-card .btn--upgrade[style*="inline-flex"][style*="opacity: 1"],
+.status-card .btn--upgrade[style*="opacity: 1"][style*="inline-flex"] {
+  animation: pulsateUpgrade 2s ease-in-out infinite !important;
+}
+
+.status-card .btn--upgrade:hover {
+  animation-play-state: paused;
+}
+
+/* Email Us button in status card (white background, black text) */
+#email-us-button {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid rgba(0, 0, 0, 0.2) !important;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  transition: background-color 140ms ease, transform 140ms ease;
+  width: 100%;
+  margin-top: 8px;
+}
+
+#email-us-button:hover {
+  background: #f0f0f0 !important;
+  color: #000000 !important;
+  transform: translateY(-1px);
+}
+
+#email-us-button:active {
+  transform: translateY(0);
+}
+
+/* Crown icon styling */
+#open-account {
+  position: relative;
+}
+
+.icon--crown {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  z-index: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+/* Email Us button in account dialog (white background, black text) */
+#email-us-account-button {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid rgba(0, 0, 0, 0.2) !important;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  transition: background-color 140ms ease, transform 140ms ease;
+  width: 100%;
+  margin-top: 12px;
+}
+
+#email-us-account-button:hover {
+  background: #f0f0f0 !important;
+  color: #000000 !important;
+  transform: translateY(-1px);
+}
+
+#email-us-account-button:active {
+  transform: translateY(0);
 }
 
 /* prompt-preview, prompt-tabs, prompt-tabpanel, prompt-textarea moved to styles/promptEnhancer.css */

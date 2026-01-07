@@ -593,11 +593,13 @@ async function fetchUserUsage(retryCount = 0) {
       console.log("[PromptProfile™ Sidepanel] Fetched usage data from API:", {
         enhancementsUsed: data.enhancementsUsed,
         enhancementsLimit: data.enhancementsLimit,
+        subscriptionStatus: data.subscriptionStatus,
         fullResponse: data
       });
       return {
         enhancementsUsed: data.enhancementsUsed ?? 0,
-        enhancementsLimit: data.enhancementsLimit ?? 10
+        enhancementsLimit: data.enhancementsLimit ?? 10,
+        subscriptionStatus: data.subscriptionStatus ?? "freemium"
       };
     } catch (fetchError) {
       clearTimeout(timeoutId);
@@ -635,6 +637,13 @@ async function updateEnhancementsDisplay() {
       if (currentState) {
         currentState.enhancementsUsed = usage.enhancementsUsed;
         currentState.enhancementsLimit = usage.enhancementsLimit;
+        currentState.subscriptionStatus = usage.subscriptionStatus;
+        // Update plan based on subscription status
+        if (usage.subscriptionStatus === "premium") {
+          currentState.plan = "Pro";
+        } else {
+          currentState.plan = "Freemium";
+        }
       }
       // Update UI
       const countEl = document.getElementById("enhancements-count");
@@ -645,6 +654,11 @@ async function updateEnhancementsDisplay() {
       }
       if (limitEl) {
         limitEl.textContent = usage.enhancementsLimit;
+      }
+      
+      // Re-render status to ensure premium UI is shown/hidden correctly
+      if (currentState) {
+        renderStatus(currentState);
       }
     }
   } finally {
@@ -658,9 +672,19 @@ async function updateEnhancementsDisplay() {
  */
 function renderStatus(status) {
   // Handle both direct status object and full state object
-  const plan = status.plan || status?.plan || "Freemium";
-  const enhancementsUsed = status.enhancementsUsed ?? status?.enhancementsUsed ?? 0;
-  const enhancementsLimit = status.enhancementsLimit ?? status?.enhancementsLimit ?? 10;
+  // Always check currentState as fallback for subscription status
+  const subscriptionStatus = status.subscriptionStatus ?? status?.subscriptionStatus ?? currentState?.subscriptionStatus;
+  // Determine plan from subscription status if available, otherwise use plan field
+  let plan = status.plan || status?.plan || currentState?.plan || "Freemium";
+  if (subscriptionStatus === "premium") {
+    plan = "Pro";
+  } else if (!status.plan && !status?.plan && !currentState?.plan) {
+    plan = "Freemium";
+  }
+  
+  const enhancementsUsed = status.enhancementsUsed ?? status?.enhancementsUsed ?? currentState?.enhancementsUsed ?? 0;
+  const enhancementsLimit = status.enhancementsLimit ?? status?.enhancementsLimit ?? currentState?.enhancementsLimit ?? 10;
+  const isPremium = subscriptionStatus === "premium";
   
   document.getElementById("user-plan").textContent = plan;
   document.getElementById("enhancements-count").textContent = enhancementsUsed;
@@ -668,7 +692,14 @@ function renderStatus(status) {
   
   // Show/hide upgrade button based on plan and login status with graceful fade-in
   const upgradeBtn = document.getElementById("status-upgrade-btn");
-  const isFreemium = plan.toLowerCase() === "freemium" || plan.toLowerCase() === "free";
+  const isFreemium = !isPremium && (plan.toLowerCase() === "freemium" || plan.toLowerCase() === "free");
+  
+  // Hide upgrade button for premium users
+  if (isPremium && upgradeBtn) {
+    upgradeBtn.style.display = "none";
+    upgradeBtn.classList.remove("btn--upgrade--visible", "btn--upgrade--fade-in");
+    upgradeBtn.style.opacity = "0";
+  }
   
   if (upgradeBtn) {
     // Reset button text if it's stuck on "Loading..."
@@ -703,6 +734,8 @@ function renderStatus(status) {
             upgradeBtn.classList.remove("btn--upgrade--fade-in");
             upgradeBtn.classList.add("btn--upgrade--visible");
             upgradeBtn.style.opacity = "1";
+            // Ensure pulsating animation continues after fade-in
+            upgradeBtn.style.animation = "pulsateUpgrade 2s ease-in-out infinite";
           }, 2000);
         } else {
           // Button already visible or animating, ensure it stays displayed
@@ -712,6 +745,8 @@ function renderStatus(status) {
               !upgradeBtn.classList.contains("btn--upgrade--fade-in")) {
             upgradeBtn.classList.add("btn--upgrade--visible");
           }
+          // Ensure pulsating animation is applied
+          upgradeBtn.style.animation = "pulsateUpgrade 2s ease-in-out infinite";
         }
       } else if (!isLoggedInFromStorage && !isFreemium) {
         // Only hide if we're sure user is not logged in AND not on freemium
@@ -737,6 +772,8 @@ function renderStatus(status) {
           upgradeBtn.classList.remove("btn--upgrade--fade-in");
           upgradeBtn.classList.add("btn--upgrade--visible");
           upgradeBtn.style.opacity = "1";
+          // Ensure pulsating animation continues after fade-in
+          upgradeBtn.style.animation = "pulsateUpgrade 2s ease-in-out infinite";
         }, 2000);
       } else {
         // Button already visible, ensure it stays visible
@@ -755,6 +792,28 @@ function renderStatus(status) {
         upgradeBtn.classList.remove("btn--upgrade--visible", "btn--upgrade--fade-in");
         upgradeBtn.style.opacity = "0";
       }
+    }
+  }
+  
+  // Show/hide enhancements card vs give feedback card based on subscription status
+  const enhancementsCard = document.getElementById("enhancements-used-card");
+  const giveFeedbackCard = document.getElementById("give-feedback-card");
+  
+  if (isPremium) {
+    // Premium users: hide enhancements card, show give feedback card
+    if (enhancementsCard) {
+      enhancementsCard.style.display = "none";
+    }
+    if (giveFeedbackCard) {
+      giveFeedbackCard.style.display = "block";
+    }
+  } else {
+    // Freemium users: show enhancements card, hide give feedback card
+    if (enhancementsCard) {
+      enhancementsCard.style.display = "block";
+    }
+    if (giveFeedbackCard) {
+      giveFeedbackCard.style.display = "none";
     }
   }
   
@@ -865,6 +924,17 @@ async function updateUserStatus() {
       } else {
         userStatusEl.textContent = "Not Logged In";
       }
+      
+      // Show/hide crown icon based on subscription status
+      const crownIcon = document.getElementById("account-crown-icon");
+      if (crownIcon) {
+        const subscriptionStatus = user.subscription_status || user.subscriptionStatus;
+        if (subscriptionStatus === "premium") {
+          crownIcon.style.display = "block";
+        } else {
+          crownIcon.style.display = "none";
+        }
+      }
     } catch (fetchError) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
@@ -971,6 +1041,49 @@ function registerSectionActionGuards() {
       );
     });
   });
+  
+  // Prevent email us button from triggering other handlers
+  const emailUsBtn = document.getElementById("email-us-button");
+  if (emailUsBtn) {
+    ["pointerdown", "mousedown", "click", "touchstart", "keydown"].forEach((type) => {
+      emailUsBtn.addEventListener(
+        type,
+        (event) => {
+          event.stopPropagation();
+        },
+        { passive: false }
+      );
+    });
+  }
+}
+
+/**
+ * Registers event handlers for section info buttons
+ */
+function registerInfoButtonHandlers() {
+  // Prompt Enhancer info button
+  const promptEnhancerInfoButton = document.getElementById("prompt-enhancer-info-btn");
+  const promptEnhancerInfoDialog = document.getElementById("prompt-enhancer-info-dialog");
+  
+  if (promptEnhancerInfoButton && promptEnhancerInfoDialog) {
+    promptEnhancerInfoButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      promptEnhancerInfoDialog.showModal();
+    });
+  }
+
+  // Side Chat info button
+  const sideChatInfoButton = document.getElementById("side-chat-info-btn");
+  const sideChatInfoDialog = document.getElementById("side-chat-info-dialog");
+  
+  if (sideChatInfoButton && sideChatInfoDialog) {
+    sideChatInfoButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      sideChatInfoDialog.showModal();
+    });
+  }
 }
 
 /**
@@ -1116,6 +1229,7 @@ async function init() {
     currentState.activePlatform = "ChatGPT";
   }
 
+  // Re-render status after updateEnhancementsDisplay to ensure subscription status is included
   renderStatus(currentState);
   // Update user login status - try immediately and also after delays
   updateUserStatus();
@@ -1157,7 +1271,11 @@ async function init() {
     }
   }
 
-  registerCopyHandlers();
+  registerCopyHandlers(currentState, {
+    renderLibrary,
+    saveState,
+    LIBRARY_SCHEMA_VERSION
+  });
   registerLibraryHandlers(currentState, {
     saveState,
     LIBRARY_SCHEMA_VERSION
@@ -1208,6 +1326,7 @@ async function init() {
   }
   initTabs();
   registerSectionActionGuards();
+  registerInfoButtonHandlers();
   
   // Register upgrade button handler
   const upgradeBtn = document.getElementById("status-upgrade-btn");
@@ -1216,6 +1335,25 @@ async function init() {
     console.log("[PromptProfile™ Sidepanel] Upgrade button handler registered");
   } else {
     console.warn("[PromptProfile™ Sidepanel] Upgrade button not found during init");
+  }
+  
+  // Register email us button handler
+  const emailUsBtn = document.getElementById("email-us-button");
+  if (emailUsBtn) {
+    emailUsBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      // Use anchor element approach for better compatibility
+      const mailtoLink = document.createElement("a");
+      mailtoLink.href = "mailto:megamix.ai.plugins@gmail.com?subject=PromptProfile Support Request";
+      mailtoLink.target = "_blank";
+      mailtoLink.rel = "noopener noreferrer";
+      document.body.appendChild(mailtoLink);
+      mailtoLink.click();
+      document.body.removeChild(mailtoLink);
+    }, { capture: true });
+    console.log("[PromptProfile™ Sidepanel] Email Us button handler registered");
   }
   
   // Initialize side chat after module loads (or immediately if already loaded)
@@ -1229,12 +1367,16 @@ async function init() {
     saveState
   });
   
-  // Check if there's a pending side chat message and open section if needed
-  if (currentState.pendingSideChat?.text) {
-    openSideChatSection();
-  }
+  // Don't auto-open sidechat on panel initialization - only open when "Elaborate" is pressed
+  // The PROMPANION_SIDECHAT_DELIVER message handler will handle opening sidechat
+  // when the user actually clicks "Elaborate"
   
-  processPendingSideChat(currentState, { saveState });
+  // Clear any stale pendingSideChat from storage to prevent auto-opening on next panel open
+  if (currentState.pendingSideChat?.text) {
+    console.log("[PromptProfile™ Sidepanel] Clearing stale pendingSideChat on panel initialization");
+    currentState.pendingSideChat = null;
+    saveState(currentState).catch(err => console.warn("Failed to clear pendingSideChat:", err));
+  }
     console.log("[PromptProfile™ Sidepanel] Side chat initialized");
   };
   
@@ -1256,7 +1398,8 @@ async function init() {
     pendingMessages.forEach((message) => {
       if (message.type === "PROMPANION_STATE_PUSH" && message.state) {
         updateAndRenderPrompts(currentState, message.state);
-        processPendingSideChat(currentState, { saveState });
+        // Don't process pendingSideChat here - PROMPANION_SIDECHAT_DELIVER handles it directly
+        // processPendingSideChat(currentState, { saveState });
       }
     });
     pendingMessages.length = 0;
@@ -1268,7 +1411,8 @@ async function init() {
     pendingStorageChanges.forEach((newState) => {
       if (hasPrompts(newState)) {
         updateAndRenderPrompts(currentState, newState);
-        processPendingSideChat(currentState, { saveState });
+        // Don't process pendingSideChat here - PROMPANION_SIDECHAT_DELIVER handles it directly
+        // processPendingSideChat(currentState, { saveState });
       }
     });
     pendingStorageChanges.length = 0;
@@ -1558,7 +1702,8 @@ if (chrome?.runtime?.onMessage) {
         renderStatus({
           ...currentState,
           enhancementsUsed: message.enhancementsUsed,
-          enhancementsLimit: message.enhancementsLimit
+          enhancementsLimit: message.enhancementsLimit,
+          subscriptionStatus: currentState.subscriptionStatus || message.subscriptionStatus
         });
       }
       return;

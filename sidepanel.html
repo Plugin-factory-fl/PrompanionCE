@@ -31,11 +31,14 @@
               />
             </svg>
           </button>
-          <button class="btn btn--ghost" id="open-account" aria-label="Account" type="button">
+          <button class="btn btn--ghost" id="open-account" aria-label="Account" type="button" style="position: relative;">
             <svg class="icon icon--account" viewBox="0 0 24 24" aria-hidden="true">
               <path
                 d="M12 12c2.761 0 5-2.462 5-5.5S14.761 1 12 1 7 3.462 7 6.5 9.239 12 12 12Zm0 2c-3.033 0-9 1.523-9 4.5V21a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2.5c0-2.977-5.967-4.5-9-4.5Z"
               />
+            </svg>
+            <svg class="icon icon--crown" id="account-crown-icon" viewBox="0 0 24 24" aria-hidden="true" style="display: none; position: absolute; top: -2px; right: -2px; width: 16px; height: 16px; z-index: 1;">
+              <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 1.1-.9 2-2 2H7c-1.1 0-2-.9-2-2v-1h14v1z" fill="#FFD700"/>
             </svg>
           </button>
         </div>
@@ -53,18 +56,27 @@
           </div>
           <div class="status-card__value" id="user-plan">Freemium</div>
         </div>
-        <div class="status-card">
+        <div class="status-card" id="enhancements-used-card">
           <div class="status-card__label">Enhancements used</div>
           <div class="status-card__value">
             <span id="enhancements-count">3</span>/<span id="enhancements-limit">10</span>
           </div>
+        </div>
+        <div class="status-card" id="give-feedback-card" style="display: none;">
+          <div class="status-card__label">Give Feedback</div>
+          <button class="btn btn--primary" id="email-us-button" type="button">Email Us</button>
         </div>
       </section>
 
       <section class="panel__section panel__section--prompt">
         <details class="section-collapsible">
           <summary class="section-heading">
-            <h2>Prompt Enhancer</h2>
+            <div class="section-heading__title-group">
+              <h2>Prompt Enhancer</h2>
+              <button class="library-info-btn" id="prompt-enhancer-info-btn" type="button" aria-label="Prompt Enhancer information">
+                <span class="library-info-btn__icon">i</span>
+              </button>
+            </div>
           </summary>
 
           <div class="section-content">
@@ -89,6 +101,7 @@
                   <div class="prompt-preview__actions">
                     <button class="btn btn--ghost" data-insert="option-a">Insert</button>
                     <button class="btn btn--ghost" data-regenerate="option-a">Regenerate</button>
+                    <button class="btn btn--ghost" data-save-to-library="option-a">Save to Library</button>
                   </div>
                 </div>
               </div>
@@ -100,7 +113,12 @@
       <section class="panel__section panel__section--chat">
         <details class="section-collapsible">
           <summary class="section-heading">
-            <h2>Side Chat</h2>
+            <div class="section-heading__title-group">
+              <h2>Side Chat</h2>
+              <button class="library-info-btn" id="side-chat-info-btn" type="button" aria-label="Side Chat information">
+                <span class="library-info-btn__icon">i</span>
+              </button>
+            </div>
           </summary>
           <div class="section-content">
             <div class="chat-window" id="chat-window">
@@ -273,6 +291,7 @@
             <p class="account__plan-description">On the free plan, you can only enhance prompts 10 times and your conversations are limited with the Side Chat. Upgrade now for unlimited enhancements and side chat conversations.</p>
           </div>
           <button type="button" class="btn btn--primary btn--upgrade" id="upgrade-button">Get PromptProfile Pro</button>
+          <button type="button" class="btn btn--primary" id="email-us-account-button" style="display: none;">Email Us</button>
         </div>
       </div>
     </dialog>
@@ -439,6 +458,84 @@
         </div>
         <footer class="modal__footer">
           <button class="btn btn--primary" value="confirm">Got it</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="prompt-enhancer-info-dialog" class="modal modal--dark">
+      <form method="dialog" class="modal__content">
+        <header class="modal__header">
+          <h2>Prompt Enhancer Information</h2>
+          <button class="btn btn--ghost modal__close" value="cancel" aria-label="Close information">
+            <svg class="icon icon--close" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7.05 6.34a1 1 0 0 1 1.41 0L12 9.88l3.54-3.54a1 1 0 1 1 1.41 1.41L13.41 11.3l3.54 3.54a1 1 0 0 1-1.41 1.41L12 12.7l-3.54 3.54a1 1 0 0 1-1.41-1.41l3.54-3.54-3.54-3.54a1 1 0 0 1 0-1.41Z" />
+            </svg>
+          </button>
+        </header>
+        <div class="modal__body library-info-content">
+          <div class="library-info-section">
+            <p class="library-info-section__text">
+              The Prompt Enhancer transforms your prompts into more effective versions using AI best practices. Enter your prompt, click "Enhance Prompt" to generate an improved version, then use "Insert" to add it to your conversation. Configure detail level (Low/Medium/High) and output type (Text/Image/Video/Code) in settings.
+            </p>
+          </div>
+        </div>
+        <footer class="modal__footer">
+          <button class="btn btn--primary" value="confirm">Got it</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="side-chat-info-dialog" class="modal modal--dark">
+      <form method="dialog" class="modal__content">
+        <header class="modal__header">
+          <h2>Side Chat Information</h2>
+          <button class="btn btn--ghost modal__close" value="cancel" aria-label="Close information">
+            <svg class="icon icon--close" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7.05 6.34a1 1 0 0 1 1.41 0L12 9.88l3.54-3.54a1 1 0 1 1 1.41 1.41L13.41 11.3l3.54 3.54a1 1 0 0 1-1.41 1.41L12 12.7l-3.54 3.54a1 1 0 0 1-1.41-1.41l3.54-3.54-3.54-3.54a1 1 0 0 1 0-1.41Z" />
+            </svg>
+          </button>
+        </header>
+        <div class="modal__body library-info-content">
+          <div class="library-info-section">
+            <p class="library-info-section__text">
+              Side Chat helps you understand AI responses directly in your browser without switching pages. Select text from any AI response (ChatGPT, Claude, Gemini, etc.) and click "Elaborate" to open Side Chat with context loaded. Ask questions for clarification or type messages anytime to get context-aware help.
+            </p>
+          </div>
+        </div>
+        <footer class="modal__footer">
+          <button class="btn btn--primary" value="confirm">Got it</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="save-to-library-dialog" class="modal modal--dark">
+      <form method="dialog" class="modal__content" id="save-to-library-form">
+        <header class="modal__header">
+          <h2>Save to Library</h2>
+          <button class="btn btn--ghost modal__close save-to-library__cancel" value="cancel" aria-label="Close dialog">
+            <svg class="icon icon--close" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7.05 6.34a1 1 0 0 1 1.41 0L12 9.88l3.54-3.54a1 1 0 1 1 1.41 1.41L13.41 11.3l3.54 3.54a1 1 0 0 1-1.41 1.41L12 12.7l-3.54 3.54a1 1 0 0 1-1.41-1.41l3.54-3.54-3.54-3.54a1 1 0 0 1 0-1.41Z" />
+            </svg>
+          </button>
+        </header>
+        <div class="modal__body">
+          <label class="form-field">
+            <span class="form-field__label">Select Folder</span>
+            <select id="save-to-library-folder-select" class="select">
+              <option value="">-- Select a folder --</option>
+            </select>
+          </label>
+          <div class="form-field" id="save-to-library-new-folder-wrapper" style="display: none;">
+            <label class="form-field">
+              <span class="form-field__label">New Folder Name</span>
+              <input type="text" id="save-to-library-new-folder-input" class="account__input" autocomplete="off" placeholder="Enter folder name..." />
+            </label>
+          </div>
+          <div class="library-dialog__message" id="save-to-library-message" style="display: none;"></div>
+        </div>
+        <footer class="modal__footer">
+          <button class="btn btn--ghost save-to-library__cancel" type="button" value="cancel">Cancel</button>
+          <button class="btn btn--primary" type="button" value="confirm">Save</button>
         </footer>
       </form>
     </dialog>

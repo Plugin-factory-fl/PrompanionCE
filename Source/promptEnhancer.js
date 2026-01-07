@@ -321,9 +321,164 @@ async function handleClipboardOperation(button, text, successText, originalText)
 }
 
 /**
- * Registers event handlers for copy, insert, and regenerate buttons
+ * Handles saving a prompt to the library
+ * @param {Object} stateRef - Reference to current state object
+ * @param {Object} dependencies - Required dependencies (renderLibrary, saveState, LIBRARY_SCHEMA_VERSION)
+ * @param {string} promptText - The prompt text to save
  */
-export function registerCopyHandlers() {
+async function handleSaveToLibrary(stateRef, dependencies, promptText) {
+  const { renderLibrary, saveState, LIBRARY_SCHEMA_VERSION } = dependencies;
+  
+  if (!promptText || !promptText.trim()) {
+    alert("No prompt to save. Please enhance a prompt first.");
+    return;
+  }
+
+  const dialog = document.getElementById("save-to-library-dialog");
+  const form = document.getElementById("save-to-library-form");
+  const folderSelect = document.getElementById("save-to-library-folder-select");
+  const newFolderWrapper = document.getElementById("save-to-library-new-folder-wrapper");
+  const newFolderInput = document.getElementById("save-to-library-new-folder-input");
+  const messageEl = document.getElementById("save-to-library-message");
+  const saveButton = form.querySelector("button[value='confirm']");
+  const cancelButtons = form.querySelectorAll(".save-to-library__cancel");
+
+  if (!dialog || !form || !folderSelect || !newFolderWrapper || !newFolderInput || !messageEl) {
+    console.error("Save to Library dialog elements not found");
+    return;
+  }
+
+  // Populate folder dropdown
+  folderSelect.innerHTML = '<option value="">-- Select a folder --</option>';
+  stateRef.library.forEach((folder, index) => {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = folder.name;
+    folderSelect.appendChild(option);
+  });
+  const createNewOption = document.createElement("option");
+  createNewOption.value = "__create_new__";
+  createNewOption.textContent = "Create New Folder";
+  folderSelect.appendChild(createNewOption);
+
+  // Reset form state
+  folderSelect.value = "";
+  newFolderWrapper.style.display = "none";
+  newFolderInput.value = "";
+  messageEl.style.display = "none";
+  messageEl.textContent = "";
+
+  // Handle dropdown change
+  const handleFolderSelectChange = () => {
+    const selectedValue = folderSelect.value;
+    if (selectedValue === "__create_new__") {
+      newFolderWrapper.style.display = "block";
+      newFolderInput.focus();
+    } else {
+      newFolderWrapper.style.display = "none";
+      newFolderInput.value = "";
+    }
+    messageEl.style.display = "none";
+    messageEl.textContent = "";
+  };
+
+  folderSelect.removeEventListener("change", handleFolderSelectChange);
+  folderSelect.addEventListener("change", handleFolderSelectChange);
+
+  // Handle cancel buttons
+  const handleCancel = (event) => {
+    event.preventDefault();
+    dialog.close("cancel");
+  };
+
+  cancelButtons.forEach(button => {
+    button.onclick = handleCancel;
+  });
+
+  // Handle form submission
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    
+    const selectedValue = folderSelect.value;
+    
+    if (!selectedValue || selectedValue === "") {
+      messageEl.textContent = "Please select a folder or create a new one.";
+      messageEl.style.display = "block";
+      return;
+    }
+
+    if (selectedValue === "__create_new__") {
+      const newFolderName = newFolderInput.value.trim();
+      if (!newFolderName) {
+        messageEl.textContent = "Please enter a folder name.";
+        messageEl.style.display = "block";
+        newFolderInput.focus();
+        return;
+      }
+
+      // Check for duplicate folder names
+      const folderExists = stateRef.library.some(
+        folder => folder.name.toLowerCase() === newFolderName.toLowerCase()
+      );
+      if (folderExists) {
+        messageEl.textContent = "A folder with this name already exists.";
+        messageEl.style.display = "block";
+        newFolderInput.focus();
+        return;
+      }
+
+      // Create new folder with the prompt
+      const newFolder = {
+        name: newFolderName,
+        prompts: [promptText.trim()]
+      };
+      stateRef.library.unshift(newFolder);
+      stateRef.libraryVersion = LIBRARY_SCHEMA_VERSION;
+    } else {
+      // Add to existing folder
+      const folderIndex = Number.parseInt(selectedValue, 10);
+      if (Number.isNaN(folderIndex) || !stateRef.library[folderIndex]) {
+        messageEl.textContent = "Invalid folder selection.";
+        messageEl.style.display = "block";
+        return;
+      }
+
+      const folder = stateRef.library[folderIndex];
+      folder.prompts.unshift(promptText.trim());
+      // Limit to 200 prompts per folder
+      folder.prompts = folder.prompts.slice(0, 200);
+      stateRef.libraryVersion = LIBRARY_SCHEMA_VERSION;
+    }
+
+    // Save state and update UI
+    await saveState(stateRef);
+    renderLibrary(stateRef.library);
+    
+    dialog.close("confirm");
+  };
+
+  saveButton.onclick = handleSubmit;
+
+  // Show dialog
+  dialog.showModal();
+
+  // Wait for dialog to close
+  return new Promise((resolve) => {
+    const handleClose = () => {
+      dialog.removeEventListener("close", handleClose);
+      folderSelect.removeEventListener("change", handleFolderSelectChange);
+      resolve(dialog.returnValue === "confirm");
+    };
+    dialog.addEventListener("close", handleClose, { once: true });
+  });
+}
+
+/**
+ * Registers event handlers for copy, insert, regenerate, and save-to-library buttons
+ * @param {Object} stateRef - Reference to current state object
+ * @param {Object} dependencies - Required dependencies (renderLibrary, saveState, LIBRARY_SCHEMA_VERSION)
+ */
+export function registerCopyHandlers(stateRef = null, dependencies = {}) {
   // Register copy button handlers (if they exist)
   document.querySelectorAll("[data-copy]").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -491,6 +646,71 @@ export function registerCopyHandlers() {
 
   document._prompanionRegenerateHandler = regenerateHandler;
   document.addEventListener("click", regenerateHandler, true);
+
+  // Register save-to-library button handler using document-level event delegation
+  // Remove any existing handler to prevent duplicates
+  if (document._prompanionSaveToLibraryHandler) {
+    document.removeEventListener("click", document._prompanionSaveToLibraryHandler, true);
+  }
+
+  const saveToLibraryHandler = async (event) => {
+    const button = event.target.closest("[data-save-to-library]");
+    if (!button || !button.closest(".prompt-preview")) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!stateRef || !dependencies.renderLibrary || !dependencies.saveState) {
+      console.error("Save to Library: Missing stateRef or dependencies");
+      alert("Unable to save to library. Please try again.");
+      return;
+    }
+
+    const targetId = button.dataset.saveToLibrary || button.getAttribute("data-save-to-library");
+    if (!targetId) {
+      console.error("Prompanion: Save to Library button missing data-save-to-library attribute");
+      return;
+    }
+
+    const field = document.getElementById(targetId);
+    if (!field) {
+      console.error("Prompanion: Save to Library target field not found:", targetId);
+      return;
+    }
+
+    const promptText = field.value.trim();
+    if (!promptText) {
+      alert("No prompt to save. Please enhance a prompt first.");
+      return;
+    }
+
+    if (button.disabled) {
+      return;
+    }
+
+    const originalButtonText = button.textContent;
+    button.disabled = true;
+    button.textContent = "Saving...";
+
+    try {
+      await handleSaveToLibrary(stateRef, dependencies, promptText);
+      button.textContent = "Saved!";
+      setTimeout(() => {
+        button.textContent = originalButtonText;
+      }, 1500);
+    } catch (error) {
+      console.error("Prompanion: save to library failed", error);
+      alert("Failed to save prompt to library. Please try again.");
+      button.textContent = originalButtonText;
+    } finally {
+      button.disabled = false;
+    }
+  };
+
+  document._prompanionSaveToLibraryHandler = saveToLibraryHandler;
+  document.addEventListener("click", saveToLibraryHandler, true);
 }
 
 /**
