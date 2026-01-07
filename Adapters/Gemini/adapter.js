@@ -856,6 +856,15 @@ function handleRefineButtonClick(e) {
   console.log("[PromptProfile™] ========== REFINE BUTTON HANDLER FIRED ==========");
   console.log("[PromptProfile™] Event type:", e.type);
   console.log("[PromptProfile™] Event target:", e.target);
+  
+  // Don't handle clicks on upgrade button - let the upgrade handler deal with it
+  const target = e.target;
+  if (target && (target.classList.contains("promptprofile-enhance-tooltip__upgrade") || 
+                  target.closest(".promptprofile-enhance-tooltip__upgrade"))) {
+    console.log("[PromptProfile™] Upgrade button clicked, ignoring refine handler");
+    return;
+  }
+  
   e.preventDefault();
   e.stopPropagation();
   if (enhanceActionInFlight) {
@@ -873,15 +882,30 @@ function handleRefineButtonClick(e) {
     return;
   }
   enhanceActionInFlight = true;
-  enhanceTooltipDismissed = true;
-  hideEnhanceTooltip();
+  // Don't hide tooltip yet - wait to see if there's a limit error
   console.log("[PromptProfile™] Requesting prompt enhancement...");
   requestPromptEnhancement(promptText)
     .then((result) => {
       if (!result || !result.ok) {
         enhanceActionInFlight = false;
+        if (result?.reason === "EXTENSION_CONTEXT_INVALIDATED") {
+          console.error("[PromptProfile™ Gemini] Cannot enhance prompt - extension context invalidated. Please reload the page.");
+          enhanceTooltipDismissed = true;
+          hideEnhanceTooltip();
+        } else if (result?.error === "LIMIT_REACHED") {
+          // Show upgrade button in tooltip instead of hiding
+          console.log("[PromptProfile™] Limit reached, showing upgrade button");
+          showUpgradeButtonInTooltip();
+        } else {
+          // Other errors - hide tooltip normally
+          enhanceTooltipDismissed = true;
+          hideEnhanceTooltip();
+        }
         return;
       }
+      // Success - hide tooltip and set text
+      enhanceTooltipDismissed = true;
+      hideEnhanceTooltip();
       const refinedText = result.optionA && typeof result.optionA === "string" && result.optionA.trim()
         ? result.optionA.trim() 
         : promptText;
@@ -939,6 +963,76 @@ function handleInputBlur() {
   clearTimeout(enhanceTooltipTimer);
   enhanceTooltipTimer = null;
   hideEnhanceTooltip();
+}
+
+function showUpgradeButtonInTooltip() {
+  // Ensure tooltip element exists and is visible
+  if (!enhanceTooltipElement) {
+    ensureEnhanceTooltipElement();
+  }
+  if (!enhanceTooltipElement) {
+    console.error("[PromptProfile™ Gemini] Cannot show upgrade button - tooltip element not found");
+    return;
+  }
+  
+  // Make sure tooltip is visible first
+  if (!enhanceTooltipElement.classList.contains("is-visible")) {
+    enhanceTooltipElement.classList.add("is-visible");
+    positionEnhanceTooltip();
+    attachTooltipResizeHandler();
+  }
+  
+  // Remove existing dismiss button if it exists (we'll add a new one)
+  const oldDismiss = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__dismiss");
+  if (oldDismiss) {
+    oldDismiss.remove();
+  }
+  
+  // Add dismiss button (X) for closing the upgrade tooltip
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "promptprofile-enhance-tooltip__dismiss";
+  dismiss.textContent = "×";
+  dismiss.setAttribute("aria-label", "Dismiss upgrade prompt");
+  dismiss.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    enhanceTooltipDismissed = true;
+    enhanceTooltipElement.classList.remove("show-upgrade");
+    hideEnhanceTooltip();
+  });
+  
+  // Change action button to upgrade button
+  const action = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__action");
+  if (action) {
+    // Create a completely new button instead of cloning to avoid old event listeners
+    const newAction = document.createElement("button");
+    newAction.type = "button";
+    newAction.className = "promptprofile-enhance-tooltip__action promptprofile-enhance-tooltip__upgrade";
+    AdapterBase.setButtonTextContent(newAction, "Upgrade for more uses!");
+    
+    // Add upgrade click handler - use capture phase to run before other handlers
+    newAction.addEventListener("click", async (e) => {
+      console.log("[PromptProfile™ Gemini] Upgrade button clicked, calling handleStripeCheckout");
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation(); // Prevent other handlers from running
+      await AdapterBase.handleStripeCheckout(newAction);
+    }, true); // Use capture phase to ensure it runs first
+    
+    // Replace the old button with the new one
+    action.replaceWith(newAction);
+    
+    // Insert dismiss button before the upgrade button
+    newAction.parentNode.insertBefore(dismiss, newAction);
+  } else {
+    // If no action button exists, just add the dismiss button
+    enhanceTooltipElement.appendChild(dismiss);
+  }
+  
+  // Add class to prevent auto-hide
+  enhanceTooltipElement.classList.add("show-upgrade");
+  enhanceTooltipDismissed = false; // Reset dismissed flag so tooltip stays visible
 }
 
 function scheduleEnhanceTooltip() {
@@ -1071,6 +1165,19 @@ document.addEventListener("mousedown", (e) => {
         console.log("[PromptProfile™] ========== CLICK AFTER MOUSEDOWN (direct handler) ==========");
         console.log("[PromptProfile™] Time since mousedown:", timeSinceMousedown, "ms");
         console.log("[PromptProfile™] Click target:", clickEvent.target);
+        
+        // Check if this is the upgrade button - if so, don't call refine handler
+        const clickedElement = clickEvent.target;
+        const isUpgradeButton = clickedElement.classList.contains("promptprofile-enhance-tooltip__upgrade") ||
+                                clickedElement.closest(".promptprofile-enhance-tooltip__upgrade");
+        
+        if (isUpgradeButton) {
+          console.log("[PromptProfile™] Upgrade button clicked, skipping refine handler in document click");
+          document.removeEventListener("click", clickHandler, true);
+          tooltipClickInProgress = false;
+          return; // Don't call refine handler for upgrade button
+        }
+        
         if (typeof handleRefineButtonClick === "function") {
           handleRefineButtonClick(clickEvent);
         }
