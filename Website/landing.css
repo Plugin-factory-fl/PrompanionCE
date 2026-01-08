@@ -200,8 +200,27 @@ h1, h2, h3, h4, h5, h6 {
 .hero__subtitle {
     font-size: 20px;
     color: var(--color-text-secondary);
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
     line-height: 1.6;
+}
+
+.hero__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+}
+
+.hero__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    background: var(--color-bg-light);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
 }
 
 .hero__cta {
@@ -228,6 +247,51 @@ h1, h2, h3, h4, h5, h6 {
     height: auto;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-xl);
+}
+
+/* Why PromptProfile Section */
+.why-promptprofile {
+    padding: var(--spacing-xl) 0;
+    background: var(--color-bg);
+}
+
+.why-promptprofile__grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-lg);
+}
+
+.why-card {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.why-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--color-primary);
+}
+
+.why-card__icon {
+    font-size: 48px;
+    margin-bottom: var(--spacing-md);
+}
+
+.why-card__title {
+    font-size: 22px;
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-text);
+}
+
+.why-card__text {
+    color: var(--color-text-secondary);
+    line-height: 1.7;
+    font-size: 16px;
 }
 
 /* Problem/Solution Section */
@@ -304,6 +368,8 @@ h1, h2, h3, h4, h5, h6 {
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 48px;
+    min-height: 60px;
 }
 
 .feature-card__image {
@@ -411,6 +477,63 @@ h1, h2, h3, h4, h5, h6 {
     margin-top: var(--spacing-xl);
 }
 
+/* Trust & Privacy Section */
+.trust-privacy {
+    padding: var(--spacing-xl) 0;
+    background: var(--color-bg-light);
+}
+
+.trust-privacy__grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-lg);
+}
+
+.trust-card {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.trust-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--color-primary);
+}
+
+.trust-card__icon {
+    font-size: 48px;
+    margin-bottom: var(--spacing-md);
+}
+
+.trust-card__title {
+    font-size: 22px;
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-text);
+}
+
+.trust-card__text {
+    color: var(--color-text-secondary);
+    line-height: 1.7;
+    font-size: 16px;
+}
+
+.trust-card__link {
+    color: var(--color-primary);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s ease;
+}
+
+.trust-card__link:hover {
+    color: var(--color-primary-dark);
+    text-decoration: underline;
+}
+
 /* Pricing Section */
 .pricing {
     padding: var(--spacing-xl) 0;
@@ -459,9 +582,20 @@ h1, h2, h3, h4, h5, h6 {
 
 .pricing-card__header {
     text-align: center;
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
     padding-bottom: var(--spacing-md);
     border-bottom: 1px solid var(--color-border);
+}
+
+.pricing-card__highlight {
+    text-align: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-bg-light);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--spacing-md);
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
 }
 
 .pricing-card__title {
@@ -763,6 +897,14 @@ h1, h2, h3, h4, h5, h6 {
     .testimonials {
         grid-template-columns: 1fr;
     }
+
+    .why-promptprofile__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .trust-privacy__grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 768px) {
@@ -786,12 +928,29 @@ h1, h2, h3, h4, h5, h6 {
         font-size: 18px;
     }
 
+    .hero__badges {
+        justify-content: center;
+    }
+
+    .hero__badge {
+        font-size: 12px;
+        padding: 6px 12px;
+    }
+
     .section-title {
         font-size: 32px;
     }
 
     .section-text {
         font-size: 16px;
+    }
+
+    .why-promptprofile__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .trust-privacy__grid {
+        grid-template-columns: 1fr;
     }
 
     .final-cta__title {
