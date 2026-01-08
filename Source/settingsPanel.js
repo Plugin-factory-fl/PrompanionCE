@@ -89,9 +89,14 @@ export function renderSettings(settings) {
   
   const complexityField = document.getElementById("setting-complexity");
   const outputTabs = document.querySelectorAll(".form-tab[data-setting='output']");
+  const evaluationToggle = document.getElementById("setting-real-time-evaluation");
 
   if (complexityField) {
     complexityField.value = settings.complexity;
+  }
+
+  if (evaluationToggle) {
+    evaluationToggle.checked = settings.realTimeEvaluation === true;
   }
 
   outputTabs.forEach((tab) => {
@@ -134,12 +139,14 @@ export function registerSettingsHandlers(stateRef, dependencies = {}) {
     // Read the active output tab's value directly from the DOM
     const activeOutputTab = document.querySelector(".form-tab[data-setting='output'].is-active");
     const selectedOutput = activeOutputTab?.dataset.value || stateRef.settings.output || "text";
+    const evaluationToggle = document.getElementById("setting-real-time-evaluation");
     
     // Always use ChatGPT - model selection removed
     stateRef.settings = {
       complexity: Number(document.getElementById("setting-complexity").value),
       model: "chatgpt", // Always ChatGPT
-      output: selectedOutput
+      output: selectedOutput,
+      realTimeEvaluation: evaluationToggle ? evaluationToggle.checked : false
     };
     
     // Update activePlatform to always be ChatGPT

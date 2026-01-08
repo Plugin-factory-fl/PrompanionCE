@@ -71,6 +71,44 @@ if (typeof AdapterBase === "undefined") {
   throw new Error("AdapterBase must be loaded before adapter.js");
 }
 
+// Evaluation module loaded via script tag, available on window.PromptEvaluator
+let PromptEvaluator = null;
+
+function loadEvaluationModule() {
+  // Since promptEvaluator.js is now loaded as a content script in manifest.json,
+  // it should be available on window.PromptEvaluator immediately
+  if (PromptEvaluator || (typeof window !== 'undefined' && window.PromptEvaluator && 
+      typeof window.PromptEvaluator.evaluatePrompt === 'function')) {
+    PromptEvaluator = window.PromptEvaluator;
+    console.log("[PromptProfile™] Evaluation module already loaded");
+    return Promise.resolve();
+  }
+  
+  // If not immediately available, wait a bit for it to load
+  return new Promise((resolve, reject) => {
+    let checkCount = 0;
+    const checkInterval = setInterval(() => {
+      checkCount++;
+      if (typeof window !== 'undefined' && window.PromptEvaluator && 
+          typeof window.PromptEvaluator.evaluatePrompt === 'function') {
+        clearInterval(checkInterval);
+        PromptEvaluator = window.PromptEvaluator;
+        console.log("[PromptProfile™] ✓ PromptEvaluator loaded successfully");
+        console.log("[PromptProfile™] PromptEvaluator functions:", {
+          evaluatePrompt: typeof PromptEvaluator.evaluatePrompt,
+          getScoreColorClass: typeof PromptEvaluator.getScoreColorClass,
+          getScoreLabel: typeof PromptEvaluator.getScoreLabel
+        });
+        resolve();
+      } else if (checkCount > 50) { // Wait up to 5 seconds
+        clearInterval(checkInterval);
+        console.warn("[PromptProfile™] PromptEvaluator not found after waiting");
+        reject(new Error("PromptEvaluator not found"));
+      }
+    }, 100);
+  });
+}
+
 const BUTTON_ID = "promptprofile-claude-trigger";
 const BUTTON_CLASS = "promptprofile-claude-trigger";
 const SELECTION_TOOLBAR_ID = AdapterBase.SELECTION_TOOLBAR_ID;
@@ -98,6 +136,9 @@ let floatingButtonTargetInput = null;
 let enhanceActionInFlight = false;
 let selectionAskInFlight = false;
 let tooltipClickInProgress = false;
+
+// Evaluation variables
+let realTimeEvaluationEnabled = false;
 let selectionToolbarElement = null;
 let selectionToolbarButton = null;
 let selectionToolbarText = "";
@@ -142,29 +183,93 @@ function getHighlightButton() {
 function nodeInAssistantMessage(node) {
   const element = AdapterBase.getElementFromNode(node);
   if (!element) return false;
+  
   // Claude uses different structure - look for assistant message containers
   // Common patterns: data-role, role attributes, or specific class patterns
-  return !!(
-    element.closest("[data-role='assistant']") ||
-    element.closest("[role='article']")?.querySelector("[data-role='assistant']") ||
-    element.closest("article")?.querySelector("[data-role='assistant']") ||
-    element.closest("div[data-testid*='message']")?.querySelector("[data-role='assistant']") ||
+  const checks = [
+    element.closest("[data-role='assistant']"),
+    element.closest("[role='article']")?.querySelector("[data-role='assistant']"),
+    element.closest("article")?.querySelector("[data-role='assistant']"),
+    element.closest("div[data-testid*='message']")?.querySelector("[data-role='assistant']"),
     // Fallback: check if parent has assistant-related attributes
-    element.closest("div")?.getAttribute("data-role") === "assistant"
-  );
+    element.closest("div")?.getAttribute("data-role") === "assistant" ? element.closest("div") : null
+  ];
+  
+  // Additional Claude-specific selectors
+  const claudeChecks = [
+    element.closest("article[data-role='assistant']"),
+    element.closest("[class*='assistant'][class*='message']"),
+    element.closest("[class*='Message'][class*='assistant']"),
+    // Check for Claude's message structure - look for article or div with assistant indicators
+    (() => {
+      const article = element.closest("article");
+      if (article) {
+        // Check if article contains assistant content indicators
+        const hasAssistantContent = article.querySelector("[data-role='assistant']") ||
+                                   article.getAttribute("data-role") === "assistant" ||
+                                   article.className?.includes("assistant") ||
+                                   article.querySelector("div[class*='assistant']");
+        if (hasAssistantContent) return article;
+      }
+      return null;
+    })()
+  ];
+  
+  const allChecks = [...checks, ...claudeChecks];
+  const found = allChecks.find(check => check !== null && check !== false);
+  
+  if (found) {
+    console.log("[PromptProfile™] nodeInAssistantMessage: Found assistant message", {
+      element: element.tagName,
+      className: element.className,
+      closestMatch: found.tagName,
+      closestClassName: found.className,
+      closestDataRole: found.getAttribute("data-role")
+    });
+    return true;
+  }
+  
+  return false;
 }
 
 function selectionTargetsAssistant(selection) {
-  if (!selection) return false;
-  if (nodeInAssistantMessage(selection.anchorNode) || nodeInAssistantMessage(selection.focusNode)) {
-    return true;
-  }
-  try {
-    const range = selection.rangeCount ? selection.getRangeAt(0) : null;
-    return range ? nodeInAssistantMessage(range.commonAncestorContainer) : false;
-  } catch {
+  if (!selection) {
+    console.log("[PromptProfile™] selectionTargetsAssistant: No selection");
     return false;
   }
+  
+  const anchorInAssistant = nodeInAssistantMessage(selection.anchorNode);
+  const focusInAssistant = nodeInAssistantMessage(selection.focusNode);
+  
+  console.log("[PromptProfile™] selectionTargetsAssistant check:", {
+    anchorInAssistant,
+    focusInAssistant,
+    anchorNode: selection.anchorNode?.nodeName,
+    focusNode: selection.focusNode?.nodeName,
+    isCollapsed: selection.isCollapsed,
+    rangeCount: selection.rangeCount
+  });
+  
+  if (anchorInAssistant || focusInAssistant) {
+    console.log("[PromptProfile™] selectionTargetsAssistant: ✓ Found in anchor/focus nodes");
+    return true;
+  }
+  
+  try {
+    const range = selection.rangeCount ? selection.getRangeAt(0) : null;
+    if (range) {
+      const commonAncestorInAssistant = nodeInAssistantMessage(range.commonAncestorContainer);
+      console.log("[PromptProfile™] selectionTargetsAssistant commonAncestor check:", {
+        commonAncestorInAssistant,
+        commonAncestorNode: range.commonAncestorContainer?.nodeName
+      });
+      return commonAncestorInAssistant;
+    }
+  } catch (error) {
+    console.warn("[PromptProfile™] selectionTargetsAssistant error:", error);
+  }
+  
+  return false;
 }
 
 function ensureHighlightObserver() {
@@ -248,31 +353,69 @@ function hideSelectionToolbar() {
 // Generic getSelectionRect removed - use AdapterBase.getSelectionRect()
 
 function requestSelectionToolbarUpdate() {
-  if (selectionUpdateRaf !== null) {
-    return;
-  }
-  selectionUpdateRaf = window.requestAnimationFrame(() => {
-    selectionUpdateRaf = null;
-    updateSelectionToolbar();
-  });
+  // Use AdapterBase's method (it will handle initialization check internally)
+  AdapterBase.requestSelectionToolbarUpdate();
 }
 
 function updateSelectionToolbar() {
   const selection = window.getSelection();
   const text = selection?.toString().trim();
   
+  const inComposer = selection ? selectionWithinComposer(selection) : false;
+  const targetsAssistant = selection ? selectionTargetsAssistant(selection) : false;
+  
   console.log("[PromptProfile™] updateSelectionToolbar called", {
     hasSelection: !!selection,
     isCollapsed: selection?.isCollapsed,
     textLength: text?.length,
     textPreview: text?.substring(0, 30),
-    inComposer: selection ? selectionWithinComposer(selection) : false,
-    targetsAssistant: selection ? selectionTargetsAssistant(selection) : false
+    inComposer,
+    targetsAssistant
   });
+  
+  // Debug: Log DOM structure when selection exists
+  if (selection && !selection.isCollapsed && text) {
+    try {
+      const range = selection.getRangeAt(0);
+      const anchorElement = AdapterBase.getElementFromNode(selection.anchorNode);
+      const focusElement = AdapterBase.getElementFromNode(selection.focusNode);
+      const commonAncestor = AdapterBase.getElementFromNode(range.commonAncestorContainer);
+      
+      console.log("[PromptProfile™] Selection DOM structure:", {
+        anchorElement: anchorElement ? {
+          tagName: anchorElement.tagName,
+          className: anchorElement.className,
+          id: anchorElement.id,
+          dataRole: anchorElement.getAttribute("data-role"),
+          closestArticle: anchorElement.closest("article")?.className,
+          closestDiv: anchorElement.closest("div")?.className?.substring(0, 50)
+        } : null,
+        focusElement: focusElement ? {
+          tagName: focusElement.tagName,
+          className: focusElement.className,
+          dataRole: focusElement.getAttribute("data-role")
+        } : null,
+        commonAncestor: commonAncestor ? {
+          tagName: commonAncestor.tagName,
+          className: commonAncestor.className,
+          dataRole: commonAncestor.getAttribute("data-role"),
+          id: commonAncestor.id
+        } : null
+      });
+    } catch (error) {
+      console.warn("[PromptProfile™] Error inspecting selection DOM:", error);
+    }
+  }
   
   if (!selection || selection.isCollapsed || !text || selectionWithinComposer(selection) || 
       !selectionTargetsAssistant(selection)) {
-    console.log("[PromptProfile™] Hiding toolbar - conditions not met");
+    console.log("[PromptProfile™] Hiding toolbar - conditions not met", {
+      noSelection: !selection,
+      isCollapsed: selection?.isCollapsed,
+      noText: !text,
+      inComposer,
+      notTargetsAssistant: !targetsAssistant
+    });
     hideSelectionToolbar();
     return;
   }
@@ -809,6 +952,25 @@ function init() {
   // Initialize sticky button (no injection logic needed)
   AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
   
+  // Initialize selection toolbar with Claude-specific logic
+  AdapterBase.initSelectionToolbar({
+    buttonText: "Elaborate",
+    toolbarId: SELECTION_TOOLBAR_ID,
+    visibleClass: SELECTION_TOOLBAR_VISIBLE_CLASS,
+    shouldShowToolbar: (selection) => {
+      if (!selection || selection.isCollapsed) return false;
+      const text = selection.toString().trim();
+      if (!text) return false;
+      // Don't show if selection is in composer
+      if (selectionWithinComposer(selection)) return false;
+      // Only show if selection targets assistant messages
+      return selectionTargetsAssistant(selection);
+    },
+    onAction: (text) => {
+      submitSelectionToSideChat(text);
+    }
+  });
+  
   const composer = locateComposer();
   requestSelectionToolbarUpdate();
   
@@ -909,12 +1071,26 @@ function bootstrap() {
 // Generic tooltip functions have been moved to AdapterBase
 // Use AdapterBase.attachTooltip(), AdapterBase.showTooltip(), etc.
 
-function setupEnhanceTooltip(input, container) {
+async function setupEnhanceTooltip(input, container) {
   if (!input || enhanceTooltipActiveTextarea === input) return;
   teardownEnhanceTooltip();
   enhanceTooltipActiveTextarea = input;
   enhanceTooltipDismissed = false;
   lastEnhanceTextSnapshot = "";
+  // Load evaluation setting
+  await AdapterBase.loadEvaluationSetting();
+  realTimeEvaluationEnabled = AdapterBase.realTimeEvaluationEnabled;
+  console.log("[PromptProfile™] Evaluation enabled in setupEnhanceTooltip:", realTimeEvaluationEnabled);
+  // Load evaluation module
+  loadEvaluationModule().then(() => {
+    // Check window.PromptEvaluator directly after load
+    if (window.PromptEvaluator && !PromptEvaluator) {
+      PromptEvaluator = window.PromptEvaluator;
+      console.log("[PromptProfile™] PromptEvaluator assigned from window after module load");
+    }
+  }).catch(err => {
+    console.warn("[PromptProfile™] Could not load evaluation module:", err);
+  });
   ensureEnhanceTooltipElement();
   bindInputEvents(input);
 }
@@ -942,6 +1118,36 @@ function ensureEnhanceTooltipElement() {
     enhanceTooltipElement.setAttribute("role", "tooltip");
     enhanceTooltipElement.setAttribute("aria-live", "polite");
     enhanceTooltipElement.setAttribute("aria-atomic", "true");
+    
+    // Evaluation score bar section
+    const evaluationSection = document.createElement("div");
+    evaluationSection.className = "enhance-tooltip__evaluation";
+    
+    // Title for evaluation section
+    const evaluationTitle = document.createElement("div");
+    evaluationTitle.className = "evaluation-score-bar__title";
+    evaluationTitle.textContent = "Your Prompt Score:";
+    evaluationSection.appendChild(evaluationTitle);
+    
+    const scoreBar = document.createElement("div");
+    scoreBar.className = "evaluation-score-bar";
+    const scoreBarFill = document.createElement("div");
+    scoreBarFill.className = "evaluation-score-bar__fill";
+    scoreBarFill.style.width = "0%";
+    const scoreBarLabel = document.createElement("span");
+    scoreBarLabel.className = "evaluation-score-bar__label evaluating";
+    scoreBarLabel.textContent = "Evaluating...";
+    scoreBar.appendChild(scoreBarFill);
+    scoreBar.appendChild(scoreBarLabel);
+    const scoreBarBlurb = document.createElement("div");
+    scoreBarBlurb.className = "evaluation-score-bar__blurb";
+    scoreBarBlurb.textContent = "";
+    evaluationSection.appendChild(scoreBar);
+    evaluationSection.appendChild(scoreBarBlurb);
+    
+    // Buttons row
+    const buttonRow = document.createElement("div");
+    buttonRow.className = "promptprofile-enhance-tooltip__row";
     const dismiss = document.createElement("button");
     dismiss.type = "button";
     dismiss.className = "promptprofile-enhance-tooltip__dismiss";
@@ -959,7 +1165,9 @@ function ensureEnhanceTooltipElement() {
     console.log("[PromptProfile™] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
     action.addEventListener("click", handleRefineButtonClick);
     console.log("[PromptProfile™] Click handler attached, button:", action);
-    enhanceTooltipElement.append(dismiss, action);
+    buttonRow.append(dismiss, action);
+    
+    enhanceTooltipElement.append(evaluationSection, buttonRow);
     console.log("[PromptProfile™] Enhance tooltip element created");
   }
   if (!enhanceTooltipElement.isConnected) {
@@ -998,6 +1206,10 @@ function handleRefineButtonClick(e) {
   if (!promptText) {
     return;
   }
+  
+  // Save current prompt version before refining
+  AdapterBase.savePromptVersion(composerNode, promptText);
+  
   enhanceActionInFlight = true;
   // Don't hide tooltip yet - wait to see if there's a limit error
   console.log("[PromptProfile™] Requesting prompt enhancement...");
@@ -1027,6 +1239,10 @@ function handleRefineButtonClick(e) {
         ? result.optionA.trim() 
         : promptText;
       setComposerText(composerNode, refinedText);
+      
+      // Show undo button after successful refinement
+      AdapterBase.showUndoButton(composerNode);
+      
       enhanceActionInFlight = false;
     })
     .catch((error) => {
@@ -1036,6 +1252,7 @@ function handleRefineButtonClick(e) {
 }
 
 function bindInputEvents(input) {
+  console.log("[PromptProfile™] bindInputEvents called for input:", input);
   input.removeEventListener("input", handleInputChange);
   input.removeEventListener("keyup", handleInputChange);
   input.removeEventListener("focus", handleInputChange);
@@ -1044,6 +1261,7 @@ function bindInputEvents(input) {
   input.addEventListener("keyup", handleInputChange);
   input.addEventListener("focus", handleInputChange);
   input.addEventListener("blur", handleInputBlur);
+  console.log("[PromptProfile™] Input events bound, calling handleInputChange()");
   handleInputChange();
 }
 
@@ -1055,11 +1273,17 @@ function extractInputText() {
 }
 
 function handleInputChange() {
-  if (!enhanceTooltipActiveTextarea) return;
+  console.log("[PromptProfile™] handleInputChange called, enhanceTooltipActiveTextarea:", enhanceTooltipActiveTextarea);
+  if (!enhanceTooltipActiveTextarea) {
+    console.log("[PromptProfile™] No active textarea, returning");
+    return;
+  }
   const rawText = extractInputText();
   const text = rawText.trim();
   const wordCount = text.split(/\s+/).filter(Boolean).length;
+  console.log("[PromptProfile™] Input text length:", text.length, "word count:", wordCount);
   if (wordCount < 3) {
+    console.log("[PromptProfile™] Word count < 3, hiding tooltip");
     hideEnhanceTooltip();
     enhanceTooltipDismissed = false;
     clearTimeout(enhanceTooltipTimer);
@@ -1067,9 +1291,13 @@ function handleInputChange() {
     lastEnhanceTextSnapshot = "";
     return;
   }
-  if (enhanceTooltipDismissed && text === lastEnhanceTextSnapshot) return;
+  if (enhanceTooltipDismissed && text === lastEnhanceTextSnapshot) {
+    console.log("[PromptProfile™] Tooltip dismissed and text unchanged, returning");
+    return;
+  }
   lastEnhanceTextSnapshot = text;
   enhanceTooltipDismissed = false;
+  console.log("[PromptProfile™] Scheduling enhance tooltip");
   scheduleEnhanceTooltip();
   if (enhanceTooltipElement?.classList.contains("is-visible") && !tooltipClickInProgress) {
     positionEnhanceTooltip();
@@ -1153,22 +1381,81 @@ function showUpgradeButtonInTooltip() {
 }
 
 function scheduleEnhanceTooltip() {
+  console.log("[PromptProfile™] scheduleEnhanceTooltip called");
   clearTimeout(enhanceTooltipTimer);
   enhanceTooltipTimer = window.setTimeout(() => {
-    if (!enhanceTooltipActiveTextarea) return;
+    console.log("[PromptProfile™] scheduleEnhanceTooltip timeout fired");
+    if (!enhanceTooltipActiveTextarea) {
+      console.log("[PromptProfile™] No active textarea in timeout, returning");
+      return;
+    }
     const wordCount = extractInputText().trim().split(/\s+/).filter(Boolean).length;
-    if (wordCount >= 3 && !enhanceTooltipDismissed) showEnhanceTooltip();
+    console.log("[PromptProfile™] Timeout check - word count:", wordCount, "dismissed:", enhanceTooltipDismissed);
+    if (wordCount >= 3 && !enhanceTooltipDismissed) {
+      console.log("[PromptProfile™] Conditions met, showing tooltip");
+      showEnhanceTooltip();
+      // Trigger evaluation when tooltip appears
+      // Re-check evaluation setting in case it changed
+      if (AdapterBase.realTimeEvaluationEnabled !== undefined) {
+        realTimeEvaluationEnabled = AdapterBase.realTimeEvaluationEnabled;
+      }
+      console.log("[PromptProfile™] Scheduling evaluation, enabled:", realTimeEvaluationEnabled);
+      if (realTimeEvaluationEnabled) {
+        // Small delay to ensure tooltip is fully rendered
+        setTimeout(() => {
+          updateTooltipEvaluation();
+        }, 50);
+      }
+    } else {
+      console.log("[PromptProfile™] Conditions not met - wordCount:", wordCount, "dismissed:", enhanceTooltipDismissed);
+    }
   }, 1000);
 }
 
 function showEnhanceTooltip() {
+  console.log("[PromptProfile™] showEnhanceTooltip called");
   if (!enhanceTooltipElement) {
+    console.log("[PromptProfile™] Tooltip element not found, creating it");
     ensureEnhanceTooltipElement();
-    if (!enhanceTooltipElement) return;
+    if (!enhanceTooltipElement) {
+      console.error("[PromptProfile™] Cannot show tooltip - element not found");
+      return;
+    }
   }
+  
+  // Ensure button row is always visible
+  const buttonRow = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__row");
+  if (buttonRow) {
+    buttonRow.style.display = "flex";
+  }
+  
+  // Show/hide evaluation section based on setting
+  const evaluationSection = enhanceTooltipElement.querySelector(".enhance-tooltip__evaluation");
+  if (evaluationSection) {
+    if (realTimeEvaluationEnabled) {
+      evaluationSection.classList.add("is-visible");
+      enhanceTooltipElement.classList.remove("no-evaluation"); // Remove class if evaluation is visible
+    } else {
+      evaluationSection.classList.remove("is-visible");
+      enhanceTooltipElement.classList.add("no-evaluation"); // Add class if evaluation is hidden
+    }
+  }
+  
+  console.log("[PromptProfile™] Positioning tooltip");
   positionEnhanceTooltip();
+  console.log("[PromptProfile™] Adding is-visible class to tooltip");
   enhanceTooltipElement.classList.add("is-visible");
   attachTooltipResizeHandler();
+  
+  // Verify tooltip is visible
+  const computedStyle = window.getComputedStyle(enhanceTooltipElement);
+  console.log("[PromptProfile™] Tooltip shown - is-visible class:", enhanceTooltipElement.classList.contains("is-visible"));
+  console.log("[PromptProfile™] Tooltip computed opacity:", computedStyle.opacity);
+  console.log("[PromptProfile™] Tooltip computed display:", computedStyle.display);
+  console.log("[PromptProfile™] Tooltip computed visibility:", computedStyle.visibility);
+  console.log("[PromptProfile™] Tooltip position:", enhanceTooltipElement.style.top, enhanceTooltipElement.style.left);
+  console.log("[PromptProfile™] Tooltip transform:", enhanceTooltipElement.style.transform);
+  console.log("[PromptProfile™] Tooltip shown, button row:", buttonRow, "evaluation section:", evaluationSection);
 }
 
 function hideEnhanceTooltip() {
@@ -1178,11 +1465,77 @@ function hideEnhanceTooltip() {
 }
 
 function positionEnhanceTooltip() {
-  if (!enhanceTooltipElement || !enhanceTooltipActiveTextarea) return;
+  console.log("[PromptProfile™] positionEnhanceTooltip called");
+  if (!enhanceTooltipElement || !enhanceTooltipActiveTextarea) {
+    console.log("[PromptProfile™] Missing tooltip element or active textarea");
+    return;
+  }
+  
   const rect = enhanceTooltipActiveTextarea.getBoundingClientRect();
-  enhanceTooltipElement.style.top = `${rect.top - 8}px`;
-  enhanceTooltipElement.style.left = `${rect.left + rect.width * 0.5}px`;
-  enhanceTooltipElement.style.transform = "translate(-50%, -100%)";
+  console.log("[PromptProfile™] Input rect:", { top: rect.top, left: rect.left, width: rect.width, height: rect.height });
+  const tooltipRect = enhanceTooltipElement.getBoundingClientRect();
+  const viewportHeight = window.innerHeight;
+  const viewportWidth = window.innerWidth;
+  console.log("[PromptProfile™] Viewport:", { width: viewportWidth, height: viewportHeight });
+  
+  // Calculate tooltip dimensions (force reflow if needed)
+  if (!tooltipRect.width || !tooltipRect.height) {
+    enhanceTooltipElement.style.visibility = "hidden";
+    enhanceTooltipElement.style.display = "flex";
+    void enhanceTooltipElement.offsetWidth; // Force reflow
+    const tempRect = enhanceTooltipElement.getBoundingClientRect();
+    enhanceTooltipElement.style.visibility = "";
+    if (tempRect.width && tempRect.height) {
+      // Use measured dimensions
+    }
+  }
+  
+  // Measure tooltip after it's visible
+  const tooltipHeight = enhanceTooltipElement.offsetHeight || 80; // Fallback height
+  const tooltipWidth = enhanceTooltipElement.offsetWidth || 200; // Fallback width
+  console.log("[PromptProfile™] Tooltip dimensions:", { width: tooltipWidth, height: tooltipHeight });
+  
+  // Calculate center position
+  const centerX = rect.left + rect.width * 0.5;
+  
+  // Check if there's enough space above (need space for tooltip + 8px gap)
+  const spaceAbove = rect.top;
+  const spaceBelow = viewportHeight - rect.bottom;
+  const neededSpace = tooltipHeight + 8;
+  console.log("[PromptProfile™] Space analysis:", { spaceAbove, spaceBelow, neededSpace });
+  
+  // Position tooltip above or below based on available space
+  let top, transform;
+  if (spaceAbove >= neededSpace) {
+    // Position above input
+    top = rect.top - 8;
+    transform = "translate(-50%, -100%)";
+    console.log("[PromptProfile™] Positioning above input");
+  } else if (spaceBelow >= neededSpace) {
+    // Position below input
+    top = rect.bottom + 8;
+    transform = "translate(-50%, 0)";
+    console.log("[PromptProfile™] Positioning below input");
+  } else {
+    // Not enough space either way - position where there's more space
+    if (spaceAbove > spaceBelow) {
+      top = Math.max(8, rect.top - 8);
+      transform = "translate(-50%, -100%)";
+      console.log("[PromptProfile™] Positioning above (constrained)");
+    } else {
+      top = Math.min(viewportHeight - tooltipHeight - 8, rect.bottom + 8);
+      transform = "translate(-50%, 0)";
+      console.log("[PromptProfile™] Positioning below (constrained)");
+    }
+  }
+  
+  // Constrain horizontal position to viewport
+  const left = Math.max(tooltipWidth * 0.5 + 8, Math.min(viewportWidth - tooltipWidth * 0.5 - 8, centerX));
+  
+  console.log("[PromptProfile™] Final position:", { top, left, transform });
+  enhanceTooltipElement.style.top = `${top}px`;
+  enhanceTooltipElement.style.left = `${left}px`;
+  enhanceTooltipElement.style.transform = transform;
 }
 
 function attachTooltipResizeHandler() {
@@ -1197,6 +1550,142 @@ function detachTooltipResizeHandler() {
   window.removeEventListener("resize", enhanceTooltipResizeHandler);
   window.removeEventListener("scroll", enhanceTooltipResizeHandler, true);
   enhanceTooltipResizeHandler = null;
+}
+
+/**
+ * Updates the evaluation score bar in the refine tooltip
+ */
+function updateTooltipEvaluation() {
+  if (!enhanceTooltipElement || !enhanceTooltipActiveTextarea) return;
+  if (!realTimeEvaluationEnabled) {
+    console.log("[PromptProfile™] Evaluation disabled, skipping");
+    return;
+  }
+  
+  const promptText = extractInputText().trim();
+  if (promptText.length < 3) return;
+  
+  // Get score bar elements
+  const scoreBarFill = enhanceTooltipElement.querySelector(".evaluation-score-bar__fill");
+  const scoreBarLabel = enhanceTooltipElement.querySelector(".evaluation-score-bar__label");
+  const scoreBarBlurb = enhanceTooltipElement.querySelector(".evaluation-score-bar__blurb");
+  
+  if (!scoreBarFill || !scoreBarLabel) {
+    console.warn("[PromptProfile™] Score bar elements not found");
+    return;
+  }
+  
+  // Show "Evaluating..." state
+  scoreBarLabel.textContent = "Evaluating...";
+  scoreBarLabel.classList.add("evaluating");
+  scoreBarFill.style.width = "0%";
+  if (scoreBarBlurb) {
+    scoreBarBlurb.textContent = "";
+  }
+  
+  // Always check window.PromptEvaluator directly - it's the source of truth
+  console.log("[PromptProfile™] Checking for PromptEvaluator...");
+  console.log("[PromptProfile™] window.PromptEvaluator:", window.PromptEvaluator);
+  console.log("[PromptProfile™] typeof window.PromptEvaluator:", typeof window.PromptEvaluator);
+  if (window.PromptEvaluator) {
+    console.log("[PromptProfile™] window.PromptEvaluator.evaluatePrompt:", typeof window.PromptEvaluator.evaluatePrompt);
+  }
+  
+  // Check window first (most reliable source)
+  if (typeof window !== 'undefined' && window.PromptEvaluator && 
+      typeof window.PromptEvaluator.evaluatePrompt === 'function') {
+    PromptEvaluator = window.PromptEvaluator;
+    console.log("[PromptProfile™] ✓ Found PromptEvaluator on window, using it");
+    performTooltipEvaluation(promptText, scoreBarFill, scoreBarLabel, scoreBarBlurb, window.PromptEvaluator);
+    return;
+  } 
+  // Fallback to local variable
+  else if (PromptEvaluator && typeof PromptEvaluator.evaluatePrompt === 'function') {
+    console.log("[PromptProfile™] Using local PromptEvaluator");
+    performTooltipEvaluation(promptText, scoreBarFill, scoreBarLabel, scoreBarBlurb, PromptEvaluator);
+    return;
+  }
+  
+  // If not available, wait a bit and check again (script might still be loading)
+  console.log("[PromptProfile™] PromptEvaluator not immediately available, waiting...");
+  let checkCount = 0;
+  const checkInterval = setInterval(() => {
+    checkCount++;
+    console.log(`[PromptProfile™] Check ${checkCount}: window.PromptEvaluator =`, window.PromptEvaluator);
+    if (typeof window !== 'undefined' && window.PromptEvaluator && 
+        typeof window.PromptEvaluator.evaluatePrompt === 'function') {
+      clearInterval(checkInterval);
+      PromptEvaluator = window.PromptEvaluator;
+      console.log("[PromptProfile™] ✓ Found PromptEvaluator after waiting");
+      performTooltipEvaluation(promptText, scoreBarFill, scoreBarLabel, scoreBarBlurb, window.PromptEvaluator);
+    } else if (checkCount > 30) { // Wait up to 3 seconds
+      clearInterval(checkInterval);
+      console.warn("[PromptProfile™] ✗ PromptEvaluator not found after waiting 3 seconds");
+      console.warn("[PromptProfile™] Final check - window.PromptEvaluator:", window.PromptEvaluator);
+      scoreBarLabel.textContent = "Evaluation unavailable";
+      scoreBarLabel.classList.remove("evaluating");
+      if (scoreBarBlurb) {
+        scoreBarBlurb.textContent = "";
+      }
+    }
+  }, 100);
+}
+
+/**
+ * Performs evaluation and updates score bar
+ */
+function performTooltipEvaluation(promptText, scoreBarFill, scoreBarLabel, scoreBarBlurb, evaluator = null) {
+  const eval = evaluator || PromptEvaluator || window.PromptEvaluator;
+  
+  if (!eval || typeof eval.evaluatePrompt !== 'function') {
+    console.error("[PromptProfile™] No valid evaluator provided");
+    scoreBarLabel.textContent = "Evaluation unavailable";
+    scoreBarLabel.classList.remove("evaluating");
+    if (scoreBarBlurb) {
+      scoreBarBlurb.textContent = "";
+    }
+    return;
+  }
+  
+  try {
+    const result = eval.evaluatePrompt(promptText);
+    console.log("[PromptProfile™] Evaluation result:", result);
+    
+    // Update score bar
+    const score = result.score;
+    const scoreClass = (eval.getScoreColorClass && typeof eval.getScoreColorClass === 'function')
+      ? eval.getScoreColorClass(score) 
+      : (score >= 80 ? 'score-excellent' : score >= 60 ? 'score-good' : score >= 40 ? 'score-fair' : 'score-poor');
+    const scoreLabel = (eval.getScoreLabel && typeof eval.getScoreLabel === 'function')
+      ? eval.getScoreLabel(score)
+      : (score >= 80 ? 'Excellent' : score >= 60 ? 'Good' : score >= 40 ? 'Fair' : 'Needs Improvement');
+    
+    // Update fill bar
+    scoreBarFill.style.width = `${score}%`;
+    scoreBarFill.className = `evaluation-score-bar__fill ${scoreClass}`;
+    
+    // Update label
+    scoreBarLabel.textContent = `${score} - ${scoreLabel}`;
+    scoreBarLabel.classList.remove("evaluating");
+    
+    // Update blurb
+    const blurb = (eval.getScoreBlurb && typeof eval.getScoreBlurb === 'function')
+      ? eval.getScoreBlurb(score)
+      : (score >= 80 ? 'Absolutely acceptable!' : score >= 50 ? 'It might work...' : 'Not well engineered.');
+    if (scoreBarBlurb) {
+      scoreBarBlurb.textContent = blurb;
+    }
+    
+    console.log("[PromptProfile™] Score bar updated:", score, scoreLabel, blurb);
+    
+  } catch (error) {
+    console.error("[PromptProfile™] Evaluation error:", error);
+    scoreBarLabel.textContent = "Evaluation error";
+    scoreBarLabel.classList.remove("evaluating");
+    if (scoreBarBlurb) {
+      scoreBarBlurb.textContent = "";
+    }
+  }
 }
 
 // Backup message listener registration (IIFE to ensure it runs immediately)

@@ -1099,6 +1099,18 @@ class AdapterBase {
   
   static _stickyButtonElement = null;
   static _stickyButtonInitialized = false;
+  static _isDragging = false;
+  static _dragStartX = 0;
+  static _dragStartY = 0;
+  static _dragOffsetX = 0;
+  static _dragOffsetY = 0;
+  static _dragStartTime = 0;
+  static _dragStartPos = { x: 0, y: 0 };
+  
+  // Version control system
+  static _promptVersionHistory = new Map();
+  static _undoButtonElement = null;
+  static _currentInputElement = null;
   
   /**
    * Creates and initializes the sticky button
@@ -1136,11 +1148,8 @@ class AdapterBase {
     this.attachTooltip(button, "Open PromptProfile™ to enhance your prompts for the best response.", this.BUTTON_ID);
     
     // Add event listeners
-    button.addEventListener("click", () => {
-      this.togglePanel().catch((e) => {
-        console.error("Prompanion: failed to open sidebar from sticky button", e);
-      });
-    });
+    // Note: Click handler is added after making draggable to allow drag detection
+    // The click handler will be added in _makeStickyButtonDraggable
     
     button.addEventListener("mouseenter", () => this.showTooltip(button, this.BUTTON_ID));
     button.addEventListener("focus", () => this.showTooltip(button, this.BUTTON_ID));
@@ -1151,23 +1160,31 @@ class AdapterBase {
     this._applyStickyButtonStyles(button, position, offsetX, offsetY);
     
     // Append to body
+    const appendButton = () => {
+      document.body.appendChild(button);
+      this._stickyButtonElement = button;
+      this._stickyButtonInitialized = true;
+      
+      // Load saved position if available (after button is in DOM)
+      this._loadStickyButtonPosition(button, position, offsetX, offsetY).then(() => {
+        // Make button draggable after position is set
+        this._makeStickyButtonDraggable(button);
+      });
+      
+      console.log("[AdapterBase] ✓ Sticky button initialized and added to page");
+    };
+    
     if (!document.body) {
       // Wait for body to be available
       const observer = new MutationObserver((mutations, obs) => {
         if (document.body) {
-          document.body.appendChild(button);
+          appendButton();
           obs.disconnect();
-          this._stickyButtonElement = button;
-          this._stickyButtonInitialized = true;
-          console.log("[AdapterBase] ✓ Sticky button initialized and added to page");
         }
       });
       observer.observe(document.documentElement, { childList: true, subtree: true });
     } else {
-      document.body.appendChild(button);
-      this._stickyButtonElement = button;
-      this._stickyButtonInitialized = true;
-      console.log("[AdapterBase] ✓ Sticky button initialized and added to page");
+      appendButton();
     }
     
     return button;
@@ -1271,8 +1288,546 @@ class AdapterBase {
     if (this._stickyButtonElement && this._stickyButtonElement.parentElement) {
       this._stickyButtonElement.remove();
     }
+    if (this._undoButtonElement && this._undoButtonElement.parentElement) {
+      this._undoButtonElement.remove();
+    }
+    
+    // Clean up window resize handler
+    if (this._windowResizeHandler) {
+      window.removeEventListener("resize", this._windowResizeHandler);
+      this._windowResizeHandler = null;
+    }
+    
+    // Clean up drag handlers
+    if (this._onDragBound) {
+      document.removeEventListener("mousemove", this._onDragBound);
+      this._onDragBound = null;
+    }
+    if (this._onDragEndBound) {
+      document.removeEventListener("mouseup", this._onDragEndBound);
+      this._onDragEndBound = null;
+    }
+    
     this._stickyButtonElement = null;
+    this._undoButtonElement = null;
     this._stickyButtonInitialized = false;
+    this._isDragging = false;
+    this._currentInputElement = null;
+  }
+  
+  // ============================================================================
+  // Draggable Sticky Button Functionality
+  // ============================================================================
+  
+  /**
+   * Makes the sticky button draggable
+   * @private
+   */
+  static _makeStickyButtonDraggable(button) {
+    if (!button) return;
+    
+    // Add cursor style for dragging
+    button.style.cursor = "grab";
+    
+    button.addEventListener("mousedown", (e) => {
+      // Don't start drag on right click or if clicking on a child element that should be clickable
+      if (e.button !== 0) return;
+      
+      // Record start time and position to detect if it's a click vs drag
+      this._dragStartTime = Date.now();
+      this._dragStartPos = { x: e.clientX, y: e.clientY };
+      
+      // Prevent default to avoid text selection
+      e.preventDefault();
+      e.stopPropagation();
+      
+      this._onDragStart(e, button);
+    });
+    
+    // Add click handler that only fires if it wasn't a drag
+    button.addEventListener("click", (e) => {
+      // If we're currently dragging, don't handle click
+      if (this._isDragging) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      
+      // Check if mouse moved significantly (it was a drag, not a click)
+      const dragDistance = Math.sqrt(
+        Math.pow(e.clientX - this._dragStartPos.x, 2) + 
+        Math.pow(e.clientY - this._dragStartPos.y, 2)
+      );
+      const dragDuration = Date.now() - this._dragStartTime;
+      
+      // If mouse moved more than 5px or drag took more than 200ms, it was a drag, not a click
+      if (dragDistance > 5 || dragDuration > 200) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      
+      // It was a click, not a drag - open panel
+      this.togglePanel().catch((err) => {
+        console.error("Prompanion: failed to open sidebar from sticky button", err);
+      });
+    }, true);
+  }
+  
+  /**
+   * Handles drag start
+   * @private
+   */
+  static _onDragStart(e, button) {
+    this._isDragging = true;
+    
+    // Get button's current position
+    const rect = button.getBoundingClientRect();
+    const buttonX = rect.left + rect.width / 2;
+    const buttonY = rect.top + rect.height / 2;
+    
+    // Calculate offset from mouse position to button center
+    this._dragOffsetX = e.clientX - buttonX;
+    this._dragOffsetY = e.clientY - buttonY;
+    
+    // Record initial mouse position
+    this._dragStartX = e.clientX;
+    this._dragStartY = e.clientY;
+    
+    // Add dragging class for visual feedback
+    button.classList.add("prompanion-sticky-button--dragging");
+    button.style.cursor = "grabbing";
+    button.style.opacity = "0.8";
+    
+    // Add global mouse move and mouse up listeners
+    document.addEventListener("mousemove", this._onDragBound = this._onDrag.bind(this, button));
+    document.addEventListener("mouseup", this._onDragEndBound = this._onDragEnd.bind(this, button));
+    
+    // Add window resize handler to reposition undo button
+    if (!this._windowResizeHandler) {
+      this._windowResizeHandler = () => {
+        if (this._undoButtonElement && this._undoButtonElement.style.display !== "none") {
+          this._positionUndoButton();
+        }
+      };
+      window.addEventListener("resize", this._windowResizeHandler);
+    }
+  }
+  
+  /**
+   * Handles drag movement
+   * @private
+   */
+  static _onDrag(button, e) {
+    if (!this._isDragging) return;
+    
+    // Calculate new position
+    let newX = e.clientX - this._dragOffsetX;
+    let newY = e.clientY - this._dragOffsetY;
+    
+    // Get button dimensions
+    const buttonRect = button.getBoundingClientRect();
+    const buttonWidth = buttonRect.width;
+    const buttonHeight = buttonRect.height;
+    
+    // Constrain to viewport bounds
+    const minX = 0;
+    const minY = 0;
+    const maxX = window.innerWidth - buttonWidth;
+    const maxY = window.innerHeight - buttonHeight;
+    
+    newX = Math.max(minX, Math.min(maxX, newX));
+    newY = Math.max(minY, Math.min(maxY, newY));
+    
+    // Update button position using left/top instead of right/bottom
+    button.style.left = `${newX}px`;
+    button.style.top = `${newY}px`;
+    button.style.right = "auto";
+    button.style.bottom = "auto";
+    
+    // Reposition undo button if visible
+    if (this._undoButtonElement && this._undoButtonElement.style.display !== "none") {
+      this._positionUndoButton();
+    }
+  }
+  
+  /**
+   * Handles drag end
+   * @private
+   */
+  static _onDragEnd(button, e) {
+    if (!this._isDragging) return;
+    
+    this._isDragging = false;
+    
+    // Remove dragging class
+    button.classList.remove("prompanion-sticky-button--dragging");
+    button.style.cursor = "grab";
+    button.style.opacity = "1";
+    
+    // Remove global listeners
+    if (this._onDragBound) {
+      document.removeEventListener("mousemove", this._onDragBound);
+      this._onDragBound = null;
+    }
+    if (this._onDragEndBound) {
+      document.removeEventListener("mouseup", this._onDragEndBound);
+      this._onDragEndBound = null;
+    }
+    
+    // Get final position
+    const rect = button.getBoundingClientRect();
+    const finalX = window.innerWidth - rect.right;
+    const finalY = window.innerHeight - rect.bottom;
+    
+    // Save position
+    this._saveStickyButtonPosition(finalX, finalY);
+  }
+  
+  /**
+   * Saves sticky button position to Chrome storage
+   * @private
+   */
+  static _saveStickyButtonPosition(x, y) {
+    if (typeof chrome === "undefined" || !chrome.storage) {
+      console.warn("[AdapterBase] Chrome storage not available, cannot save button position");
+      return;
+    }
+    
+    chrome.storage.local.set({
+      "prompanion-sticky-button-position": { x, y }
+    }, () => {
+      if (chrome.runtime.lastError) {
+        console.error("[AdapterBase] Failed to save button position:", chrome.runtime.lastError);
+      } else {
+        console.log("[AdapterBase] Button position saved:", { x, y });
+      }
+    });
+  }
+  
+  /**
+   * Loads sticky button position from Chrome storage
+   * @private
+   */
+  static async _loadStickyButtonPosition(button, defaultPosition, defaultOffsetX, defaultOffsetY) {
+    if (typeof chrome === "undefined" || !chrome.storage) {
+      return;
+    }
+    
+    return new Promise((resolve) => {
+      chrome.storage.local.get("prompanion-sticky-button-position", (result) => {
+        if (chrome.runtime.lastError) {
+          console.error("[AdapterBase] Failed to load button position:", chrome.runtime.lastError);
+          resolve();
+          return;
+        }
+        
+        const savedPosition = result["prompanion-sticky-button-position"];
+        if (savedPosition && typeof savedPosition.x === "number" && typeof savedPosition.y === "number") {
+          // Use saved position
+          button.style.left = "auto";
+          button.style.top = "auto";
+          button.style.right = `${savedPosition.x}px`;
+          button.style.bottom = `${savedPosition.y}px`;
+          console.log("[AdapterBase] Loaded saved button position:", savedPosition);
+        }
+        resolve();
+      });
+    });
+  }
+  
+  // ============================================================================
+  // Version Control System
+  // ============================================================================
+  
+  /**
+   * Saves current prompt as previous version before refinement
+   * @param {HTMLElement} inputElement - The input element containing the prompt
+   * @param {string} promptText - The current prompt text
+   */
+  static savePromptVersion(inputElement, promptText) {
+    if (!inputElement || !promptText || !promptText.trim()) {
+      return;
+    }
+    
+    // Get or create element identifier
+    const elementId = this._getElementId(inputElement);
+    
+    // Get current text from element to ensure accuracy
+    const currentText = this._extractTextFromElement(inputElement);
+    
+    // Only save if text is different from what we already have
+    const existingVersion = this._promptVersionHistory.get(elementId);
+    if (existingVersion && existingVersion.current === currentText) {
+      // Already have this version, don't overwrite
+      return;
+    }
+    
+    // Save version
+    this._promptVersionHistory.set(elementId, {
+      previous: currentText,
+      current: currentText, // Will be updated after refinement
+      timestamp: Date.now(),
+      element: inputElement
+    });
+    
+    console.log("[AdapterBase] Saved prompt version for element:", elementId);
+  }
+  
+  /**
+   * Shows undo button next to sticky button
+   * @param {HTMLElement} inputElement - The input element that was refined
+   */
+  static showUndoButton(inputElement) {
+    if (!inputElement) return;
+    
+    const elementId = this._getElementId(inputElement);
+    const version = this._promptVersionHistory.get(elementId);
+    
+    if (!version || !version.previous) {
+      // No previous version to undo to
+      return;
+    }
+    
+    // Update current version with refined text
+    const currentText = this._extractTextFromElement(inputElement);
+    version.current = currentText;
+    this._currentInputElement = inputElement;
+    
+    // Create undo button if it doesn't exist
+    if (!this._undoButtonElement) {
+      this._createUndoButton();
+    }
+    
+    // Position and show undo button
+    this._positionUndoButton();
+    this._undoButtonElement.style.display = "flex";
+    this._undoButtonElement.classList.add("prompanion-undo-button--visible");
+    
+    // Show toast notification
+    this._showUndoToast();
+    
+    console.log("[AdapterBase] Undo button shown");
+  }
+  
+  /**
+   * Shows a toast notification near the undo button
+   * @private
+   */
+  static _showUndoToast() {
+    // Remove existing toast if any
+    const existingToast = document.getElementById("prompanion-undo-toast");
+    if (existingToast) {
+      existingToast.remove();
+    }
+    
+    if (!this._undoButtonElement) return;
+    
+    const toast = document.createElement("div");
+    toast.id = "prompanion-undo-toast";
+    toast.textContent = "Go back to previous prompt";
+    toast.style.cssText = `
+      position: fixed;
+      background: rgba(12, 18, 32, 0.95);
+      color: #e9edff;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      z-index: 2147482998;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 200ms ease, transform 200ms ease;
+      transform: translateY(-4px);
+      white-space: nowrap;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Position toast above undo button
+    const undoRect = this._undoButtonElement.getBoundingClientRect();
+    toast.style.left = `${undoRect.left + (undoRect.width / 2)}px`;
+    toast.style.top = `${undoRect.top - 40}px`;
+    toast.style.transform = `translateX(-50%) translateY(-4px)`;
+    
+    // Force reflow and show
+    void toast.offsetHeight;
+    requestAnimationFrame(() => {
+      toast.style.opacity = "1";
+      toast.style.transform = `translateX(-50%) translateY(0)`;
+    });
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.transform = `translateX(-50%) translateY(-4px)`;
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.remove();
+        }
+      }, 200);
+    }, 3000);
+  }
+  
+  /**
+   * Hides the undo button
+   */
+  static hideUndoButton() {
+    if (this._undoButtonElement) {
+      this._undoButtonElement.style.display = "none";
+      this._undoButtonElement.classList.remove("prompanion-undo-button--visible");
+      this._currentInputElement = null;
+    }
+  }
+  
+  /**
+   * Handles undo action - restores previous version
+   * @param {HTMLElement} inputElement - The input element to restore
+   */
+  static handleUndo(inputElement) {
+    if (!inputElement) {
+      inputElement = this._currentInputElement;
+    }
+    
+    if (!inputElement) {
+      console.warn("[AdapterBase] No input element provided for undo");
+      return;
+    }
+    
+    const elementId = this._getElementId(inputElement);
+    const version = this._promptVersionHistory.get(elementId);
+    
+    if (!version || !version.previous) {
+      console.warn("[AdapterBase] No previous version to restore");
+      return;
+    }
+    
+    // Restore previous version
+    this.setEditableElementText(inputElement, version.previous);
+    
+    // Clear version history for this element
+    this._promptVersionHistory.delete(elementId);
+    
+    // Hide undo button
+    this.hideUndoButton();
+    
+    console.log("[AdapterBase] Prompt version restored");
+  }
+  
+  /**
+   * Clears version history for an input element (called when user manually edits)
+   * @param {HTMLElement} inputElement - The input element that was edited
+   */
+  static clearVersionHistory(inputElement) {
+    if (!inputElement) return;
+    
+    const elementId = this._getElementId(inputElement);
+    if (this._promptVersionHistory.has(elementId)) {
+      this._promptVersionHistory.delete(elementId);
+      this.hideUndoButton();
+      console.log("[AdapterBase] Version history cleared for element:", elementId);
+    }
+  }
+  
+  /**
+   * Creates the undo button element
+   * @private
+   */
+  static _createUndoButton() {
+    if (this._undoButtonElement) return;
+    
+    const button = document.createElement("button");
+    button.className = "prompanion-undo-button";
+    button.setAttribute("aria-label", "Undo refinement");
+    button.type = "button";
+    
+    // Create icon (undo arrow - big curved arrow that loops but doesn't touch itself)
+    const icon = document.createElement("span");
+    icon.innerHTML = `
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 4L1 8L5 12M1 8H16C17.6569 8 19 9.34315 19 11C19 12.6569 17.6569 14 16 14H11" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+    icon.style.width = "28px";
+    icon.style.height = "28px";
+    icon.style.display = "flex";
+    icon.style.alignItems = "center";
+    icon.style.justifyContent = "center";
+    button.appendChild(icon);
+    
+    // Add click handler
+    button.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.handleUndo();
+    });
+    
+    // Initially hidden
+    button.style.display = "none";
+    
+    // Append to body
+    document.body.appendChild(button);
+    this._undoButtonElement = button;
+    
+    console.log("[AdapterBase] Undo button created");
+  }
+  
+  /**
+   * Positions undo button to the left of sticky button
+   * @private
+   */
+  static _positionUndoButton() {
+    if (!this._undoButtonElement || !this._stickyButtonElement) return;
+    
+    const stickyRect = this._stickyButtonElement.getBoundingClientRect();
+    const undoSize = 40; // Approximate size of undo button
+    
+    // Position to the left of sticky button with some spacing
+    const left = stickyRect.left - undoSize - 8;
+    const top = stickyRect.top + (stickyRect.height - undoSize) / 2;
+    
+    this._undoButtonElement.style.left = `${left}px`;
+    this._undoButtonElement.style.top = `${top}px`;
+  }
+  
+  /**
+   * Gets a unique identifier for an element
+   * @private
+   */
+  static _getElementId(element) {
+    if (!element) return null;
+    
+    // Try to use existing ID
+    if (element.id) {
+      return element.id;
+    }
+    
+    // Generate a stable ID based on element characteristics
+    const tagName = element.tagName;
+    const className = element.className || "";
+    const parentId = element.parentElement?.id || "";
+    
+    return `${tagName}-${className.substring(0, 20)}-${parentId}`;
+  }
+  
+  /**
+   * Extracts text from an input element
+   * @private
+   */
+  static _extractTextFromElement(element) {
+    if (!element) return "";
+    
+    if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) {
+      return element.value || "";
+    }
+    
+    if (element.isContentEditable) {
+      return element.textContent || element.innerText || "";
+    }
+    
+    return "";
   }
   
   /**
@@ -1317,6 +1872,46 @@ class AdapterBase {
       alert("Failed to start checkout: " + (error.message || "Unknown error") + "\n\nPlease try again or contact support.");
       button.disabled = false;
       button.textContent = originalText;
+    }
+  }
+  
+  // ============================================================================
+  // Evaluation Settings Loading
+  // ============================================================================
+  
+  static realTimeEvaluationEnabled = false;
+  
+  /**
+   * Loads evaluation setting from storage and sets up change listener
+   * @returns {Promise<void>}
+   */
+  static async loadEvaluationSetting() {
+    try {
+      if (typeof chrome !== "undefined" && chrome.storage) {
+        const result = await chrome.storage.sync.get("prompanion-sidepanel-state");
+        const state = result["prompanion-sidepanel-state"];
+        if (state && state.settings) {
+          this.realTimeEvaluationEnabled = state.settings.realTimeEvaluation === true;
+          console.log("[AdapterBase] Real-time evaluation enabled:", this.realTimeEvaluationEnabled);
+        } else {
+          console.log("[AdapterBase] No evaluation setting found, defaulting to disabled");
+        }
+      }
+    } catch (error) {
+      console.warn("[AdapterBase] Could not load evaluation setting:", error);
+    }
+
+    // Set up a listener for settings changes
+    if (typeof chrome !== "undefined" && chrome.storage) {
+      chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName === 'sync' && changes['prompanion-sidepanel-state']) {
+          const newState = changes['prompanion-sidepanel-state'].newValue;
+          if (newState && newState.settings) {
+            this.realTimeEvaluationEnabled = newState.settings.realTimeEvaluation === true;
+            console.log("[AdapterBase] Real-time evaluation setting updated:", this.realTimeEvaluationEnabled);
+          }
+        }
+      });
     }
   }
 }

@@ -326,7 +326,7 @@ async function handleClipboardOperation(button, text, successText, originalText)
  * @param {Object} dependencies - Required dependencies (renderLibrary, saveState, LIBRARY_SCHEMA_VERSION)
  * @param {string} promptText - The prompt text to save
  */
-async function handleSaveToLibrary(stateRef, dependencies, promptText) {
+export async function handleSaveToLibrary(stateRef, dependencies, promptText) {
   const { renderLibrary, saveState, LIBRARY_SCHEMA_VERSION } = dependencies;
   
   if (!promptText || !promptText.trim()) {

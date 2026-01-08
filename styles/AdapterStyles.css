@@ -26,6 +26,62 @@
   outline-offset: 2px;
 }
 
+/* Draggable Sticky Button Styles */
+.prompanion-chatgpt-trigger.prompanion-sticky-button--dragging {
+  opacity: 0.8 !important;
+  cursor: grabbing !important;
+  transform: scale(1.05);
+  box-shadow: 0 12px 24px rgba(31, 42, 68, 0.4) !important;
+  z-index: 2147483001 !important;
+}
+
+/* Undo Button Styles */
+.prompanion-undo-button {
+  position: fixed;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2147482999;
+  transition: transform 120ms ease, box-shadow 120ms ease, opacity 200ms ease;
+  opacity: 0;
+  pointer-events: none;
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.prompanion-undo-button:hover {
+  transform: translateY(-1px) scale(1.1);
+  box-shadow: 0 8px 20px rgba(249, 115, 22, 0.4);
+}
+
+.prompanion-undo-button:active {
+  transform: translateY(0) scale(1.05);
+}
+
+.prompanion-undo-button--visible {
+  opacity: 1;
+  pointer-events: auto;
+  animation: fadeInSlide 200ms ease-out;
+}
+
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateX(10px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
 .prompanion-chatgpt-trigger__icon {
   width: 34px;
   height: 34px;
@@ -43,9 +99,9 @@
 .prompanion-enhance-tooltip {
   position: fixed;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-radius: 12px;
   background: rgba(12, 18, 32, 0.9);
   color: #e9edff;
@@ -55,6 +111,30 @@
   pointer-events: none;
   transition: opacity 140ms ease, transform 140ms ease;
   z-index: 2147483000;
+  width: auto;
+  min-width: auto;
+}
+
+.promptprofile-enhance-tooltip__row,
+.prompanion-enhance-tooltip__row {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  width: fit-content;
+}
+
+/* When evaluation is hidden, tooltip should shrink to fit buttons */
+.promptprofile-enhance-tooltip:not(:has(.enhance-tooltip__evaluation.is-visible)) .promptprofile-enhance-tooltip__row,
+.prompanion-enhance-tooltip:not(:has(.enhance-tooltip__evaluation.is-visible)) .prompanion-enhance-tooltip__row {
+  width: fit-content;
+}
+
+/* Alternative approach for browsers that don't support :has() */
+.promptprofile-enhance-tooltip:not(.has-evaluation),
+.prompanion-enhance-tooltip:not(.has-evaluation) {
+  width: fit-content;
+  min-width: auto;
 }
 
 .promptprofile-enhance-tooltip.is-visible,
@@ -126,6 +206,92 @@
   pointer-events: auto !important;
 }
 
+/* Evaluation Score Bar Styles */
+.enhance-tooltip__evaluation {
+  display: none;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.enhance-tooltip__evaluation.is-visible {
+  display: block;
+}
+
+.evaluation-score-bar__title {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(233, 237, 255, 0.8);
+  margin-bottom: 6px;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.evaluation-score-bar {
+  position: relative;
+  width: 100%;
+  height: 24px;
+  background: rgba(233, 237, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+}
+
+.evaluation-score-bar__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0%;
+  border-radius: 12px;
+  transition: width 300ms ease-out, background-color 300ms ease-out;
+  z-index: 1;
+}
+
+.evaluation-score-bar__fill.score-excellent {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.evaluation-score-bar__fill.score-good {
+  background: linear-gradient(90deg, #3a7bff, #2957c7);
+}
+
+.evaluation-score-bar__fill.score-fair {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.evaluation-score-bar__fill.score-poor {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.evaluation-score-bar__label {
+  position: relative;
+  z-index: 2;
+  font-size: 11px;
+  font-weight: 600;
+  color: #e9edff;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: opacity 200ms ease;
+}
+
+.evaluation-score-bar__label.evaluating {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.evaluation-score-bar__blurb {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(233, 237, 255, 0.75);
+  text-align: center;
+  margin-top: 4px;
+  line-height: 1.2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
 /* Selection Toolbar Styles */
 #prompanion-selection-toolbar {
   position: fixed;
@@ -185,6 +351,145 @@
 
 #prompanion-selection-toolbar .prompanion-selection-toolbar__button:hover {
   background: #2957c7;
+}
+
+/* Evaluation Tooltip Styles */
+.prompanion-evaluation-tooltip {
+  position: fixed;
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(12, 18, 32, 0.95);
+  color: #e9edff;
+  box-shadow: 0 18px 40px rgba(8, 12, 28, 0.45);
+  max-width: 400px;
+  z-index: 2147482997;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 200ms ease, transform 200ms ease;
+  pointer-events: none;
+}
+
+.prompanion-evaluation-tooltip.is-visible {
+  display: flex;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.evaluation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.evaluation-score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.evaluation-score__number {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.evaluation-score__label {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.evaluation-score.score-excellent {
+  color: #10b981;
+}
+
+.evaluation-score.score-good {
+  color: #3a7bff;
+}
+
+.evaluation-score.score-fair {
+  color: #f59e0b;
+}
+
+.evaluation-score.score-poor {
+  color: #ef4444;
+}
+
+.evaluation-dismiss {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: transparent;
+  border: none;
+  color: rgba(233, 237, 255, 0.6);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+}
+
+.evaluation-dismiss:hover {
+  background: rgba(233, 237, 255, 0.14);
+  color: #ffffff;
+}
+
+.evaluation-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.evaluation-section__title {
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
+
+.evaluation-strengths .evaluation-section__title {
+  color: #10b981;
+}
+
+.evaluation-issues .evaluation-section__title {
+  color: #f59e0b;
+}
+
+.evaluation-suggestions .evaluation-section__title {
+  color: #3a7bff;
+}
+
+.evaluation-list {
+  margin: 0;
+  padding-left: 20px;
+  list-style: none;
+}
+
+.evaluation-list li {
+  margin-bottom: 4px;
+  opacity: 0.9;
+}
+
+.evaluation-list li:last-child {
+  margin-bottom: 0;
+}
+
+.evaluation-list li::before {
+  content: "•";
+  color: rgba(233, 237, 255, 0.5);
+  font-weight: bold;
+  display: inline-block;
+  width: 12px;
+  margin-left: -20px;
 }
 
 

@@ -15,8 +15,10 @@ import {
   initTabs,
   registerEnhanceButton,
   handleStateRestore,
-  handleStatePush
+  handleStatePush,
+  handleSaveToLibrary
 } from "../Source/promptEnhancer.js";
+import { initPromptCreator } from "../Source/promptCreator.js";
 
 // Make renderPrompts available globally for storage listener
 window.renderPrompts = renderPrompts;
@@ -90,6 +92,7 @@ import {
  */
 const defaultState = {
   plan: "Freemium",
+  subscriptionStatus: "freemium", // Always default to freemium
   enhancementsUsed: 0, // Will be updated from server
   enhancementsLimit: 10, // Will be updated from server
   activePlatform: "ChatGPT",
@@ -99,7 +102,8 @@ const defaultState = {
   settings: {
     complexity: 2,
     model: "chatgpt",
-    output: "text"
+    output: "text",
+    realTimeEvaluation: true
   },
   conversations: [],
   activeConversationId: null,
@@ -416,7 +420,10 @@ async function loadState() {
       model: "chatgpt" // Always ChatGPT, ignore stored model
     },
     conversations: validConversations,
-    activeConversationId: null // Will be set to new conversation in init()
+    activeConversationId: null, // Will be set to new conversation in init()
+    // Reset subscriptionStatus to default - it will be updated from API
+    // Don't trust stored subscriptionStatus as it might be stale
+    subscriptionStatus: defaultState.subscriptionStatus
   };
   
   // Always set activePlatform to ChatGPT - model selection removed
@@ -535,7 +542,11 @@ async function fetchUserUsage(retryCount = 0) {
         return fetchUserUsage(retryCount + 1);
       } else {
         console.warn("[PromptProfile™ Sidepanel] Extension context invalidated after max retries, returning defaults");
-        return { enhancementsUsed: 0, enhancementsLimit: 10 }; // Return defaults
+        return { 
+          enhancementsUsed: 0, 
+          enhancementsLimit: 10,
+          subscriptionStatus: "freemium"
+        }; // Return defaults
       }
     }
 
@@ -559,8 +570,12 @@ async function fetchUserUsage(retryCount = 0) {
     });
 
     if (!result.authToken) {
-      // Not logged in - return default values
-      return { enhancementsUsed: 0, enhancementsLimit: 10 };
+      // Not logged in - return default values with explicit freemium status
+      return { 
+        enhancementsUsed: 0, 
+        enhancementsLimit: 10,
+        subscriptionStatus: "freemium"
+      };
     }
 
     // Fetch usage from API
@@ -582,24 +597,33 @@ async function fetchUserUsage(retryCount = 0) {
 
       if (!response.ok) {
         if (response.status === 401) {
-          // Token invalid, return defaults
-          return { enhancementsUsed: 0, enhancementsLimit: 10 };
+          // Token invalid, return defaults with explicit freemium status
+          return { 
+            enhancementsUsed: 0, 
+            enhancementsLimit: 10,
+            subscriptionStatus: "freemium"
+          };
         }
         console.warn("[PromptProfile™ Sidepanel] Failed to fetch usage:", response.status, response.statusText);
         return null;
       }
 
       const data = await response.json();
+      // Normalize subscription status - only "premium" is premium, everything else is freemium
+      const rawSubscriptionStatus = data.subscriptionStatus;
+      const subscriptionStatus = (rawSubscriptionStatus === "premium") ? "premium" : "freemium";
+      
       console.log("[PromptProfile™ Sidepanel] Fetched usage data from API:", {
         enhancementsUsed: data.enhancementsUsed,
         enhancementsLimit: data.enhancementsLimit,
-        subscriptionStatus: data.subscriptionStatus,
+        rawSubscriptionStatus: rawSubscriptionStatus,
+        normalizedSubscriptionStatus: subscriptionStatus,
         fullResponse: data
       });
       return {
         enhancementsUsed: data.enhancementsUsed ?? 0,
         enhancementsLimit: data.enhancementsLimit ?? 10,
-        subscriptionStatus: data.subscriptionStatus ?? "freemium"
+        subscriptionStatus: subscriptionStatus
       };
     } catch (fetchError) {
       clearTimeout(timeoutId);
@@ -637,13 +661,9 @@ async function updateEnhancementsDisplay() {
       if (currentState) {
         currentState.enhancementsUsed = usage.enhancementsUsed;
         currentState.enhancementsLimit = usage.enhancementsLimit;
-        currentState.subscriptionStatus = usage.subscriptionStatus;
-        // Update plan based on subscription status
-        if (usage.subscriptionStatus === "premium") {
-          currentState.plan = "Pro";
-        } else {
-          currentState.plan = "Freemium";
-        }
+        // subscriptionStatus is the source of truth - ensure it's always set
+        currentState.subscriptionStatus = usage.subscriptionStatus || "freemium";
+        // Don't set plan here - let renderStatus determine it from subscriptionStatus
       }
       // Update UI
       const countEl = document.getElementById("enhancements-count");
@@ -657,8 +677,13 @@ async function updateEnhancementsDisplay() {
       }
       
       // Re-render status to ensure premium UI is shown/hidden correctly
-      if (currentState) {
-        renderStatus(currentState);
+      // Only re-render if we have valid subscription status data
+      if (currentState && usage.subscriptionStatus !== undefined) {
+        // Use a debounce to prevent rapid re-renders
+        clearTimeout(window._renderStatusTimeout);
+        window._renderStatusTimeout = setTimeout(() => {
+          renderStatus(currentState);
+        }, 100);
       }
     }
   } finally {
@@ -673,22 +698,53 @@ async function updateEnhancementsDisplay() {
 function renderStatus(status) {
   // Handle both direct status object and full state object
   // Always check currentState as fallback for subscription status
-  const subscriptionStatus = status.subscriptionStatus ?? status?.subscriptionStatus ?? currentState?.subscriptionStatus;
-  // Determine plan from subscription status if available, otherwise use plan field
-  let plan = status.plan || status?.plan || currentState?.plan || "Freemium";
-  if (subscriptionStatus === "premium") {
-    plan = "Pro";
-  } else if (!status.plan && !status?.plan && !currentState?.plan) {
-    plan = "Freemium";
+  // Get subscription status from the most reliable source
+  let subscriptionStatus = status?.subscriptionStatus ?? currentState?.subscriptionStatus ?? "freemium";
+  
+  // Normalize subscription status - only "premium" is premium, everything else is freemium
+  // This prevents issues with undefined, null, or other values
+  if (subscriptionStatus !== "premium") {
+    subscriptionStatus = "freemium";
   }
   
-  const enhancementsUsed = status.enhancementsUsed ?? status?.enhancementsUsed ?? currentState?.enhancementsUsed ?? 0;
-  const enhancementsLimit = status.enhancementsLimit ?? status?.enhancementsLimit ?? currentState?.enhancementsLimit ?? 10;
+  console.log("[PromptProfile™ Sidepanel] renderStatus called with:", {
+    statusSubscriptionStatus: status?.subscriptionStatus,
+    currentStateSubscriptionStatus: currentState?.subscriptionStatus,
+    normalizedSubscriptionStatus: subscriptionStatus
+  });
+  
+  // Determine plan from subscription status - subscription status is the source of truth
+  // Only use "premium" status to show "Pro", everything else is "Freemium"
+  let plan = "Freemium";
+  if (subscriptionStatus === "premium") {
+    plan = "Pro";
+  }
+  
+  const enhancementsUsed = status?.enhancementsUsed ?? currentState?.enhancementsUsed ?? 0;
+  const enhancementsLimit = status?.enhancementsLimit ?? currentState?.enhancementsLimit ?? 10;
   const isPremium = subscriptionStatus === "premium";
+  
+  console.log("[PromptProfile™ Sidepanel] Rendering status:", {
+    plan,
+    isPremium,
+    subscriptionStatus,
+    enhancementsUsed,
+    enhancementsLimit
+  });
   
   document.getElementById("user-plan").textContent = plan;
   document.getElementById("enhancements-count").textContent = enhancementsUsed;
   document.getElementById("enhancements-limit").textContent = enhancementsLimit;
+  
+  // Show/hide "Unlimited free uses!" badge for Prompt Creator (only for non-pro users)
+  const promptCreatorBadge = document.getElementById("prompt-creator-free-badge");
+  if (promptCreatorBadge) {
+    if (isPremium) {
+      promptCreatorBadge.style.display = "none";
+    } else {
+      promptCreatorBadge.style.display = "inline-block";
+    }
+  }
   
   // Show/hide upgrade button based on plan and login status with graceful fade-in
   const upgradeBtn = document.getElementById("status-upgrade-btn");
@@ -824,6 +880,174 @@ function renderStatus(status) {
 window.renderStatus = renderStatus;
 
 /**
+ * Polling interval for checking login status (in milliseconds)
+ */
+let loginCheckInterval = null;
+let loginPollingStorageListener = null;
+
+/**
+ * Checks if user is logged in and shows login dialog if not
+ * Also sets up polling if dialog is closed without logging in
+ */
+async function checkAndShowLoginDialog() {
+  try {
+    // Check if user is logged in
+    const authResult = await new Promise((resolve) => {
+      chrome.storage.local.get(["authToken"], (items) => {
+        resolve(items || { authToken: null });
+      });
+    });
+    
+    if (!authResult.authToken) {
+      // User is not logged in - show login dialog
+      const accountDialog = document.getElementById("account-dialog");
+      if (accountDialog) {
+        console.log("[PromptProfile™ Sidepanel] User not logged in, opening login dialog");
+        
+        // Ensure login view is shown
+        const loginView = document.getElementById("account-form");
+        const loggedInView = document.getElementById("account-logged-in-view");
+        if (loginView) {
+          loginView.hidden = false;
+          loginView.style.display = "block";
+        }
+        if (loggedInView) {
+          loggedInView.hidden = true;
+          loggedInView.style.display = "none";
+        }
+        
+        accountDialog.showModal();
+        
+        // Set up polling when dialog is closed
+        setupLoginPolling(accountDialog);
+      } else {
+        console.warn("[PromptProfile™ Sidepanel] Account dialog not found, cannot auto-open login");
+        // Still set up polling in case dialog appears later
+        setTimeout(() => {
+          const accountDialog = document.getElementById("account-dialog");
+          if (accountDialog) {
+            setupLoginPolling(accountDialog);
+          }
+        }, 1000);
+      }
+    } else {
+      // User is logged in - stop any existing polling
+      stopLoginPolling();
+    }
+  } catch (error) {
+    console.error("[PromptProfile™ Sidepanel] Error checking login status:", error);
+  }
+}
+
+/**
+ * Sets up polling to check login status every 10 seconds
+ * Shows login dialog again if user is still not logged in
+ */
+function setupLoginPolling(accountDialog) {
+  // Clear any existing interval
+  stopLoginPolling();
+  
+  // Set up close event listener to start polling
+  const handleDialogClose = async () => {
+    console.log("[PromptProfile™ Sidepanel] Login dialog closed, checking login status");
+    
+    // Small delay to allow any login operations to complete
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Check immediately if they logged in while dialog was open
+    const authResult = await new Promise((resolve) => {
+      chrome.storage.local.get(["authToken"], (items) => {
+        resolve(items || { authToken: null });
+      });
+    });
+    
+    if (authResult.authToken) {
+      // User logged in - stop polling
+      console.log("[PromptProfile™ Sidepanel] User logged in, stopping polling");
+      stopLoginPolling();
+      return;
+    }
+    
+    // User is still not logged in - start polling
+    console.log("[PromptProfile™ Sidepanel] User still not logged in, starting polling (will check every 10 seconds)");
+    
+    // Start polling every 10 seconds
+    loginCheckInterval = setInterval(async () => {
+      try {
+        const authResult = await new Promise((resolve) => {
+          chrome.storage.local.get(["authToken"], (items) => {
+            resolve(items || { authToken: null });
+          });
+        });
+        
+        if (!authResult.authToken) {
+          // Still not logged in - show dialog again
+          console.log("[PromptProfile™ Sidepanel] User still not logged in, showing login dialog again");
+          
+          // Ensure login view is shown
+          const loginView = document.getElementById("account-form");
+          const loggedInView = document.getElementById("account-logged-in-view");
+          if (loginView) {
+            loginView.hidden = false;
+            loginView.style.display = "block";
+          }
+          if (loggedInView) {
+            loggedInView.hidden = true;
+            loggedInView.style.display = "none";
+          }
+          
+          accountDialog.showModal();
+        } else {
+          // User logged in - stop polling
+          console.log("[PromptProfile™ Sidepanel] User logged in, stopping polling");
+          stopLoginPolling();
+        }
+      } catch (error) {
+        console.error("[PromptProfile™ Sidepanel] Error during login polling:", error);
+      }
+    }, 10000); // Check every 10 seconds
+  };
+  
+  // Add event listener for dialog close (use once: false so it can fire multiple times)
+  // But only add it once - check if it's already been added
+  if (!accountDialog.hasAttribute('data-login-polling-setup')) {
+    accountDialog.addEventListener("close", handleDialogClose);
+    accountDialog.setAttribute('data-login-polling-setup', 'true');
+  }
+  
+  // Set up storage listener to stop polling when user logs in (only once)
+  if (!loginPollingStorageListener) {
+    loginPollingStorageListener = (changes, areaName) => {
+      if (areaName === 'local' && changes.authToken) {
+        if (changes.authToken.newValue) {
+          // User logged in - stop polling
+          console.log("[PromptProfile™ Sidepanel] Auth token added, stopping login polling");
+          stopLoginPolling();
+        }
+      }
+    };
+    chrome.storage.onChanged.addListener(loginPollingStorageListener);
+  }
+}
+
+/**
+ * Stops the login status polling
+ */
+function stopLoginPolling() {
+  if (loginCheckInterval) {
+    clearInterval(loginCheckInterval);
+    loginCheckInterval = null;
+    console.log("[PromptProfile™ Sidepanel] Login polling stopped");
+  }
+  
+  // Remove storage listener if it exists
+  if (loginPollingStorageListener) {
+    chrome.storage.onChanged.removeListener(loginPollingStorageListener);
+    loginPollingStorageListener = null;
+  }
+}
+
+/**
  * Updates the user status display based on authentication state
  */
 async function updateUserStatus() {
@@ -925,10 +1149,24 @@ async function updateUserStatus() {
         userStatusEl.textContent = "Not Logged In";
       }
       
+      // Update currentState with subscription status from user profile
+      // Normalize subscription status - only "premium" is premium, everything else is freemium
+      const rawSubscriptionStatus = user.subscription_status || user.subscriptionStatus;
+      const subscriptionStatus = (rawSubscriptionStatus === "premium") ? "premium" : "freemium";
+      console.log("[PromptProfile™ Sidepanel] User profile subscription status:", {
+        raw: rawSubscriptionStatus,
+        normalized: subscriptionStatus
+      });
+      if (currentState) {
+        currentState.subscriptionStatus = subscriptionStatus;
+        console.log("[PromptProfile™ Sidepanel] Updated currentState.subscriptionStatus to:", currentState.subscriptionStatus);
+        // Re-render status to reflect correct plan
+        renderStatus(currentState);
+      }
+      
       // Show/hide crown icon based on subscription status
       const crownIcon = document.getElementById("account-crown-icon");
       if (crownIcon) {
-        const subscriptionStatus = user.subscription_status || user.subscriptionStatus;
         if (subscriptionStatus === "premium") {
           crownIcon.style.display = "block";
         } else {
@@ -1061,6 +1299,18 @@ function registerSectionActionGuards() {
  * Registers event handlers for section info buttons
  */
 function registerInfoButtonHandlers() {
+  // Prompt Creator info button
+  const promptCreatorInfoButton = document.getElementById("prompt-creator-info-btn");
+  const promptCreatorInfoDialog = document.getElementById("prompt-creator-info-dialog");
+  
+  if (promptCreatorInfoButton && promptCreatorInfoDialog) {
+    promptCreatorInfoButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      promptCreatorInfoDialog.showModal();
+    });
+  }
+
   // Prompt Enhancer info button
   const promptEnhancerInfoButton = document.getElementById("prompt-enhancer-info-btn");
   const promptEnhancerInfoDialog = document.getElementById("prompt-enhancer-info-dialog");
@@ -1167,6 +1417,36 @@ async function init() {
     initPromptEnhancer(currentState);
   }
   
+  // Initialize Prompt Creator
+  initPromptCreator(currentState);
+  
+  // Set dependencies for Prompt Creator save to library functionality
+  if (typeof window.setPromptCreatorDependencies === 'function') {
+    window.setPromptCreatorDependencies({
+      renderLibrary,
+      saveState,
+      LIBRARY_SCHEMA_VERSION
+    });
+  }
+  
+  // Make handleSaveToLibrary available globally for Prompt Creator
+  window.handleSaveToLibrary = handleSaveToLibrary;
+  
+  // Set dependencies for Prompt Creator save to library functionality
+  if (typeof window.setPromptCreatorDependencies === 'function') {
+    window.setPromptCreatorDependencies({
+      renderLibrary,
+      saveState,
+      LIBRARY_SCHEMA_VERSION
+    });
+  }
+  
+  // Auto-open login dialog if user is not logged in
+  checkAndShowLoginDialog();
+  
+  // Make handleSaveToLibrary available globally for Prompt Creator
+  window.handleSaveToLibrary = handleSaveToLibrary;
+  
   // Also check storage again after a short delay to catch any updates
   // This is important because enhancements might be generated while the side panel is loading
   schedulePromptCheck(500, "[PromptProfile™ Sidepanel] Found updated prompts in storage after delay, updating and rendering...");
@@ -1219,8 +1499,31 @@ async function init() {
 
   const activeConversation = getActiveConversation(currentState);
 
-  // Fetch and display real usage data from server
-  await updateEnhancementsDisplay();
+  // Fetch and display real usage data from server (only if logged in)
+  // Check if user is logged in before fetching usage
+  try {
+    const authResult = await new Promise((resolve) => {
+      chrome.storage.local.get(["authToken"], (items) => {
+        resolve(items || { authToken: null });
+      });
+    });
+    
+    if (authResult.authToken) {
+      await updateEnhancementsDisplay();
+    } else {
+      // Not logged in - set defaults and render status
+      if (currentState) {
+        currentState.enhancementsUsed = 0;
+        currentState.enhancementsLimit = 10;
+        currentState.subscriptionStatus = "freemium";
+      }
+      renderStatus(currentState);
+    }
+  } catch (error) {
+    console.error("[PromptProfile™ Sidepanel] Error checking auth status:", error);
+    // On error, still try to update (will handle not logged in case)
+    await updateEnhancementsDisplay();
+  }
 
   // Ensure activePlatform is always set from settings.model before rendering
   if (currentState.settings?.model) {
@@ -1319,10 +1622,19 @@ async function init() {
   // Also try registerAccountHandlers (but don't depend on it)
   try {
     console.log("[PromptProfile™ Sidepanel] Calling registerAccountHandlers...");
-  registerAccountHandlers();
+    registerAccountHandlers();
     console.log("[PromptProfile™ Sidepanel] registerAccountHandlers completed");
   } catch (error) {
     console.error("[PromptProfile™ Sidepanel] Error in registerAccountHandlers (non-fatal):", error);
+    // Try again after a delay if it failed
+    setTimeout(() => {
+      try {
+        registerAccountHandlers();
+        console.log("[PromptProfile™ Sidepanel] registerAccountHandlers retry succeeded");
+      } catch (retryError) {
+        console.error("[PromptProfile™ Sidepanel] registerAccountHandlers retry also failed:", retryError);
+      }
+    }, 500);
   }
   initTabs();
   registerSectionActionGuards();

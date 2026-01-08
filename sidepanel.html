@@ -6,6 +6,7 @@
     <title>PromptProfile™ Prompt Enhancer</title>
     <link rel="stylesheet" href="styles/sidepanel.css" />
     <link rel="stylesheet" href="styles/promptEnhancer.css" />
+    <link rel="stylesheet" href="styles/promptCreator.css" />
     <link rel="stylesheet" href="styles/sideChat.css" />
     <link rel="stylesheet" href="styles/LoginMenu.css" />
     <link rel="stylesheet" href="styles/promptLibrary.css" />
@@ -66,6 +67,28 @@
           <div class="status-card__label">Give Feedback</div>
           <button class="btn btn--primary" id="email-us-button" type="button">Email Us</button>
         </div>
+      </section>
+
+      <section class="panel__section panel__section--creator">
+        <details class="section-collapsible">
+          <summary class="section-heading">
+            <div class="section-heading__title-group">
+              <div class="section-heading__title-with-badge">
+                <h2>Prompt Creator</h2>
+                <span class="prompt-creator-free-badge" id="prompt-creator-free-badge" style="display: none;">Unlimited free uses!</span>
+              </div>
+              <button class="library-info-btn" id="prompt-creator-info-btn" type="button" aria-label="Prompt Creator information">
+                <span class="library-info-btn__icon">i</span>
+              </button>
+            </div>
+          </summary>
+
+          <div class="section-content">
+            <div id="prompt-creator-content">
+              <!-- Content will be injected by promptCreator.js -->
+            </div>
+          </div>
+        </details>
       </section>
 
       <section class="panel__section panel__section--prompt">
@@ -224,6 +247,15 @@
             <input type="range" id="setting-complexity" min="1" max="3" value="2" />
             <span class="range-output" data-for="setting-complexity">Medium</span>
             <span class="form-field__description" id="complexity-description"></span>
+          </label>
+
+          <label class="form-field form-field--toggle">
+            <div class="form-field__label-group">
+              <span class="form-field__label">Real-Time Prompt Evaluation</span>
+              <span class="form-field__description">Get instant feedback on your prompts as you type, including score, strengths, issues, and suggestions</span>
+            </div>
+            <input type="checkbox" id="setting-real-time-evaluation" />
+            <span class="toggle-switch"></span>
           </label>
 
         </div>
@@ -453,6 +485,32 @@
             </ol>
             <p class="library-info-section__text">
               Once enabled, your prompt library will automatically sync to all devices where you're signed in.
+            </p>
+          </div>
+        </div>
+        <footer class="modal__footer">
+          <button class="btn btn--primary" value="confirm">Got it</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="prompt-creator-info-dialog" class="modal modal--dark">
+      <form method="dialog" class="modal__content">
+        <header class="modal__header">
+          <h2>Prompt Creator Information</h2>
+          <button class="btn btn--ghost modal__close" value="cancel" aria-label="Close information">
+            <svg class="icon icon--close" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7.05 6.34a1 1 0 0 1 1.41 0L12 9.88l3.54-3.54a1 1 0 1 1 1.41 1.41L13.41 11.3l3.54 3.54a1 1 0 0 1-1.41 1.41L12 12.7l-3.54 3.54a1 1 0 0 1-1.41-1.41l3.54-3.54-3.54-3.54a1 1 0 0 1 0-1.41Z" />
+            </svg>
+          </button>
+        </header>
+        <div class="modal__body library-info-content">
+          <div class="library-info-section">
+            <p class="library-info-section__text">
+              The Prompt Creator helps you build effective prompts using pre-made templates. Simply browse categories, select a template, fill in the blanks, and insert your completed prompt into the chat. No prompt engineering knowledge required - just choose what you need and customize it to your situation.
+            </p>
+            <p class="library-info-section__text" style="margin-top: 12px; font-weight: 500;">
+              Best of all, the Prompt Creator is completely free to use with unlimited uses - no limits, no restrictions!
             </p>
           </div>
         </div>

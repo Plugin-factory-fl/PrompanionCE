@@ -290,6 +290,85 @@ input[type="range"]:focus-visible {
   animation: settingsFadeIn 200ms ease;
 }
 
+/* Toggle Switch Styles */
+.form-field--toggle {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.form-field--toggle .form-field__label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.form-field--toggle input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.toggle-switch::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 12px;
+  transition: background var(--settings-transition-speed) var(--settings-transition-ease);
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform var(--settings-transition-speed) var(--settings-transition-ease),
+              box-shadow var(--settings-transition-speed) var(--settings-transition-ease);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.form-field--toggle input[type="checkbox"]:checked + .toggle-switch::before {
+  background: var(--color-primary);
+}
+
+.form-field--toggle input[type="checkbox"]:checked + .toggle-switch::after {
+  transform: translateX(20px);
+}
+
+.form-field--toggle input[type="checkbox"]:focus-visible + .toggle-switch {
+  outline: 2px solid var(--settings-focus-outline);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+.form-field--toggle input[type="checkbox"]:hover + .toggle-switch::before {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+.form-field--toggle input[type="checkbox"]:checked:hover + .toggle-switch::before {
+  background: var(--color-primary-strong);
+}
+
 /* Responsive Design */
 @media (max-width: 360px) {
   .model-grid {

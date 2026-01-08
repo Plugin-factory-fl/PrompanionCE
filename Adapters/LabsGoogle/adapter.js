@@ -461,6 +461,9 @@ async function handleRefineButtonClick(e) {
     return false;
   }
 
+  // Save current prompt version before refining
+  AdapterBase.savePromptVersion(composerNode, promptText);
+
   console.log("[PromptProfile™ LabsGoogle] Text to refine:", promptText.substring(0, 50));
   enhanceActionInFlight = true;
   
@@ -480,6 +483,9 @@ async function handleRefineButtonClick(e) {
       
       const success = setComposerText(composerNode, refinedText);
       console.log("[PromptProfile™ LabsGoogle] Insertion success:", success);
+      
+      // Show undo button after successful refinement
+      AdapterBase.showUndoButton(composerNode);
       
       hideEnhanceTooltip();
       enhanceTooltipDismissed = true;

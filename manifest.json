@@ -41,7 +41,8 @@
         "sidepanel.html",
         "styles/sidepanel.css",
         "styles/AdapterStyles.css",
-        "Assets/icons/icon48.png"
+        "Assets/icons/icon48.png",
+        "Source/promptEvaluator.js"
       ],
       "matches": ["<all_urls>"]
     }
@@ -52,14 +53,14 @@
       "js": ["scripts/injector.js"],
       "run_at": "document_idle"
     },
-      {
-        "matches": [
-          "https://sora.chatgpt.com/*",
-          "https://*.sora.chatgpt.com/*"
-        ],
-        "js": ["Base/AdapterBase.js", "Adapters/Sora/adapter.js"],
-        "run_at": "document_idle"
-      },
+    {
+      "matches": [
+        "https://sora.chatgpt.com/*",
+        "https://*.sora.chatgpt.com/*"
+      ],
+      "js": ["Source/promptEvaluator.js", "Base/AdapterBase.js", "Adapters/Sora/adapter.js"],
+      "run_at": "document_idle"
+    },
       {
         "matches": [
           "https://chatgpt.com/*",
@@ -67,7 +68,7 @@
           "https://chat.openai.com/*",
           "https://*.chat.openai.com/*"
         ],
-        "js": ["Base/AdapterBase.js", "Adapters/ChatGPT/adapter.js"],
+        "js": ["Source/promptEvaluator.js", "Base/AdapterBase.js", "Adapters/ChatGPT/adapter.js"],
         "run_at": "document_idle"
       },
       {
@@ -77,7 +78,7 @@
           "https://x.com/*",
           "https://*.x.com/*"
         ],
-        "js": ["Base/AdapterBase.js", "Adapters/Grok/adapter.js"],
+        "js": ["Source/promptEvaluator.js", "Base/AdapterBase.js", "Adapters/Grok/adapter.js"],
         "run_at": "document_idle"
       },
     {
@@ -85,7 +86,7 @@
         "https://claude.ai/*",
         "https://*.claude.ai/*"
       ],
-      "js": ["Base/AdapterBase.js", "Adapters/Claude/adapter.js"],
+      "js": ["Source/promptEvaluator.js", "Base/AdapterBase.js", "Adapters/Claude/adapter.js"],
       "run_at": "document_idle"
     },
     {
@@ -93,7 +94,7 @@
         "https://gemini.google.com/*",
         "https://*.gemini.google.com/*"
       ],
-      "js": ["Base/AdapterBase.js", "Adapters/Gemini/adapter.js"],
+      "js": ["Source/promptEvaluator.js", "Base/AdapterBase.js", "Adapters/Gemini/adapter.js"],
       "run_at": "document_idle"
     },
     {
@@ -102,7 +103,7 @@
         "https://perplexity.ai/*",
         "https://*.perplexity.ai/*"
       ],
-      "js": ["Base/AdapterBase.js", "Adapters/Perplexity/adapter.js"],
+      "js": ["Source/promptEvaluator.js", "Base/AdapterBase.js", "Adapters/Perplexity/adapter.js"],
       "run_at": "document_idle"
     },
     {
@@ -120,7 +121,7 @@
         "https://deepseek.com/*",
         "https://*.deepseek.com/*"
       ],
-      "js": ["Base/AdapterBase.js", "Adapters/Deepseek/adapter.js"],
+      "js": ["Source/promptEvaluator.js", "Base/AdapterBase.js", "Adapters/Deepseek/adapter.js"],
       "run_at": "document_idle"
     },
     {
@@ -129,6 +130,39 @@
         "https://*.labs.google.com/*"
       ],
       "js": ["Base/AdapterBase.js", "Adapters/LabsGoogle/adapter.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.midjourney.com/*",
+        "https://*.midjourney.com/*"
+      ],
+      "js": ["Base/AdapterBase.js", "Adapters/Midjourney/adapter.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.meta.ai/*",
+        "https://*.meta.ai/*"
+      ],
+      "js": ["Source/promptEvaluator.js", "Base/AdapterBase.js", "Adapters/MetaAI/adapter.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://poe.com/*",
+        "https://*.poe.com/*"
+      ],
+      "js": ["Source/promptEvaluator.js", "Base/AdapterBase.js", "Adapters/Poe/adapter.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://copilot.microsoft.com/*",
+        "https://*.copilot.microsoft.com/*",
+        "https://www.bing.com/chat/*"
+      ],
+      "js": ["Source/promptEvaluator.js", "Base/AdapterBase.js", "Adapters/Copilot/adapter.js"],
       "run_at": "document_idle"
     }
   ],

@@ -13,6 +13,44 @@ if (typeof AdapterBase === "undefined") {
   throw new Error("AdapterBase must be loaded before adapter.js");
 }
 
+// Evaluation module loaded via script tag, available on window.PromptEvaluator
+let PromptEvaluator = null;
+
+function loadEvaluationModule() {
+  // Since promptEvaluator.js is now loaded as a content script in manifest.json,
+  // it should be available on window.PromptEvaluator immediately
+  if (PromptEvaluator || (typeof window !== 'undefined' && window.PromptEvaluator && 
+      typeof window.PromptEvaluator.evaluatePrompt === 'function')) {
+    PromptEvaluator = window.PromptEvaluator;
+    console.log("[PromptProfile™] Evaluation module already loaded");
+    return Promise.resolve();
+  }
+  
+  // If not immediately available, wait a bit for it to load
+  return new Promise((resolve, reject) => {
+    let checkCount = 0;
+    const checkInterval = setInterval(() => {
+      checkCount++;
+      if (typeof window !== 'undefined' && window.PromptEvaluator && 
+          typeof window.PromptEvaluator.evaluatePrompt === 'function') {
+        clearInterval(checkInterval);
+        PromptEvaluator = window.PromptEvaluator;
+        console.log("[PromptProfile™] ✓ PromptEvaluator loaded successfully");
+        console.log("[PromptProfile™] PromptEvaluator functions:", {
+          evaluatePrompt: typeof PromptEvaluator.evaluatePrompt,
+          getScoreColorClass: typeof PromptEvaluator.getScoreColorClass,
+          getScoreLabel: typeof PromptEvaluator.getScoreLabel
+        });
+        resolve();
+      } else if (checkCount > 50) { // Wait up to 5 seconds
+        clearInterval(checkInterval);
+        console.warn("[PromptProfile™] PromptEvaluator not found after waiting");
+        reject(new Error("PromptEvaluator not found"));
+      }
+    }, 100);
+  });
+}
+
 const BUTTON_ID = AdapterBase.BUTTON_ID;
 const BUTTON_CLASS = AdapterBase.BUTTON_CLASS;
 const SELECTION_TOOLBAR_ID = AdapterBase.SELECTION_TOOLBAR_ID;
@@ -36,6 +74,9 @@ let selectionAskInFlight = false;
 let tooltipClickInProgress = false;
 // Selection toolbar variables moved to AdapterBase
 let highlightObserver = null;
+
+// Evaluation variables
+let realTimeEvaluationEnabled = false;
 
 // Generic styles moved to styles/AdapterStyles.css
 // Styles are loaded via ensureStyle() function
@@ -1159,6 +1200,14 @@ function init() {
   // Initialize sticky button (no injection logic needed)
   AdapterBase.initStickyButton({ position: 'bottom-right', offsetX: 250, offsetY: 250 });
   
+  // Load evaluation setting and module
+  AdapterBase.loadEvaluationSetting().then(() => {
+    realTimeEvaluationEnabled = AdapterBase.realTimeEvaluationEnabled;
+  });
+  loadEvaluationModule().catch(err => {
+    console.warn("[PromptProfile™] Could not load evaluation module:", err);
+  });
+  
   // Setup selection toolbar and enhance tooltip
   AdapterBase.requestSelectionToolbarUpdate();
   const composer = locateComposer();
@@ -1289,12 +1338,26 @@ function bootstrap() {
 // Generic tooltip functions have been moved to AdapterBase
 // Use AdapterBase.attachTooltip(), AdapterBase.showTooltip(), etc.
 
-function setupEnhanceTooltip(input, container) {
+async function setupEnhanceTooltip(input, container) {
   if (!input || enhanceTooltipActiveTextarea === input) return;
   teardownEnhanceTooltip();
   enhanceTooltipActiveTextarea = input;
   enhanceTooltipDismissed = false;
   lastEnhanceTextSnapshot = "";
+  // Load evaluation setting
+  await AdapterBase.loadEvaluationSetting();
+  realTimeEvaluationEnabled = AdapterBase.realTimeEvaluationEnabled;
+  console.log("[PromptProfile™] Evaluation enabled in setupEnhanceTooltip:", realTimeEvaluationEnabled);
+  // Load evaluation module
+  loadEvaluationModule().then(() => {
+    // Check window.PromptEvaluator directly after load
+    if (window.PromptEvaluator && !PromptEvaluator) {
+      PromptEvaluator = window.PromptEvaluator;
+      console.log("[PromptProfile™] PromptEvaluator assigned from window after module load");
+    }
+  }).catch(err => {
+    console.warn("[PromptProfile™] Could not load evaluation module:", err);
+  });
   ensureEnhanceTooltipElement();
   bindInputEvents(input);
 }
@@ -1317,6 +1380,36 @@ function ensureEnhanceTooltipElement() {
   if (!enhanceTooltipElement) {
     enhanceTooltipElement = document.createElement("div");
     enhanceTooltipElement.className = "promptprofile-enhance-tooltip";
+    
+    // Evaluation score bar section
+    const evaluationSection = document.createElement("div");
+    evaluationSection.className = "enhance-tooltip__evaluation";
+    
+    // Title for evaluation section
+    const evaluationTitle = document.createElement("div");
+    evaluationTitle.className = "evaluation-score-bar__title";
+    evaluationTitle.textContent = "Your Prompt Score:";
+    evaluationSection.appendChild(evaluationTitle);
+    
+    const scoreBar = document.createElement("div");
+    scoreBar.className = "evaluation-score-bar";
+    const scoreBarFill = document.createElement("div");
+    scoreBarFill.className = "evaluation-score-bar__fill";
+    scoreBarFill.style.width = "0%";
+    const scoreBarLabel = document.createElement("span");
+    scoreBarLabel.className = "evaluation-score-bar__label evaluating";
+    scoreBarLabel.textContent = "Evaluating...";
+    scoreBar.appendChild(scoreBarFill);
+    scoreBar.appendChild(scoreBarLabel);
+    const scoreBarBlurb = document.createElement("div");
+    scoreBarBlurb.className = "evaluation-score-bar__blurb";
+    scoreBarBlurb.textContent = "";
+    evaluationSection.appendChild(scoreBar);
+    evaluationSection.appendChild(scoreBarBlurb);
+    
+    // Buttons row
+    const buttonRow = document.createElement("div");
+    buttonRow.className = "promptprofile-enhance-tooltip__row";
     const dismiss = document.createElement("button");
     dismiss.type = "button";
     dismiss.className = "promptprofile-enhance-tooltip__dismiss";
@@ -1332,7 +1425,11 @@ function ensureEnhanceTooltipElement() {
     AdapterBase.setButtonTextContent(action, "Refine");
     console.log("[PromptProfile™] handleRefineButtonClick function exists:", typeof handleRefineButtonClick);
     action.addEventListener("click", handleRefineButtonClick);
-    enhanceTooltipElement.append(dismiss, action);
+    console.log("[PromptProfile™] Click handler attached, button:", action);
+    buttonRow.append(dismiss, action);
+    
+    enhanceTooltipElement.append(evaluationSection, buttonRow);
+    console.log("[PromptProfile™] Enhance tooltip element created");
   }
   if (!enhanceTooltipElement.isConnected) {
     document.body.append(enhanceTooltipElement);
@@ -1367,6 +1464,10 @@ function handleRefineButtonClick(e) {
   if (!promptText) {
     return;
   }
+  
+  // Save current prompt version before refining
+  AdapterBase.savePromptVersion(composerNode, promptText);
+  
   enhanceActionInFlight = true;
   // Don't hide tooltip yet - wait to see if there's a limit error
   requestPromptEnhancement(promptText)
@@ -1398,6 +1499,10 @@ function handleRefineButtonClick(e) {
         ? result.optionA.trim() 
         : promptText;
       setComposerText(composerNode, refinedText);
+      
+      // Show undo button after successful refinement
+      AdapterBase.showUndoButton(composerNode);
+      
       enhanceActionInFlight = false;
     })
     .catch((error) => {
@@ -1447,6 +1552,8 @@ function handleInputChange() {
   if (enhanceTooltipElement?.classList.contains("is-visible") && !tooltipClickInProgress) {
     positionEnhanceTooltip();
   }
+  
+  // Evaluation will be triggered when tooltip appears (in scheduleEnhanceTooltip)
 }
 
 function handleInputBlur() {
@@ -1455,23 +1562,197 @@ function handleInputBlur() {
   hideEnhanceTooltip();
 }
 
+
+/**
+ * Updates the evaluation score bar in the refine tooltip
+ */
+function updateTooltipEvaluation() {
+  if (!enhanceTooltipElement || !enhanceTooltipActiveTextarea) return;
+  if (!realTimeEvaluationEnabled) {
+    console.log("[PromptProfile™] Evaluation disabled, skipping");
+    return;
+  }
+  
+  const promptText = extractInputText().trim();
+  if (promptText.length < 3) return;
+  
+  // Get score bar elements
+  const scoreBarFill = enhanceTooltipElement.querySelector(".evaluation-score-bar__fill");
+  const scoreBarLabel = enhanceTooltipElement.querySelector(".evaluation-score-bar__label");
+  const scoreBarBlurb = enhanceTooltipElement.querySelector(".evaluation-score-bar__blurb");
+  
+  if (!scoreBarFill || !scoreBarLabel) {
+    console.warn("[PromptProfile™] Score bar elements not found");
+    return;
+  }
+  
+  // Show "Evaluating..." state
+  scoreBarLabel.textContent = "Evaluating...";
+  scoreBarLabel.classList.add("evaluating");
+  scoreBarFill.style.width = "0%";
+  
+  // Always check window.PromptEvaluator directly - it's the source of truth
+  console.log("[PromptProfile™] Checking for PromptEvaluator...");
+  console.log("[PromptProfile™] window.PromptEvaluator:", window.PromptEvaluator);
+  console.log("[PromptProfile™] typeof window.PromptEvaluator:", typeof window.PromptEvaluator);
+  if (window.PromptEvaluator) {
+    console.log("[PromptProfile™] window.PromptEvaluator.evaluatePrompt:", typeof window.PromptEvaluator.evaluatePrompt);
+  }
+  
+  // Check window first (most reliable source)
+  if (typeof window !== 'undefined' && window.PromptEvaluator && 
+      typeof window.PromptEvaluator.evaluatePrompt === 'function') {
+    PromptEvaluator = window.PromptEvaluator;
+    console.log("[PromptProfile™] ✓ Found PromptEvaluator on window, using it");
+    performTooltipEvaluation(promptText, scoreBarFill, scoreBarLabel, scoreBarBlurb, window.PromptEvaluator);
+    return;
+  } 
+  // Fallback to local variable
+  else if (PromptEvaluator && typeof PromptEvaluator.evaluatePrompt === 'function') {
+    console.log("[PromptProfile™] Using local PromptEvaluator");
+    performTooltipEvaluation(promptText, scoreBarFill, scoreBarLabel, scoreBarBlurb, PromptEvaluator);
+    return;
+  }
+  
+  // If not available, wait a bit and check again (script might still be loading)
+  console.log("[PromptProfile™] PromptEvaluator not immediately available, waiting...");
+  let checkCount = 0;
+  const checkInterval = setInterval(() => {
+    checkCount++;
+    console.log(`[PromptProfile™] Check ${checkCount}: window.PromptEvaluator =`, window.PromptEvaluator);
+    if (typeof window !== 'undefined' && window.PromptEvaluator && 
+        typeof window.PromptEvaluator.evaluatePrompt === 'function') {
+      clearInterval(checkInterval);
+      PromptEvaluator = window.PromptEvaluator;
+      console.log("[PromptProfile™] ✓ Found PromptEvaluator after waiting");
+      performTooltipEvaluation(promptText, scoreBarFill, scoreBarLabel, scoreBarBlurb, window.PromptEvaluator);
+    } else if (checkCount > 30) { // Wait up to 3 seconds
+      clearInterval(checkInterval);
+      console.warn("[PromptProfile™] ✗ PromptEvaluator not found after waiting 3 seconds");
+      console.warn("[PromptProfile™] Final check - window.PromptEvaluator:", window.PromptEvaluator);
+      scoreBarLabel.textContent = "Evaluation unavailable";
+      scoreBarLabel.classList.remove("evaluating");
+      if (scoreBarBlurb) {
+        scoreBarBlurb.textContent = "";
+      }
+    }
+  }, 100);
+}
+
+/**
+ * Performs evaluation and updates score bar
+ */
+function performTooltipEvaluation(promptText, scoreBarFill, scoreBarLabel, scoreBarBlurb, evaluator = null) {
+  const eval = evaluator || PromptEvaluator || window.PromptEvaluator;
+  
+  if (!eval || typeof eval.evaluatePrompt !== 'function') {
+    console.error("[PromptProfile™] No valid evaluator provided");
+    scoreBarLabel.textContent = "Evaluation unavailable";
+    scoreBarLabel.classList.remove("evaluating");
+    if (scoreBarBlurb) {
+      scoreBarBlurb.textContent = "";
+    }
+    return;
+  }
+  
+  try {
+    const result = eval.evaluatePrompt(promptText);
+    console.log("[PromptProfile™] Evaluation result:", result);
+    
+    // Update score bar
+    const score = result.score;
+    const scoreClass = (eval.getScoreColorClass && typeof eval.getScoreColorClass === 'function')
+      ? eval.getScoreColorClass(score) 
+      : (score >= 80 ? 'score-excellent' : score >= 60 ? 'score-good' : score >= 40 ? 'score-fair' : 'score-poor');
+    const scoreLabel = (eval.getScoreLabel && typeof eval.getScoreLabel === 'function')
+      ? eval.getScoreLabel(score)
+      : (score >= 80 ? 'Excellent' : score >= 60 ? 'Good' : score >= 40 ? 'Fair' : 'Needs Improvement');
+    
+    // Update fill bar
+    scoreBarFill.style.width = `${score}%`;
+    scoreBarFill.className = `evaluation-score-bar__fill ${scoreClass}`;
+    
+    // Update label
+    scoreBarLabel.textContent = `${score} - ${scoreLabel}`;
+    scoreBarLabel.classList.remove("evaluating");
+    
+    // Update blurb
+    const blurb = (eval.getScoreBlurb && typeof eval.getScoreBlurb === 'function')
+      ? eval.getScoreBlurb(score)
+      : (score >= 80 ? 'Absolutely acceptable!' : score >= 50 ? 'It might work...' : 'Not well engineered.');
+    if (scoreBarBlurb) {
+      scoreBarBlurb.textContent = blurb;
+    }
+    
+    console.log("[PromptProfile™] Score bar updated:", score, scoreLabel, blurb);
+    
+  } catch (error) {
+    console.error("[PromptProfile™] Evaluation error:", error);
+    scoreBarLabel.textContent = "Evaluation error";
+    scoreBarLabel.classList.remove("evaluating");
+    if (scoreBarBlurb) {
+      scoreBarBlurb.textContent = "";
+    }
+  }
+}
+
 function scheduleEnhanceTooltip() {
   clearTimeout(enhanceTooltipTimer);
   enhanceTooltipTimer = window.setTimeout(() => {
     if (!enhanceTooltipActiveTextarea) return;
     const wordCount = extractInputText().trim().split(/\s+/).filter(Boolean).length;
-    if (wordCount >= 3 && !enhanceTooltipDismissed) showEnhanceTooltip();
+    if (wordCount >= 3 && !enhanceTooltipDismissed) {
+      showEnhanceTooltip();
+      // Trigger evaluation when tooltip appears
+      // Re-check evaluation setting in case it changed
+      if (AdapterBase.realTimeEvaluationEnabled !== undefined) {
+        realTimeEvaluationEnabled = AdapterBase.realTimeEvaluationEnabled;
+      }
+      console.log("[PromptProfile™] Scheduling evaluation, enabled:", realTimeEvaluationEnabled);
+      if (realTimeEvaluationEnabled) {
+        // Small delay to ensure tooltip is fully rendered
+        setTimeout(() => {
+          updateTooltipEvaluation();
+        }, 50);
+      }
+    }
   }, 1000);
 }
 
 function showEnhanceTooltip() {
   if (!enhanceTooltipElement) {
     ensureEnhanceTooltipElement();
-    if (!enhanceTooltipElement) return;
+    if (!enhanceTooltipElement) {
+      console.error("[PromptProfile™] Cannot show tooltip - element not found");
+      return;
+    }
   }
+  
+  // Ensure button row is always visible
+  const buttonRow = enhanceTooltipElement.querySelector(".promptprofile-enhance-tooltip__row");
+  if (buttonRow) {
+    buttonRow.style.display = "flex";
+  }
+  
+  // Show/hide evaluation section based on setting
+  const evaluationSection = enhanceTooltipElement.querySelector(".enhance-tooltip__evaluation");
+  if (evaluationSection) {
+    if (realTimeEvaluationEnabled) {
+      evaluationSection.classList.add("is-visible");
+      enhanceTooltipElement.classList.add("has-evaluation");
+    } else {
+      evaluationSection.classList.remove("is-visible");
+      enhanceTooltipElement.classList.remove("has-evaluation");
+    }
+  } else {
+    enhanceTooltipElement.classList.remove("has-evaluation");
+  }
+  
   positionEnhanceTooltip();
   enhanceTooltipElement.classList.add("is-visible");
   attachTooltipResizeHandler();
+  
+  console.log("[PromptProfile™] Tooltip shown, button row:", buttonRow, "evaluation section:", evaluationSection);
 }
 
 function hideEnhanceTooltip() {

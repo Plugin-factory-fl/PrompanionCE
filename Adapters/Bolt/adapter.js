@@ -1017,6 +1017,10 @@ function handleRefineButtonClick(e) {
   if (!promptText) {
     return;
   }
+  
+  // Save current prompt version before refining
+  AdapterBase.savePromptVersion(composerNode, promptText);
+  
   enhanceActionInFlight = true;
   // Don't hide tooltip yet - wait to see if there's a limit error
   console.log("[PromptProfile™] Requesting prompt enhancement...");
@@ -1049,6 +1053,10 @@ function handleRefineButtonClick(e) {
         ? result.optionA.trim() 
         : promptText;
       setComposerText(composerNode, refinedText);
+      
+      // Show undo button after successful refinement
+      AdapterBase.showUndoButton(composerNode);
+      
       enhanceActionInFlight = false;
     })
     .catch((error) => {

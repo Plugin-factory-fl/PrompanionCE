@@ -74,6 +74,24 @@
   margin: 0;
 }
 
+.section-heading__title-with-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.prompt-creator-free-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #20d4b0;
+  background: rgba(32, 212, 176, 0.15);
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  border: 1px solid rgba(32, 212, 176, 0.3);
+}
+
 /* Library Info Button */
 .library-info-btn {
   width: 20px;
